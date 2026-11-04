@@ -3173,8 +3173,8 @@ function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?
   const R=$('tdRes');R.hidden=false;R.innerHTML=`<div class="tdrbox"><h2>${win?'守住家園了!':T.mode==='endless'?'無盡模式結束':'城門被攻破了…'}</h2>
    ${T.mode==='normal'&&win?`<div class="tdstars">${[0,1,2].map(i=>`<span class="${i<stars?'':'off'}">★</span>`).join('')}</div>`:''}
    <p>${T.mode==='endless'?`撐過 <b>${Math.max(0,cl)}</b> 波`:`第 ${Math.min(T.wave,TDW)} / ${TDW} 波 · 城門剩 ${T.hp} / ${TDHP}`} · 擊倒 ${T.kills} 隻</p>
-   <ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul>${win?'':tdTips()}<button class="go" id="tdBack">回到城鎮</button></div>`;iconize(R);$('tdBack').onclick=()=>{sfx('click');tdQuit()};R.querySelectorAll('[data-tgo]').forEach(b=>b.onclick=()=>{sfx('click');const [s2,tb]=b.dataset.tgo.split(':');tdQuit();setTimeout(()=>{closeSheet();openSheet(s2,tb||null)},60)})}
-function tdTips(){const T=TD,L=[],ow=owned(),mx=ow.reduce((a,k)=>SV.pets[k].lv>a.lv?{k,lv:SV.pets[k].lv}:a,{k:null,lv:0});
+   <ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul>${!win?tdTips():T.mode==='normal'&&stars<3?tdTips(`💪 想拿 3 星?城門剩 15 以上就是 3 星`):''}<button class="go" id="tdBack">回到城鎮</button></div>`;iconize(R);$('tdBack').onclick=()=>{sfx('click');tdQuit()};R.querySelectorAll('[data-tgo]').forEach(b=>b.onclick=()=>{sfx('click');const [s2,tb]=b.dataset.tgo.split(':');tdQuit();setTimeout(()=>{closeSheet();openSheet(s2,tb||null)},60)})}
+function tdTips(ttl){const T=TD,L=[],ow=owned(),mx=ow.reduce((a,k)=>SV.pets[k].lv>a.lv?{k,lv:SV.pets[k].lv}:a,{k:null,lv:0});
   const rec=new Set();if(T.tone!=='rainbow')for(const f of TDCNT[T.tone])for(const e in BEATS)if(BEATS[e].includes(f))rec.add(e);const recA=[...rec],haveRec=recA.some(e=>ow.some(k=>PETS[k].el===e));
   if(recA.length)L.push({ic:'🎯',t:`這場怪物多為 ${TDCNT[T.tone].map(e=>EL[e].n).join('、')}系,推薦帶 ${recA.map(e=>EL[e].n).join('、')}系萌獸${haveRec?'(你已經有,記得擺上場!)':',你還沒有,去召喚看看!'}`,go:haveRec?null:'summon'});
   if(ow.length<8)L.push({ic:'🥚',t:'獲得更多萌獸:同一隻可以重複放,但屬性越多越好剋怪,去召喚更多夥伴吧!',go:'summon'});
@@ -3184,7 +3184,7 @@ function tdTips(){const T=TD,L=[],ow=owned(),mx=ow.reduce((a,k)=>SV.pets[k].lv>a
   const tw=Object.keys(SV.twLv||{});if(!tw.length)L.push({ic:'🏰',t:'到主城蓋城牆砲塔,守塔時也能放上場幫忙',go:'castle:wall'});else if(tw.every(k=>towerLv(k)<3))L.push({ic:'🏰',t:'升級城牆砲塔,守塔時砲塔也會變強',go:'castle:wall'});
   const lk=T.lk||{boss:0,fly:0,n:0};L.push({ic:'💡',t:lk.boss>=lk.n*.4&&lk.boss?'頭目會震暈附近的萌獸,分散擺放,把落石和守護留給頭目':lk.fly>=lk.n*.4&&lk.fly?'飛行怪只有遠程萌獸打得到,多放遠程萌獸':'先把主力萌獸升到 3 級:射程 +30%、攻擊 ×2'});
   const tip=L.pop(),pick=[...L.slice(0,2),tip];
-  return `<div class="tdtips"><b>💪 變強建議</b>${pick.map(x=>`<div class="tdtipr"><span>${x.ic} ${x.t}</span>${x.go?`<button class="mini go" data-tgo="${x.go}">前往</button>`:''}</div>`).join('')}</div>`}
+  return `<div class="tdtips"><b>${ttl||'💪 變強建議'}</b>${pick.map(x=>`<div class="tdtipr"><span>${x.ic} ${x.t}</span>${x.go?`<button class="mini go" data-tgo="${x.go}">前往</button>`:''}</div>`).join('')}</div>`}
 // ---- towers / enemies
 function tdTower(k,slot){const P=PETS[k],s=SV.pets[k],S=stat(k);return {k,slot,lv:1,spent:tdCost(k),cd:.5,skT:P.sk.cd*.8,atk:S.atk,crit:S.crit||.05,rate:P.rate,el:P.el,far:P.range!=='melee',img:imgName(k),face:1,anim:rnd()*9,hit:0,stun:0,q:qOf(k)}}
 function tdWTower(tk,slot){const T2=TOWERS[tk],lv=towerLv(tk);return {k:'wt:'+tk,wt:tk,slot,lv:1,plv:lv,spent:tdWCost(tk),cd:.5,skT:1e9,atk:T2.dmg*(1+.35*(lv-1))*(3+.5*(SV.castle||1)),crit:.05,rate:T2.rate,el:T2.el,far:true,img:T2.img,face:1,anim:rnd()*9,hit:0,stun:0,q:0}}
