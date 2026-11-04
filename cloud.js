@@ -20,4 +20,14 @@ function coll(cpath,f=[],o=null,n=100){const q={path:cpath,
 const db={doc,collection:coll};
 const user={id:async()=>{await ready;return uid},me:async()=>({name:''}),can:async()=>true,isOwner:()=>false,canEdit:()=>false,profiles:async()=>({})};
 window.claude={use:async k=>{try{await ready}catch(e){console.warn('MOE: 雲端登入失敗',e);return null}return k==='db'?db:k==='user'?user:null}};
-window.MOE_SB=sb;})();
+window.MOE_SB=sb;
+// 帳號密碼:帳號會對應成內部用的信箱(不會寄信),第一次建立帳號時直接綁定目前的匿名帳號,進度不變
+const em=u=>String(u).trim().toLowerCase()+'@player.moe-planet.app';
+const msg=e=>{const m=(e&&(e.message||e.code))||'';return /already|exists|registered/i.test(m)?'這個帳號已經有人使用':/Invalid login/i.test(m)?'帳號或密碼錯誤':/Password should|weak/i.test(m)?'密碼太簡單,請至少 6 個字元並混合英數':/rate|too many/i.test(m)?'嘗試太多次,請稍後再試':/confirm/i.test(m)?'伺服器需要關閉「Confirm email」設定':m||'發生錯誤,請稍後再試'};
+window.MOE_AUTH={
+  async info(){await ready.catch(()=>{});const {data:{user}}=await sb.auth.getUser();if(!user)return {uid:null};const e=user.email||'';return {uid:user.id,anon:!e,name:e?e.split('@')[0]:null,pending:!!user.new_email&&!e}},
+  async register(u,p){const {data,error}=await sb.auth.updateUser({email:em(u),password:p});if(error)throw new Error(msg(error));if(!data.user.email)throw new Error('伺服器需要關閉「Confirm email」設定才能建立帳號')},
+  async login(u,p){const {error}=await sb.auth.signInWithPassword({email:em(u),password:p});if(error)throw new Error(msg(error))},
+  async logout(){await sb.auth.signOut()},
+  async changePw(p){const {error}=await sb.auth.updateUser({password:p});if(error)throw new Error(msg(error))}};
+})();

@@ -392,6 +392,8 @@ button.red{background:linear-gradient(#ff8a8a,#e04a4a);color:#fff;box-shadow:0 4
 #a2hs .x{background:none;border:0;font-size:18px;color:#a08a70;padding:4px}
 .a2steps{display:grid;gap:8px;margin:8px 0}.a2steps div{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;background:#fff6e6}.a2steps i{font-style:normal;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#ff8a3d;color:#fff;font-weight:900;flex-shrink:0}
 body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.standalone #tBot{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+.accf{display:grid;gap:8px;margin:8px 0}.accf input,#loginPane input{padding:10px 12px;border-radius:12px;border:2px solid #e6cfa8;font-size:16px;width:100%;box-sizing:border-box}#loginPane input{margin:6px 0}#loginPane{z-index:30}.accd summary{cursor:pointer;font-weight:700;margin:6px 0}
+#tLogin{margin-top:8px}
 /* gem + */
 .gemc{cursor:pointer}.gplus{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:4px;border-radius:50%;background:linear-gradient(#5ad65a,#2a9a3a);color:#fff;font-style:normal;font-weight:900;font-size:15px;line-height:1;box-shadow:0 2px 0 rgba(0,0,0,.25);animation:gpulse 1.6s ease-in-out infinite}
 @keyframes gpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
@@ -486,7 +488,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 <div id="a2hs" hidden><img src="assets/icon_180.png" alt=""><div><b>把萌獸星球放到手機桌面</b><small>像 App 一樣全螢幕開啟,一點就玩</small></div><button class="go" id="a2go">怎麼做</button><button class="x" id="a2x">✕</button></div>
 <div id="sumRes" class="modal" hidden><div class="box sumbox"><h3>召喚結果</h3><div id="sumGrid"></div><button class="go" id="sumOk">太好了!</button></div></div>
 <div id="hatch" class="modal" hidden><div class="box"><div class="hst"><img id="hEgg" alt=""><i class="hray"></i><img id="hImg" alt=""></div><h3 id="hName"></h3><span id="hRar"></span><p id="hTxt"></p><button class="go" id="hClose">太好了!</button></div></div>
-<div id="title" class="ov"><div class="tbox"><h1 class="logo">萌獸星球</h1><p class="sub">收集・進化・守護家園</p><button class="go big" id="tStart" disabled>連線中…</button><button id="tCodeBtn" hidden>用轉移碼找回進度</button><p id="accInfo" class="acc">連線中…</p></div></div>
+<div id="title" class="ov"><div class="tbox"><h1 class="logo">萌獸星球</h1><p class="sub">收集・進化・守護家園</p><button class="go big" id="tStart" disabled>連線中…</button><button class="blue" id="tLogin" hidden>已有帳號?登入</button><button id="tCodeBtn" hidden>用轉移碼找回進度</button><p id="accInfo" class="acc">連線中…</p></div></div>
 <div id="intro" class="ov dark" hidden><div class="ibg" id="introBg"></div><div class="ifog"></div><div class="iglow"></div><div class="icap"><small id="introCh">序章 · 1 / 3</small><p id="introTxt"></p><p id="introDots"></p><p class="hint">點畫面繼續 ▸</p></div><button id="introSkip">跳過</button></div>
 <div id="namePane" class="ov" hidden><div class="tbox"><h2>你好,守護員!</h2><p>你叫什麼名字?</p><input id="nameIn" maxlength="12" placeholder="最多 12 個字" autocomplete="off"><button class="go big" id="nameOk">決定</button></div></div>
 <div id="eggPane" class="ov" hidden><div class="tbox"><h2>選擇你的第一隻萌獸</h2><p id="eggTip"></p><div id="eggPick"></div><div id="eggBig" class="egg0"><span class="shell">🥚</span></div>
@@ -494,6 +496,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
   <div id="eggBtns" class="row" hidden><button class="go big" id="eggKeep">就是你了!</button><button class="blue" id="eggReroll">重抽</button></div></div></div>
 <div id="guide" hidden><div id="gRing"></div><div id="gTip"></div></div>
 <div id="choose" class="modal" hidden><div class="box"><h3 style="font-size:22px">要用哪一份進度?</h3><p class="mut">你的帳號裡已經有雲端進度,這台裝置也有遊客進度。選一份繼續,另一份會被取代。</p><button id="cfA" class="pick"></button><button id="cfB" class="pick"></button></div></div>
+<div id="loginPane" class="modal" hidden><div class="box"><h3 style="font-size:22px">🔐 登入遊戲帳號</h3><input id="lgU" placeholder="帳號" autocomplete="username" autocapitalize="off" maxlength="16"><input id="lgP" type="password" placeholder="密碼" autocomplete="current-password"><p class="mut" style="font-size:12px">登入後會載入這個帳號的雲端進度。</p><div class="row" style="justify-content:center"><button class="go" id="lgGo">登入</button><button id="lgClose">取消</button></div></div></div>
 <div id="code" class="modal" hidden><div class="box"><h3 id="codeMode" style="font-size:22px"></h3><input id="codeIn" placeholder="轉移碼(8 碼)" autocomplete="off"><input id="codePw" type="password" placeholder="密碼(至少 4 個字)" autocomplete="new-password"><p id="codeOut"></p><div class="row" style="justify-content:center"><button class="go" id="codeGo">確定</button><button id="codeClose">關閉</button></div></div></div>
 <div id="toast"></div>
 
@@ -650,10 +653,11 @@ setInterval(()=>cloudWrite(),10000);addEventListener('visibilitychange',()=>{if(
 function setAcc(){const el=$('accInfo');if(!el)return;el.textContent=!ACC.checked?'連線中…':ACC.cloud?`☁ 已登入${ACC.name?':'+ACC.name:''} · 進度雲端保存`:ACC.uid&&!ACC.canWrite?'👤 已登入,但沒有寫入權限:以遊客身分保存在這台裝置':'👤 遊客模式 · 進度只存在這台裝置'}
 async function accInit(){const C=window.claude;let user=null,db=null;
   try{if(C&&C.use){[user,db]=await Promise.all([C.use('user'),C.use('db')])}}catch(e){}
-  const id=user?await user.id():null;if(user){const me=await user.me();ACC.name=me.name||''}
+  const id=user?await user.id():null;if(user){const me=await user.me();ACC.name=me.name||''}if(window.MOE_AUTH){try{ACC.auth=await MOE_AUTH.info();if(ACC.auth.name)ACC.name=ACC.auth.name}catch(e){}}
   ACC.uid=id;ACC.db=db;ACC.checked=true;
   if(id&&db){const cloud=await cloudRead();ACC.cloud=true;
-    if(cloud&&(!SV.started||SV.uid===id&&(cloud.t||0)>=(SV.t||0))){SV=cloud;SV.uid=id;saveLocalOnly()}
+    let wantCloud=false;try{wantCloud=!!localStorage.getItem('moe.login');localStorage.removeItem('moe.login')}catch(e){}
+    if(cloud&&(wantCloud||!SV.started||SV.uid===id&&(cloud.t||0)>=(SV.t||0))){SV=cloud;SV.uid=id;saveLocalOnly()}
     else if(cloud&&SV.started&&SV.uid!==id){await chooseSave(cloud)}
     else if(SV.started){SV.uid=id;save();await cloudWrite(true);if(!cloud)toast('已把這台裝置的進度綁定到你的帳號')}}
   setAcc();titleReady();if(ACC.cloud){netPublish(true);netFetch(true);setTimeout(likeCheck,3000)}}
@@ -2643,8 +2647,8 @@ addEventListener('beforeinstallprompt',e=>{e.preventDefault();A2.prompt=e});
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!A2.inFrame&&!/claude\.ai|claudeusercontent/.test(location.host))navigator.serviceWorker.register('sw.js').catch(()=>{});
 document.addEventListener('contextmenu',e=>{if(A2.mobile)e.preventDefault()});
 function a2hsCard(){if(A2.standalone)return `<div class="card"><h3>📱 手機桌面</h3><p class="mut">✅ 你現在是從桌面捷徑開啟的,已經是全螢幕模式。</p></div>`;
-  const ios=`<div class="a2steps"><div><i>1</i>用 <b>Safari</b> 打開這個遊戲(在其他 App 裡請先選「用 Safari 開啟」)</div><div><i>2</i>點下方的 <b>分享</b> 按鈕(方框加向上箭頭 ⬆)</div><div><i>3</i>往下滑,選 <b>加入主畫面</b>,再按 <b>新增</b></div><div><i>4</i>回到桌面點「萌獸星球」圖示,就會全螢幕開啟</div></div>`,
-    and=`<div class="a2steps"><div><i>1</i>用 <b>Chrome</b> 打開這個遊戲</div><div><i>2</i>點右上角的 <b>⋮</b> 選單</div><div><i>3</i>選 <b>加到主畫面</b>(或「安裝應用程式」),再按 <b>新增</b></div><div><i>4</i>回到桌面點「萌獸星球」圖示,就會全螢幕開啟</div></div>`;
+  const ios=`<div class="a2steps"><div><i>1</i><span>用 <b>Safari</b> 打開這個遊戲(在其他 App 裡請先選「用 Safari 開啟」)</span></div><div><i>2</i><span>點下方的 <b>分享</b> 按鈕(方框加向上箭頭 ⬆)</span></div><div><i>3</i><span>往下滑,選 <b>加入主畫面</b>,再按 <b>新增</b></span></div><div><i>4</i><span>回到桌面點「萌獸星球」圖示,就會全螢幕開啟</span></div></div>`,
+    and=`<div class="a2steps"><div><i>1</i><span>用 <b>Chrome</b> 打開這個遊戲</span></div><div><i>2</i><span>點右上角的 <b>⋮</b> 選單</span></div><div><i>3</i><span>選 <b>加到主畫面</b>(或「安裝應用程式」),再按 <b>新增</b></span></div><div><i>4</i><span>回到桌面點「萌獸星球」圖示,就會全螢幕開啟</span></div></div>`;
   return `<div class="card"><h3>📱 放到手機桌面 <small>像 App 一樣一點就玩</small></h3>${A2.prompt?`<button class="go" data-act="a2inst">一鍵加到桌面</button>`:''}
     ${A2.ios?ios:A2.android?and:`<p><b>iPhone / iPad</b></p>${ios}<p><b>Android</b></p>${and}`}${A2.inFrame?'<p class="mut">提示:目前是在 claude.ai 頁面裡開啟,加到桌面後開的是這個分享連結。之後遊戲架設到自己的網站,就能完整全螢幕執行。</p>':''}</div>`}
 function a2hsBanner(){const el=$('a2hs');if(!el)return;el.hidden=!(A2.mobile&&!A2.standalone&&SV.started&&SV.tut>=9&&!SV.a2hsNo&&!B&&$('sheet').hidden&&(SV.stat.wins||0)>=3)}
@@ -2664,7 +2668,7 @@ setInterval(()=>{if(!B){townHud();if(sheetK&&['summon','farm','train','castle'].
 
 /* =============== title, intro, first egg, tutorial =============== */
 let titleOk=false;
-function titleReady(){if(titleOk)return;titleOk=true;$('tStart').disabled=false;$('tStart').textContent=SV.started?'繼續遊戲':'開始遊戲';$('tCodeBtn').hidden=!ACC.db}
+function titleReady(){if(titleOk)return;titleOk=true;$('tLogin').hidden=!(window.MOE_AUTH&&ACC.auth&&ACC.auth.uid&&!ACC.auth.name);$('tStart').disabled=false;$('tStart').textContent=SV.started?'繼續遊戲':'開始遊戲';$('tCodeBtn').hidden=!ACC.db}
 $('tStart').onclick=()=>{au();sfx('click');$('title').hidden=true;if(SV.started)enterGame();else startIntro()};
 $('tCodeBtn').onclick=()=>openCode('use');
 function enterGame(){try{potSettle()}catch(e){}if(SV.tut===3)SV.tut=4;eggsFix();try{MKT.settle()}catch(e){}SV.subs=[null,null];regen();const nr=offlineRaids();save();TP=[];townHud();$('town').hidden=false;if(nr)setTimeout(()=>toast(`你離開時被攻打了 ${nr} 次,到主城看戰報`),600)}
@@ -2700,12 +2704,31 @@ function guideTick(){const g=GUIDE[SV.tut],box=$('guide');if(!g||!SV.started||B|
   box.hidden=false;const ring=$('gRing'),pad=8;ring.style.left=(r.x-pad)+'px';ring.style.top=(r.y-pad)+'px';ring.style.width=(r.w+pad*2)+'px';ring.style.height=(r.h+pad*2)+'px';
   const tip=$('gTip');tip.textContent=g.t;const tw=Math.min(280,W-32);tip.style.width=tw+'px';let tx=clamp(r.x+r.w/2-tw/2,16,W-tw-16),ty=r.y-74;if(ty<80)ty=r.y+r.h+16;tip.style.left=tx+'px';tip.style.top=ty+'px'}
 /* settings panel: account, bind, transfer code */
-function pSet(){const signed=!!ACC.uid;return a2hsCard()+`<div class="card"><h3>帳號</h3><p>${ACC.cloud?`☁ 已連線到雲端${ACC.name?'('+ACC.name+')':''},進度會自動存到雲端;在別的裝置打開同一個遊戲就會自動找回。`:signed?'已登入,但這個遊戲沒有給你寫入權限,進度只存在這台裝置。':'目前是遊客模式,進度只存在這台裝置。連線到伺服器後,進度會自動存到雲端。'}</p>
+function accCard(){if(!window.MOE_AUTH)return '';const A=ACC.auth||{};if(!A.uid)return `<div class="card"><h3>🔐 遊戲帳號</h3><p class="mut">連線中或無法連線到伺服器,請稍後再開啟這頁。</p></div>`;
+  if(A.name)return `<div class="card"><h3>🔐 遊戲帳號</h3><p>已登入帳號 <b>${esc(A.name)}</b>,進度會自動存到雲端;在其他手機或電腦用同一組帳號密碼登入,就能接著玩。</p>
+    <details class="accd"><summary>修改密碼</summary><div class="accf"><input id="accP" type="password" placeholder="新密碼(至少 6 個字)" autocomplete="new-password"><input id="accP2" type="password" placeholder="再輸入一次新密碼" autocomplete="new-password"><button class="go" data-act="accPw">確定修改</button></div></details>
+    <button data-act="accOut" style="color:#c03030">登出</button><p class="mut">登出後這台裝置會變回新的遊客,重新登入帳號就能找回進度。</p></div>`;
+  return `<div class="card hero"><div><h3>🔐 建立遊戲帳號 <small>強烈建議</small></h3><p>目前是<b>訪客帳號</b>:進度有存在雲端,但只認得這台裝置。清除瀏覽器資料或換手機就會找不到。建立帳號密碼後,任何裝置都能登入接著玩。</p>
+    <div class="accf"><input id="accU" placeholder="帳號(4–16 個英文小寫、數字或底線)" autocomplete="username" autocapitalize="off" maxlength="16"><input id="accP" type="password" placeholder="密碼(至少 6 個字)" autocomplete="new-password"><input id="accP2" type="password" placeholder="再輸入一次密碼" autocomplete="new-password"><button class="go" data-act="accReg">建立帳號(保留目前進度)</button></div>
+    <p class="mut">已經有帳號?<button class="blue" data-act="accGoLogin">登入其他帳號</button></p></div></div>`}
+function pSet(){const signed=!!ACC.uid;return accCard()+a2hsCard()+`<div class="card"><h3>帳號</h3><p>${ACC.cloud?`☁ 已連線到雲端${ACC.name?'('+ACC.name+')':''},進度會自動存到雲端;在別的裝置打開同一個遊戲就會自動找回。`:signed?'已登入,但這個遊戲沒有給你寫入權限,進度只存在這台裝置。':'目前是遊客模式,進度只存在這台裝置。連線到伺服器後,進度會自動存到雲端。'}</p>
   <p>守護員名稱:<b>${SV.name||'-'}</b> <button data-act="rename">改名</button></p>
   ${ACC.cloud?`<button class="blue" data-act="sync">立即同步到雲端</button>`:''}</div>
   <div class="card"><h3>轉移碼 <small>換帳號或備份進度時使用;進度用你設定的密碼加密</small></h3>${ACC.db?`<div class="row"><button class="go" data-act="mkcode">建立轉移碼</button><button class="blue" data-act="usecode">輸入轉移碼找回</button></div>`:'<p class="mut">需要連線到伺服器 才能使用轉移碼。</p>'}</div>
   <div class="card"><h3>其他</h3><div class="row"><button data-act="snd">${SND.on?'🔊 音效開':'🔇 音效關'}</button><button data-act="replay">重看開場</button><button data-act="reset" style="color:#c03030">重新開始(清除進度)</button></div></div>`}
 let resetArm=0;
+const accBusy={v:0};
+async function accDo(fn,okMsg,reload){if(accBusy.v)return;accBusy.v=1;try{await fn();if(okMsg)toast(okMsg);if(reload){try{localStorage.setItem('moe.login','1')}catch(e){}await cloudWrite(true).catch(()=>{});setTimeout(()=>location.reload(),900);return}ACC.auth=await MOE_AUTH.info();if(ACC.auth.name)ACC.name=ACC.auth.name;setAcc();netPublish(true);renderSheet()}catch(e){toast(e.message||'發生錯誤')}accBusy.v=0}
+const accVals=()=>({u:($('accU')||{}).value||'',p:($('accP')||{}).value||'',p2:($('accP2')||{}).value||''});
+Object.assign(ACT,{accReg:()=>{const {u,p,p2}=accVals();if(!/^[a-z0-9_]{4,16}$/.test(u.trim().toLowerCase()))return toast('帳號要 4–16 個英文小寫、數字或底線');if(p.length<6)return toast('密碼至少 6 個字');if(p!==p2)return toast('兩次密碼不一樣');accDo(()=>MOE_AUTH.register(u,p),'帳號建立成功!之後可以用這組帳號密碼在任何裝置登入')},
+  accPw:()=>{const {p,p2}=accVals();if(p.length<6)return toast('密碼至少 6 個字');if(p!==p2)return toast('兩次密碼不一樣');accDo(()=>MOE_AUTH.changePw(p),'密碼已修改')},
+  accOut:()=>{if(!accBusy.out){accBusy.out=1;toast('再按一次「登出」確認');setTimeout(()=>accBusy.out=0,3000);return}accBusy.out=0;accDo(async()=>{await cloudWrite(true).catch(()=>{});await MOE_AUTH.logout();try{localStorage.removeItem(LSKEY)}catch(e){}},'已登出',false).then(()=>setTimeout(()=>location.reload(),600))},
+  accGoLogin:()=>{closeSheet();openLogin()}});
+function openLogin(){$('loginPane').hidden=false;$('lgU').value='';$('lgP').value='';$('lgU').focus()}
+$('lgClose').onclick=()=>{$('loginPane').hidden=true};
+$('lgGo').onclick=()=>{const u=$('lgU').value.trim().toLowerCase(),p=$('lgP').value;if(!u||!p)return toast('請輸入帳號和密碼');accDo(()=>MOE_AUTH.login(u,p),'登入成功,正在載入你的進度…',true)};
+$('lgP').addEventListener('keydown',e=>{if(e.key==='Enter')$('lgGo').click()});
+$('tLogin').onclick=()=>{sfx('click');openLogin()};
 Object.assign(ACT,{rename:()=>{const n=prompt?null:null;openName()},sync:()=>{ACC.dirty=1;cloudWrite(true).then(()=>toast('已同步'))},
   mkcode:()=>openCode('make'),usecode:()=>openCode('use'),snd:()=>{SND.on=!SND.on;$('sndBtn').textContent=SND.on?'🔊':'🔇'},
   replay:()=>{closeSheet();$('town').hidden=true;startIntro();$('namePane').dataset.replay='1'},
