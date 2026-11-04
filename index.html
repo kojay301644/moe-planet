@@ -2005,7 +2005,7 @@ cv.addEventListener('pointerup',e=>{const d=TV.drag;TV.drag=null;if(d&&!d.moved&
 /* =============== panels =============== */
 let sheetK=null,sheetTab=null,selSlot=0,selTeam='team',petView=null;
 function openSheet(k,tab){sheetK=k;sheetTab=tab||null;$('sheet').hidden=false;renderSheet();$('shBody').scrollTop=0;document.querySelectorAll('#tNav button').forEach(b=>b.classList.toggle('on',b.dataset.p===k))}
-function closeSheet(){if(SV.tut===2&&sheetK==='pets')SV.tut=owned().length<3?5:9;sheetK=null;petView=null;$('sheet').hidden=true;townHud();document.querySelectorAll('#tNav button').forEach(b=>b.classList.remove('on'))}
+function closeSheet(){if(SV.tut===2&&sheetK==='pets')SV.tut=owned().length<3?5:9;sheetK=null;petView=null;petFrom=null;$('sheet').hidden=true;townHud();document.querySelectorAll('#tNav button').forEach(b=>b.classList.remove('on'))}
 $('shClose').onclick=()=>{if(SV.tut===5&&sheetK==='summon')return toast('先用 💎160 單抽一次,完成新手教學');closeSheet()};
 const tutBlock=()=>{if(SV.started&&SV.tut<9){toast('先跟著指引完成新手教學喔');return true}return false};
 const TITLES={grow:'變強',market:'交易所',mail:'信箱',todo:'今日待辦',set:'設定',adv:'冒險之橋',summon:'召喚',castle:'主城',academy:'學院',forge:'鍛造',evo:'進化之泉',shop:'商店',farm:'農場',train:'訓練場 · 潛能特訓',pets:'萌獸',bag:'背包',ach:'成就',rank:'天梯 · 排行榜',friends:'好友',chat:'聊天',pay:'儲值',me:'守護員',boss:'Boss 副本',deco:'擺放裝飾',vip:'VIP 特權',quest:'每日任務',sign:'每日簽到',event:'活動',gift:'福利'};
@@ -2057,8 +2057,8 @@ const ACT={
   put:k=>{const arr=selTeam==='def'?(selSlot>=3?SV.subs:SV.defTeam):SV.team,idx=selSlot>=3?selSlot-3:selSlot;
     if(selTeam==='def'){for(const a of [SV.defTeam,SV.subs]){const j=a.indexOf(k);if(j>=0)a[j]=null}}else{const j=SV.team.indexOf(k);if(j>=0)SV.team[j]=SV.team[idx]}
     arr[idx]=k;selSlot=Math.min(selSlot+1,selTeam==='def'?4:2)},
-  goStar:k=>{petView=k;openSheet('pets');setTimeout(()=>{const e=document.querySelector(`#shBody [data-act="star:${k}"]`);if(e){e.scrollIntoView({block:'center',behavior:'smooth'});e.classList.add('pulse')}},80)},
-  view:k=>{petView=k},back:()=>{petView=null},mineS:k=>{SV.mineS=k},
+  goStar:k=>{petView=k;openSheet('pets');petFrom='bag';setTimeout(()=>{const e=document.querySelector(`#shBody [data-act="star:${k}"]`);if(e){e.scrollIntoView({block:'center',behavior:'smooth'});e.classList.add('pulse')}},80)},
+  view:k=>{petView=k;petFrom=null},back:()=>{petView=null;if(petFrom==='bag'){petFrom=null;openSheet('bag','shard')}},mineS:k=>{SV.mineS=k},
   xMake:k=>{SV.xs=SV.xs||{};if((SV.xs[k]||0)<XNEED||SV.pets[k])return;SV.xs[k]-=XNEED;SV.pets[k]=P0();SV.pets[k].eq={collar:null,hat:null,charm:null,bell:null};sfx('egg');showHatch(k,true)},
   wish:k=>{SV.wish=SV.wish===k?null:k;toast(SV.wish?'心願單:'+PETS[k].n[0]:'取消心願單')},
   goEvo:()=>{setTimeout(()=>openSheet('evo'),0)},
@@ -2544,8 +2544,9 @@ function skinCard(k){const s=SV.pets[k],own=(SV.pskins||{})[k]||[],cur=ownSkin(k
     <div class="skins"><div class="skc ${!cur?'on':''}"><img src="assets/${PETS[k].img}3.webp" alt=""${shSty(k)}><b>原始造型</b>${!cur?'<small>使用中</small>':`<button data-act="skSet:${k}:-">換上</button>`}</div>
     ${SKK.map(t=>{const T=SKT[t],o=own.includes(t),on=cur===t;return `<div class="skc ${on?'on':''}" style="--sc:${T.c}"><img src="assets/sk_${PETS[k].img}_${t}.webp" alt=""${shSty(k)}><b><span class="tier ${T.g.toLowerCase()}">${T.g}</span> ${T.n}</b>${on?'<small>使用中</small>':o?`<button class="go" data-act="skSet:${k}:${t}" ${s.st<2?'disabled':''}>換上</button>`:(T.cost&&inRot(k,t)?`<button class="blue" data-act="skBuy:${k}:${t}">本週精選 ${costTxt(skinPrice(k,t))}</button>`:'')+((t==='star'?SV.skvS>0:SV.skv>0)?`<button class="mini" data-act="skTix:${k}:${t}">${t==='star'?'🌟 星辰造型券':'🎟 造型券'}兌換</button>`:'')+(!(T.cost&&inRot(k,t))&&!(t==='star'?SV.skvS>0:SV.skv>0)?`<small class="mut">${t==='star'?(wishPet()===k?'本期星辰祈願!':'星辰祈願/星辰造型券'):'本週未上架/造型券'}</small>`:'')}</div>`}).join('')}</div><p class="mut">持有 🎟 造型券 ${SV.skv||0} · 🌟 星辰造型券 ${SV.skvS||0} · ${skinFull(k)?'<b style="color:#3a9a3a">3 款集滿:屬性 +1%</b>':`收集 ${own.length}/3(集滿 3 款這隻屬性 +1%)`}</p>
     <p class="shr">✨ 異色:${sh?`已擁有 <button data-act="shT:${k}">${ownShiny(k)?'關閉異色':'開啟異色'}</button>`:`進化到三階時 3% 機率獲得,或用碎片 ${SHX} 兌換 <button class="blue" data-act="shX:${k}" ${s.shards<SHX?'disabled':''}>兌換(碎片 ${s.shards}/${SHX})</button>`}</p></div>`}
+let petFrom=null;
 function petDetail(k){const P=PETS[k],s=SV.pets[k],S=stat(k),pickT=(sheetTab||'').startsWith('eq:')?sheetTab.slice(3):null;
-  let h=`<div class="card"><button data-act="back">← 返回</button><div class="pd"><div class="big"><img src="assets/${imgName(k)}.webp" alt=""${shSty(k)}></div><div><h3>${P.n[s.st]} <span class="lvtag">Lv${s.lv}</span></h3>
+  let h=`<div class="card"><button data-act="back">${petFrom==='bag'?'← 返回背包碎片':'← 返回'}</button><div class="pd"><div class="big"><img src="assets/${imgName(k)}.webp" alt=""${shSty(k)}></div><div><h3>${P.n[s.st]} <span class="lvtag">Lv${s.lv}</span></h3>
     <p><span class="el el-${P.el}">${EL[P.el].n}</span> <b class="qtag q${qOf(k)}">${RAR[qOf(k)]}</b>${DIVINE.includes(k)?' <b class="qtag div">✨神獸</b>':''} · ${P.role} · <span style="color:#f0a400">${'★'.repeat(s.stars)}${'☆'.repeat(5-s.stars)}</span></p>
     <table class="tb"><tr><td>血量</td><td>${fmt(S.hp)}</td><td>攻擊</td><td>${fmt(S.atk)}</td></tr><tr><td>防禦</td><td>${fmt(S.def)}</td><td>爆擊</td><td>${(S.crit*100).toFixed(1)}%</td></tr></table>
     <div class="skev">${[0,1,2].map(i=>`<div class="${i===s.st?'on':i<s.st?'done':'lock'}"><b>${['一階','二階','三階'][i]}・${skn(k,i)}${i===s.st?' Lv'+s.sk:''}</b><small>${skd(k,i)}</small></div>`).join('')}</div>
