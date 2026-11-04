@@ -648,7 +648,7 @@ const TLIMIT=90,ENMAX=5,ENT=2*3600e3;
 const tlim=()=>tlim0()+(B&&B.extraT||0),tlim0=()=>{if(!B)return TLIMIT;if(B.mode==='boss')return Math.min(240,180+15*Math.floor((B.cfg.tier||1)/5));if(B.mode==='raid')return 180;if(B.mode==='adv'&&B.L&&!B.cfg.tut){if(B.L.boss)return 150;if(B.L.elite||B.cfg.trial)return 120}return TLIMIT};
 const enrPhase=()=>B&&(B.mode==='boss'||B.mode==='raid'||(B.mode==='adv'&&B.L&&(B.L.boss||B.L.elite)));
 /* AI keepers that live on the planet; their strength follows the player */
-const LORD_NAMES=['長安小霸王','草原狼王','洛陽老街','尼羅河午夜','不勝不歸','奶茶去冰','肝帝阿明','小熊軟糖','雷霆一擊','睡到自然醒','星空下的貓','佛系守護員','鍋貼大王','月光餅乾','鹹魚翻身'];
+let LORD_NAMES=['長安小霸王','草原狼王','洛陽老街','尼羅河午夜','不勝不歸','奶茶去冰','肝帝阿明','小熊軟糖','雷霆一擊','睡到自然醒','星空下的貓','佛系守護員','鍋貼大王','月光餅乾','鹹魚翻身'];const LORD0=LORD_NAMES.slice();let BOTX={};const botRook=rs=>rs?clamp((Date.now()-rs)/(3*DAY),.15,1):1,botGrow=(n,start,span)=>{const x=BOTX[n];return x&&x.rs>start?clamp((Date.now()-x.rs)/span,0,1):1};
 const lordTi=L=>{const A=[...LTITLE,...SPT];return L.i%3===2?'':A[(L.i*7)%A.length].n},tiTag=t=>t?`<i class="ttag">${t}</i>`:'';
 const LTYPE=[{n:'爆肝型',off:3,raid:2},{n:'休閒型',off:-3,raid:.5},{n:'課金型',off:5,raid:1},{n:'塔防型',off:1,raid:.3,tower:1},{n:'掠奪型',off:1,raid:2.5},{n:'棄坑型',off:-5,raid:0,rich:1}];
 /* =============== save =============== */
@@ -977,7 +977,7 @@ function bossReward(key,tier,first,lines){eqFix();const D=PBOSS[key],L=[];const 
   if(rnd()<pbDrop(tier)){const e=rollPiece(D.set,pieceRar(tier));L.push({img:eqImg(e),n:EQSET[e.set].n+EQT[e.type].n,rar:e.rar})}
   if(first){const g=30*tier;SV.gem+=g;SV.stones+=tier;L.push({img:'assets/i_gem.webp',n:'首通 💎'+g},{img:'assets/i_stone.webp',n:'進化石 ×'+tier})}
   if(lines)lines.push(`${D.n} 第 ${tier} 層${first?'首次':''}通關!`);return L}
-function raidBots(id,prog){const r=seeded(id*7717+3),bots=[...LORD_NAMES,...BOT_NAMES].slice(0,30).map(n=>({n,w:.2+r()})),sw=bots.reduce((a,b)=>a+b.w,0);bots.forEach(b=>b.d=Math.round(b.w/sw*RHP*.95*prog));return bots}
+function raidBots(id,prog){const r=seeded(id*7717+3),bots=[...LORD_NAMES,...BOT_NAMES].slice(0,30).map(n=>({n,w:(.2+r())*botGrow(n,Date.now()-RCYC,RCYC)})),sw=bots.reduce((a,b)=>a+b.w,0);bots.forEach(b=>b.d=Math.round(b.w/sw*RHP*.95*prog));return bots}
 function raidState(){const id=raidId(),key=raidKey(id),prog=clamp((Date.now()-raidEnd(id-1))/RCYC,0,1),bots=raidBots(id,prog);
   if(!SV.rb||SV.rb.id!==id){if(SV.rb&&SV.rb.id!==id)raidSettle();SV.rb={id,dmg:0,best:0,kill:0}}
   const real=(NET.rbList||[]).filter(d=>d.rbid===id&&d.id!==ACC.uid).map(d=>({n:d.n,d:d.rbd||0,real:1})),me={n:(SV.name||'你')+'(你)',d:SV.rb.dmg,me:1};
@@ -1506,13 +1506,15 @@ function drawBattle(){const s=B.shake>.4?B.shake:0;ctx.setTransform(dpr,0,0,dpr,
   for(const pr of B.proj)drawProj(pr);for(const f of B.fx)if(!['vines','wave','heal'].includes(f.k))drawFx(f);drawParts();drawCommand();drawGrassFront();for(const n of B.nums)drawNum(n);drawFlash();
   ctx.setTransform(dpr,0,0,dpr,0,0);drawCombo();drawWaveBanner();drawHudCanvas()}
 /* =============== keepers (AI) =============== */
+function mkLord(i,n){const r=seeded(i*977+13),ty=i%LTYPE.length,pool=PK.filter(k=>PETS[k].rar<(ty===2?4:3)),team=[];while(team.length<3){const k=pool[Math.floor(r()*pool.length)];if(!team.includes(k))team.push(k)}
+  return {i,name:n,ty,team,towers:[TK[Math.floor(r()*5)],r()<.6||ty===3?TK[Math.floor(r()*5)]:null,ty===3?TK[Math.floor(r()*5)]:null],off:LTYPE[ty].off+Math.round(r()*2-1),last:0,beatT:0,online:r()<.4}}
 function lords(){if(!SV.lords){let seed=7;const r=()=>{seed=(seed*9301+49297)%233280;return seed/233280};
     SV.lords=LORD_NAMES.map((n,i)=>{const ty=i%LTYPE.length,pool=PK.filter(k=>PETS[k].rar<(ty===2?4:3));const team=[];while(team.length<3){const k=pool[Math.floor(r()*pool.length)];if(!team.includes(k))team.push(k)}
       return {i,name:n,ty,team,towers:[TK[Math.floor(r()*5)],r()<.6||ty===3?TK[Math.floor(r()*5)]:null,ty===3?TK[Math.floor(r()*5)]:null],off:LTYPE[ty].off+Math.round(r()*2-1),last:0,beatT:0,online:r()<.4}})}
   const tm=SV.team.filter(k=>k&&SV.pets[k]);const avg=Math.max(1,Math.round(tm.reduce((a,k)=>a+SV.pets[k].lv,0)/Math.max(1,tm.length)));
-  for(const L of SV.lords){L.lv=Math.max(1,avg+L.off+Math.min(4,Math.floor(SV.castle/2)));L.stock=(LTYPE[L.ty].rich?6000:2500)+L.lv*350;
+  for(const L of SV.lords){L.lv=Math.max(1,Math.round((avg+L.off+Math.min(4,Math.floor(SV.castle/2)))*(L.mul||1)*botRook(L.rs)));L.stock=(LTYPE[L.ty].rich?6000:2500)+L.lv*350;
     L.power=L.team.reduce((a,k)=>{const st=L.lv>=20?2:L.lv>=10?1:0,s=stat(k,{lv:L.lv,st,stars:1});return a+Math.round((s.hp*.1+s.atk*2+s.def)*PWX)},0)}
-  return SV.lords}
+  return SV.lords.filter(L=>!L.gone)}
 function defensePower(){const t=[...SV.defTeam,...SV.subs].filter(k=>k&&SV.pets[k]);let p=teamPower(SV.defTeam.filter(k=>k&&SV.pets[k]));
   SV.towers.forEach((t,i)=>{if(t&&i<towerSlots()&&twHp(i)>0)p+=TOWERS[t].dmg*60*(1+.25*(towerLv(t)-1))*(.5+.5*twHp(i))});return p*(.7+.3*SV.gate)*(hpT().tw||1)+SV.castle*400}
 const towerSlots=()=>SV.castle>=5?3:SV.castle>=3?2:1;
@@ -1521,7 +1523,7 @@ function raidLoss(){const st=farmStock(),c=Math.floor(st*lootPct());if(c>0)SV.fa
 // what happened while the player was away: keepers attack, unlimited times, with protection and falling loot
 function offlineRaids(){if(!unlocked('siege')||shielded()){SV.lastSeen=Date.now();return 0}const now=Date.now(),away=Math.min(24*3600e3,now-(SV.lastSeen||now));const Ls=lords();let n=0,lossIdx=0,t=SV.lastSeen||now;const LOSS=[.15,.1,.07];
   while(t+90*60e3<=now&&away>20*60e3){t+=60*60e3+rnd()*60*60e3;if(t>now)break;
-    const pool=Ls.filter(L=>LTYPE[L.ty].raid>0&&t-(L.last||0)>4*3600e3);if(!pool.length)continue;const w=pool.map(L=>LTYPE[L.ty].raid),s=w.reduce((a,b)=>a+b,0);let r=rnd()*s,L=pool[0];for(let i=0;i<pool.length;i++){r-=w[i];if(r<=0){L=pool[i];break}}
+    const pool=Ls.filter(L=>LTYPE[L.ty].raid>0&&t-(L.last||0)>4*3600e3&&botRook(L.rs)>=1);if(!pool.length)continue;const w=pool.map(L=>LTYPE[L.ty].raid),s=w.reduce((a,b)=>a+b,0);let r=rnd()*s,L=pool[0];for(let i=0;i<pool.length;i++){r-=w[i];if(r<=0){L=pool[i];break}}
     L.last=t;const A=L.power*(.8+rnd()*.4),D=defensePower(),win=D>=A;let c=0,f=0;
     if(win){c=150+SV.castle*80;SV.coin+=c;hpHit(.08);twHit(.02,.08)}else{const p=LOSS[lossIdx++]??.05;const r2=raidLoss(p);c=-r2.c;f=-r2.f;hpHit(.25);twHit(.15,.3)}if(shielded())break;
     SV.reports.unshift({t,lord:L.name,li:L.i,win,c,f,off:1,seen:0});n++}
@@ -1836,7 +1838,7 @@ function townUpdate(dt){townPets();townFx(dt);skinFx(skinOf(VISIT?VISIT.skin:SV.
   for(let i=0;i<TP.length;i++)for(let j=i+1;j<TP.length;j++){const a=TP[i],b=TP[j];if(Math.abs(a.x-b.x)<.025&&Math.abs(a.y-b.y)<.025&&!a.emote&&!b.emote&&rnd()<.01){a.emote={s:'👋',t:0,life:1.4};b.emote={s:'😊',t:0,life:1.4};a.face=b.x>a.x?1:-1;b.face=-a.face}}
   for(const f of tfx)f.t+=dt;tfx=tfx.filter(f=>f.t<f.life);
   // a keeper shows up at the gate now and then while you are online
-  if(!raid&&!VISIT&&unlocked('siege')&&!shielded()&&$('sheet').hidden&&!B){townRaidT-=dt;if(townRaidT<=0){townRaidT=240+rnd()*240;const pool=lords().filter(L=>LTYPE[L.ty].raid>0);const L=pool[Math.floor(rnd()*pool.length)];raid={L,t:30};showRaid()}}
+  if(!raid&&!VISIT&&unlocked('siege')&&!shielded()&&$('sheet').hidden&&!B){townRaidT-=dt;if(townRaidT<=0){townRaidT=240+rnd()*240;const pool=lords().filter(L=>LTYPE[L.ty].raid>0&&botRook(L.rs)>=1);const L=pool[Math.floor(rnd()*pool.length)];raid={L,t:30};showRaid()}}
   if(raid){raid.t-=dt;$('raidT').textContent=Math.ceil(raid.t);if(raid.t<=0)autoDefend()}}
 let townRaidT=180;
 const farmRate=()=>Math.round((15+10*SV.farmLv)*(vip()>=8?1.2:1)*prodMul()),farmCap=()=>farmRate()*60*capH();
@@ -1980,7 +1982,7 @@ const ACT={
   twFix:i=>{i=+i;const c=twRep(i);if(c<=0)return;if(SV.coin<c)return toast('星星幣不足');SV.coin-=c;SV.twHp[i]=1;sfx('up');toast('砲塔修好了')},
   twFixAll:()=>{const ids=[0,1,2].filter(i=>SV.towers[i]&&i<towerSlots()&&twHp(i)<.999),c=ids.reduce((a,i)=>a+twRep(i),0);if(!c)return;if(SV.coin<c)return toast('星星幣不足');SV.coin-=c;ids.forEach(i=>SV.twHp[i]=1);sfx('up');toast('全部砲塔修好了')},
   twUp:t=>{const c=towerUpCost(t);if(towerLv(t)>=5)return;if(SV.coin<c)return toast('星星幣不足');SV.coin-=c;SV.twLv[t]=towerLv(t)+1;sfx('up')},
-  atk:(i,rev)=>{regen();if(hpT().noAtk)return toast('主城耐久低於 20%,先修理主城才能出兵');const L=lords()[+i];if(rev==='2'){if(!(SV.ctr||[]).includes(L.i))return;SV.ctr=SV.ctr.filter(x=>x!==L.i)}else{if(SV.en<1)return toast('攻打次數用完了,可到商店購買攻打令');SV.en--;if(SV.en===enMax()-1)SV.enT=Date.now()}startBattle({mode:'siege',lord:L,revenge:rev!=='0',bg:'bg_forest'});
+  atk:(i,rev)=>{regen();if(hpT().noAtk)return toast('主城耐久低於 20%,先修理主城才能出兵');lords();const L=SV.lords[+i];if(rev==='2'){if(!(SV.ctr||[]).includes(L.i))return;SV.ctr=SV.ctr.filter(x=>x!==L.i)}else{if(SV.en<1)return toast('攻打次數用完了,可到商店購買攻打令');SV.en--;if(SV.en===enMax()-1)SV.enT=Date.now()}startBattle({mode:'siege',lord:L,revenge:rev!=='0',bg:'bg_forest'});
     if(rev==='1'){const r=SV.reports.find(r=>r.li===+i&&!r.win&&!r.rev);if(r)r.rev=1}},
   seen:()=>{SV.reports.forEach(r=>r.seen=1)},
   vipDay:()=>{const v=vip();if(!v||SV.vipDay===today())return;SV.vipDay=today();const d=vipDaily(v);SV.gem+=d.gem;SV.coin+=d.coin;toast(`VIP 每日禮物:💎${d.gem}、⭐${fmt(d.coin)}`)},
@@ -2234,7 +2236,14 @@ function pMail(){mailFetch();if(!SRV.on())return `<div class="card"><h3>📬 信
 const EVT={list:[],t:0},EVN={xp2:'雙倍經驗',drop2:'雙倍掉落',sumup:'召喚機率 UP'};
 const evOn=k=>EVT.list.some(e=>e.kind===k&&new Date(e.starts)<=Date.now()&&new Date(e.ends)>Date.now());
 const evEnd=k=>{const e=EVT.list.find(e=>e.kind===k&&new Date(e.ends)>Date.now());return e?new Date(e.ends).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):''};
-async function evFetch(){if(!window.MOE_SB)return;try{const {data}=await MOE_SB.from('game_event').select('kind,starts,ends,note').gt('ends',new Date().toISOString());EVT.list=data||[];EVT.t=Date.now()}catch(e){}}
+async function botFetch(){if(!window.MOE_SB)return;try{const {data,error}=await MOE_SB.from('bots').select('id,name,role,mul,active,reset_at,sort').order('sort').order('id');if(!error&&data&&data.length)botApply(data)}catch(e){}}
+function botApply(rows){const act=rows.filter(b=>b.active),pad=(arr,def,min)=>{const ns=arr.map(b=>b.name);for(const n of def){if(ns.length>=min)break;if(!ns.includes(n)&&!rows.some(b=>b.name===n))ns.push(n)}return ns};
+  LORD_NAMES=pad(act.filter(b=>b.role==='lord'),LORD0,5);BOT_NAMES=pad(act.filter(b=>b.role==='player'),BOT0,10);BOTX={};rows.forEach(b=>BOTX[b.name]={id:b.id,mul:+b.mul||1,rs:b.reset_at?new Date(b.reset_at).getTime():0});MQ.botW=-1;lordSync()}
+function lordSync(){lords();const byId={};for(const n in BOTX)byId[BOTX[n].id]=n;
+  for(const L of SV.lords){if(L.bid&&byId[L.bid])L.name=byId[L.bid];else if(!L.bid&&BOTX[L.name])L.bid=BOTX[L.name].id;L.gone=!LORD_NAMES.includes(L.name);const x=BOTX[L.name],rs=x?x.rs:0;L.mul=x?x.mul:1;
+    if(rs&&rs!==L.rs){SV.ctr=(SV.ctr||[]).filter(i=>i!==L.i);SV.reports=(SV.reports||[]).filter(r=>r.li!==L.i);L.beatT=0;L.last=0;L.rs=rs}}
+  for(const n of LORD_NAMES)if(!SV.lords.some(L=>L.name===n))SV.lords.push(mkLord(SV.lords.length,n));lords();save()}
+async function evFetch(){botFetch();if(!window.MOE_SB)return;try{const {data}=await MOE_SB.from('game_event').select('kind,starts,ends,note').gt('ends',new Date().toISOString());EVT.list=data||[];EVT.t=Date.now()}catch(e){}}
 const LIVE={id:0};
 async function liveFetch(){if(!window.MOE_SB||!ACC.cloud)return;try{const {data}=await MOE_SB.from('live_msg').select('id,txt,until').gt('until',new Date().toISOString()).order('id',{ascending:false}).limit(1);const m=data&&data[0];if(m&&m.id!==LIVE.id){LIVE.id=m.id;liveShow(m.txt,new Date(m.until).getTime()-Date.now())}}catch(e){}}
 function liveShow(txt,ms){const el=$('liveBar');if(!el)return;$('liveT').textContent=txt;el.hidden=false;el.classList.remove('in');void el.offsetWidth;el.classList.add('in');sfx('boss');clearTimeout(LIVE.tm);LIVE.tm=setTimeout(()=>{el.hidden=true},Math.max(3000,Math.min(ms,300e3)))}
@@ -2626,7 +2635,7 @@ async function chatPost(to,x){const C=chatSV();if(!ACC.cloud||!ACC.db||!ACC.uid)
   CHAT.sent=Date.now();const m={t:Date.now(),x};if(to==='w'){C.cw.push(m);C.cw=C.cw.slice(-6)}else{if(!(SV.friends||[]).some(f=>f.id===to))return;C.dm.push({...m,to});C.dm=C.dm.slice(-30)}
   save();const i=$('chatIn');if(i)i.value='';renderSheet();const ok=await chatWrite();if(ok&&to==='w')chatFetch(true)}
 let VISIT=null;
-function docFor(id){return id[0]==='L'&&!FR.cache[id]?lordDoc(lords()[+id.slice(1)]):FR.cache[id]}
+function docFor(id){return id[0]==='L'&&!FR.cache[id]?(lords(),lordDoc(SV.lords[+id.slice(1)])):FR.cache[id]}
 function startVisit(id){const d=docFor(id);if(!d)return;let pets=petList(d);if(!pets.length)pets=parseTeam(d.team).map(([k,lv,st])=>[k,st,lv]);
   VISIT={id,n:d.n,gl:d.gl||1,castle:d.lv||1,skin:d.skin||'spring',pets,pw:d.pw||0,pi:d.pi||[],dt:d.dt||parseTeam(d.team).map(x=>x[0]),town:d.town||dec(d),ghp:d.ghp??(d.ai?.55+((+id.slice(1))*37%45)/100:1)};$('vRep').hidden=false;VISIT.pr=d.pr??prosperity(VISIT.town);EDIT=null;$('editBar').hidden=true;TP=[];SKP=[];closeSheet();['tTop','tLeft','tBot','raid'].forEach(e=>$(e).hidden=true);
   $('visitBar').hidden=false;$('vName').textContent=d.n;$('vInfo').textContent=`守護員 Lv.${VISIT.gl} · 主城 Lv.${VISIT.castle} · 繁榮度 ${fmt(VISIT.pr)} · ${skinOf(VISIT.skin).n} · ${pets.length} 隻萌獸`;$('vLike').disabled=!!(SV.lkDay&&SV.lkDay.day===today()&&SV.lkDay.ids.includes(id));$('vSpar').dataset.id=id;sfx('egg')}
@@ -2644,16 +2653,16 @@ const leftTxt=t=>{const ms=Math.max(0,t-Date.now()),d=Math.floor(ms/DAY),h=Math.
 const TIERS=[{n:'青銅',c:'#c4824e',min:0,gem:80,st:3},{n:'白銀',c:'#9aa8bd',min:300,gem:130,st:6},{n:'黃金',c:'#e9a920',min:600,gem:180,st:10},{n:'鉑金',c:'#2fb8a8',min:900,gem:250,st:15},{n:'鑽石',c:'#4a8cff',min:1200,gem:320,st:22},{n:'星耀',c:'#a95cff',min:1500,gem:400,st:35}];
 function tierOf(p){let i=0;while(i<5&&p>=TIERS[i+1].min)i++;const T=TIERS[i],sub=i<5?['III','II','I'][Math.min(2,Math.floor((p-T.min)/100))]:'';
   const lo=i<5?T.min+Math.min(2,Math.floor((p-T.min)/100))*100:T.min,hi=i<5?lo+100:null;return {i,T,sub,name:T.n+(sub?' '+sub:''),lo,hi}}
-const BOT_NAMES=['阿喵不睡覺','布丁大隊長','小熊愛吃蜜','炸雞配可樂','夜貓子阿哲','珍奶少冰','一隻小企鵝','曬太陽的龍','山頂洞人','拿鐵不加糖','肥宅快樂水','今天也要加油','跳跳虎','火鍋第一名','雨天的狐狸','阿福的寵物店','雲端漫步','黑糖饅頭','路過的勇者','鳳梨酥','綠茶凍','小籠包','午夜電台','海邊的鯨魚','滷肉飯大師'];
+let BOT_NAMES=['阿喵不睡覺','布丁大隊長','小熊愛吃蜜','炸雞配可樂','夜貓子阿哲','珍奶少冰','一隻小企鵝','曬太陽的龍','山頂洞人','拿鐵不加糖','肥宅快樂水','今天也要加油','跳跳虎','火鍋第一名','雨天的狐狸','阿福的寵物店','雲端漫步','黑糖饅頭','路過的勇者','鳳梨酥','綠茶凍','小籠包','午夜電台','海邊的鯨魚','滷肉飯大師'];const BOT0=BOT_NAMES.slice();
 function seeded(n){let x=(n*2654435761)>>>0;return ()=>{x^=x<<13;x>>>=0;x^=x>>17;x^=x<<5;x>>>=0;return x/4294967296}}
 function pickTeam(r,rich){const pool=PK.filter(k=>PETS[k].rar<=(rich>.8?3:rich>.5?2:1)),t=[];while(t.length<3&&t.length<pool.length){const k=pool[Math.floor(r()*pool.length)];if(!t.includes(k))t.push(k)}return t}
 function myLv(){const tm=SV.team.filter(k=>k&&SV.pets[k]);return Math.max(1,Math.round(tm.reduce((a,k)=>a+SV.pets[k].lv,0)/Math.max(1,tm.length)))}
 // computer ladder players for a season; their points grow over the season so the board feels alive
 function seasonBots(ss){const r=seeded(ss*7919+11),prog=clamp((Date.now()-seasonEnd(ss-1))/(14*DAY),0,1),day=Math.floor(Date.now()/DAY);
   return [...LORD_NAMES,...BOT_NAMES].map((n,i)=>{const fin=Math.round(1950*Math.pow(r(),1.5)),rich=fin/1950,team=pickTeam(r,rich),jit=seeded(day*31+i)();
-    return {id:'bot'+i,n,pts:Math.max(0,Math.round(fin*(.2+.8*prog)+(jit-.5)*30)),team,bot:1}})}
+    const gr=botGrow(n,seasonEnd(ss-1),14*DAY);return {id:'bot'+i,n,pts:Math.max(0,Math.round((gr<1?fin*gr:fin*(.2+.8*prog))+(jit-.5)*30)),team,bot:1}})}
 function weekBots(wk,final){const r=seeded(wk*104729+5),prog=final?1:clamp((Date.now()-weekEnd(wk-1))/(7*DAY),0,1);
-  return [...LORD_NAMES,...BOT_NAMES].map((n,i)=>{const fin=Math.round(32*Math.pow(r(),1.9)),ws=Math.round(fin*prog),loot=Math.round(ws*(1800+r()*2600));r();return {id:'bot'+i,n,ws,wl:loot,wd:Math.round(fin*prog*r()),bot:1}})}
+  return [...LORD_NAMES,...BOT_NAMES].map((n,i)=>{const fin=Math.round(32*Math.pow(r(),1.9)*botGrow(n,weekEnd(wk-1),7*DAY)),ws=Math.round(fin*prog),loot=Math.round(ws*(1800+r()*2600));r();return {id:'bot'+i,n,ws,wl:loot,wd:Math.round(fin*prog*r()),bot:1}})}
 function botTeam(b,pts){const tm=SV.team.filter(k=>k&&SV.pets[k]),av=f=>tm.length?tm.reduce((a,k)=>a+SV.pets[k][f],0)/tm.length:0,st=Math.round(av('st')),stars=Math.max(1,Math.round(av('stars'))),
   lv=clamp(myLv()+Math.round((b.pts-pts)/120),1,st<2?LVCAP[st]:50);return b.team.map(k=>[k,lv,st,stars,1+st])}
 // the computer controls the defending side less cleverly than a player attacks, so defenders get a stat bonus by stage
@@ -2685,7 +2694,7 @@ async function refreshOpp(){const L=lad(),me=L.pts;let real=[];
     real=q.docs.map(d=>safeD(d)).filter(d=>d.id!==ACC.uid&&parseTeam(d.team).length).map(d=>({n:d.n,pts:d.pts,real:1,pw:d.pw|0,team:parseTeam(d.team)}))}catch(e){}}
   const bots=seasonBots(L.ss).filter(b=>Math.abs(b.pts-me)<=260).map(b=>({n:b.n,pts:b.pts,team:botTeam(b,me)}));
   let pool=[...real,...real,...bots].sort(()=>rnd()-.5),out=[];const pick=f=>{const i=pool.findIndex(o=>f(o)&&!out.some(x=>x.n===o.n));if(i>=0)out.push(pool[i])};
-  const myPw=teamPower(SV.team.filter(k=>k&&SV.pets[k])),bMul=o=>{const base=Math.max(1,teamPw(o.team)),rel=clamp((o.pts-me)/120,-1,1);return clamp(myPw*(1+PVPR*rel)*1.2*PVPB*(L.adj||1)/base,.5,8)};pool.forEach(o=>{o.mul=o.real?realMul(o.team):bMul(o)});pick(o=>o.pts<me-20);pick(o=>Math.abs(o.pts-me)<=60);pick(o=>o.pts>me+20);while(out.length<3){const b=seasonBots(L.ss)[Math.floor(rnd()*40)];if(!out.some(x=>x.n===b.n))out.push({n:b.n,pts:clamp(me+Math.round((rnd()-.5)*120),0,9999),team:botTeam({...b,pts:me},me),mul:0})}out.forEach(o=>{if(!o.mul)o.mul=bMul(o)});
+  const myPw=teamPower(SV.team.filter(k=>k&&SV.pets[k])),bMul=o=>{const base=Math.max(1,teamPw(o.team)),rel=clamp((o.pts-me)/120,-1,1),bm=(BOTX[o.n]&&BOTX[o.n].mul)||1;return clamp(myPw*(1+PVPR*rel)*1.2*PVPB*(L.adj||1)*bm/base,.5,8)};pool.forEach(o=>{o.mul=o.real?realMul(o.team):bMul(o)});pick(o=>o.pts<me-20);pick(o=>Math.abs(o.pts-me)<=60);pick(o=>o.pts>me+20);while(out.length<3){const b=seasonBots(L.ss)[Math.floor(rnd()*40)];if(!out.some(x=>x.n===b.n))out.push({n:b.n,pts:clamp(me+Math.round((rnd()-.5)*120),0,9999),team:botTeam({...b,pts:me},me),mul:0})}out.forEach(o=>{if(!o.mul)o.mul=bMul(o)});
   L.opp=out.sort((a,b)=>a.pts-b.pts).map(o=>({...o,pw:Math.round(teamPw(o.team)*(o.real?1:o.mul))}));save();if(sheetK==='rank')renderSheet()}
 const SPT=[{id:'sp_t20',n:'試煉勇者',sp:1,src:'試煉塔第 20 層首通'},{id:'sp_t40',n:'試煉英雄',sp:1,src:'試煉塔第 40 層首通'},{id:'sp_t60',n:'試煉傳說',sp:1,src:'試煉塔第 60 層首通'},{id:'sp_raid',n:'討伐之王',sp:1,src:'團隊 Boss 週排名第 1'},{id:'sp_siege',n:'攻城霸主',sp:1,src:'攻城週排名第 1'},{id:'ach_ch6',n:'冒險英雄',sp:1,src:'成就:通關第 6 章'},{id:'ach_leg',n:'傳說馴獸師',sp:1,src:'成就:第一隻傳說品質萌獸'},{id:'ach_div',n:'神獸之友',sp:1,src:'成就:擁有神獸'},{id:'ach_all',n:'萌獸博士',sp:1,src:'成就:收集全部 20 種'},{id:'ach_g50',n:'傳奇守護員',sp:1,src:'成就:守護員 Lv.50'},{id:'ach_myth',n:'神話工匠',sp:1,src:'成就:第一件神話裝備'},{id:'ach_pot',n:'潛能大師',sp:1,src:'潛能特訓:一隻萌獸 4 條全滿'}];
 function giveTitle(id){SV.cos=SV.cos||[];if(SV.cos.includes(id))return;SV.cos.push(id);const t=SPT.find(x=>x.id===id);if(t)setTimeout(()=>toast('🏅 得到專屬稱號「'+t.n+'」!到守護員頁面可以換上'),1200)}

@@ -732,3 +732,34 @@ grant execute on function public.admin_live(text,int), public.admin_events(), pu
   public.admin_codes(), public.admin_code_save(text,jsonb,int,timestamptz,boolean), public.redeem(text), public.admin_maint(boolean,text),
   public.admin_chat(), public.admin_chat_hide(uuid,bigint,boolean), public.admin_mute(uuid,int,text), public.ticket_submit(text,text), public.admin_tickets(text),
   public.admin_ticket_reply(bigint,text,boolean), public.admin_topups(date,date), public.admin_report() to authenticated;
+
+-- ============ 電腦玩家管理 ============
+create table if not exists public.bots(id bigserial primary key, name text not null unique, role text not null check (role in ('lord','player')), mul real not null default 1,
+  active boolean not null default true, reset_at timestamptz, sort int not null default 0, created timestamptz not null default now());
+alter table public.bots enable row level security;
+drop policy if exists bots_read on public.bots; create policy bots_read on public.bots for select to anon, authenticated using (true);
+grant select on public.bots to anon, authenticated;
+insert into public.bots(name, role, sort) select * from (values ('長安小霸王','lord',0),('草原狼王','lord',1),('洛陽老街','lord',2),('尼羅河午夜','lord',3),('不勝不歸','lord',4),('奶茶去冰','lord',5),('肝帝阿明','lord',6),('小熊軟糖','lord',7),('雷霆一擊','lord',8),('睡到自然醒','lord',9),('星空下的貓','lord',10),('佛系守護員','lord',11),('鍋貼大王','lord',12),('月光餅乾','lord',13),('鹹魚翻身','lord',14),('阿喵不睡覺','player',100),('布丁大隊長','player',101),('小熊愛吃蜜','player',102),('炸雞配可樂','player',103),('夜貓子阿哲','player',104),('珍奶少冰','player',105),('一隻小企鵝','player',106),('曬太陽的龍','player',107),('山頂洞人','player',108),('拿鐵不加糖','player',109),('肥宅快樂水','player',110),('今天也要加油','player',111),('跳跳虎','player',112),('火鍋第一名','player',113),('雨天的狐狸','player',114),('阿福的寵物店','player',115),('雲端漫步','player',116),('黑糖饅頭','player',117),('路過的勇者','player',118),('鳳梨酥','player',119),('綠茶凍','player',120),('小籠包','player',121),('午夜電台','player',122),('海邊的鯨魚','player',123),('滷肉飯大師','player',124)) v(name, role, sort) where not exists (select 1 from public.bots);
+create or replace function public.admin_bot_save(p_id bigint, p_name text, p_role text, p_mul real, p_active boolean) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); n text := left(trim(coalesce(p_name,'')), 12); i bigint;
+begin
+  if n = '' then raise exception '請填寫名字'; end if;
+  if p_role not in ('lord','player') then raise exception '類型不對'; end if;
+  if exists (select 1 from bots where name = n and id is distinct from p_id) then raise exception '這個名字已經有了'; end if;
+  if p_id is null then insert into bots(name, role, mul, active, sort) values (n, p_role, least(greatest(coalesce(p_mul,1),.5),2), coalesce(p_active,true), coalesce((select max(sort) from bots),0) + 1) returning id into i;
+  else update bots set name = n, role = p_role, mul = least(greatest(coalesce(p_mul,1),.5),2), active = coalesce(p_active,true) where id = p_id returning id into i; end if;
+  perform alog('bot', null, jsonb_build_object('id', i, 'name', n, 'role', p_role, 'mul', p_mul, 'active', p_active));
+  return jsonb_build_object('id', i);
+end $$;
+create or replace function public.admin_bot_delete(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); n text;
+begin delete from bots where id = p_id returning name into n; perform alog('bot_delete', null, jsonb_build_object('id', p_id, 'name', n)); return jsonb_build_object('ok', true); end $$;
+-- 重玩:p_id 留空 = 全部電腦玩家
+create or replace function public.admin_bot_reset(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); n int;
+begin
+  update bots set reset_at = now() where p_id is null or id = p_id; get diagnostics n = row_count;
+  perform alog('bot_reset', null, jsonb_build_object('id', p_id, 'n', n));
+  return jsonb_build_object('n', n);
+end $$;
+grant execute on function public.admin_bot_save(bigint,text,text,real,boolean), public.admin_bot_delete(bigint), public.admin_bot_reset(bigint) to authenticated;
