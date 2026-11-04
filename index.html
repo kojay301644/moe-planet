@@ -481,15 +481,31 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 /* towers */
 .twh{display:flex;gap:10px;align-items:center;margin-bottom:6px}.twh>img{width:64px;height:64px;object-fit:contain}.twh>div{flex:1}.twe{width:64px;height:64px;border-radius:14px;background:#f2ebe0;display:grid;place-items:center;font-size:26px;color:#b8a88a}
 .hpbar.sm{height:10px;margin:4px 0}
-@media (orientation:landscape) and (max-height:560px) and (min-width:761px){
-#tLeft{display:grid;grid-template-columns:repeat(2,auto);gap:2px;top:calc(env(safe-area-inset-top,0px) + 70px)}
+#tMenu{display:none}
+@media (orientation:landscape) and (max-height:560px){
+#tMenu{display:grid;place-items:center;position:absolute;left:max(10px,env(safe-area-inset-left,0px));width:48px;height:44px;border-radius:14px;font-size:22px;pointer-events:auto;background:rgba(20,30,60,.8);color:#fff;z-index:4}
+#tMenu .dot{position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#e04a4a;box-shadow:0 0 0 2px #fff}
+#tLeft{display:none!important;bottom:auto;padding:4px;gap:2px;z-index:4}#tLeft.open{display:grid!important;animation:popin .2s}
 #tLeft button{width:52px;min-height:46px;font-size:11px}#tLeft button b{font-size:18px}#tLeft button b img{width:26px;height:26px}
-#marq{top:calc(max(8px,env(safe-area-inset-top,0px)) + 62px);left:calc(max(10px,env(safe-area-inset-left,0px)) + 124px);right:max(10px,env(safe-area-inset-right,0px));height:26px}
+}
+@media (orientation:landscape) and (max-height:560px) and (min-width:761px){
+#tMenu{top:calc(env(safe-area-inset-top,0px) + 70px)}
+#tLeft{grid-template-columns:repeat(2,auto);top:calc(env(safe-area-inset-top,0px) + 120px)}
+#marq{top:calc(max(8px,env(safe-area-inset-top,0px)) + 74px);left:calc(max(10px,env(safe-area-inset-left,0px)) + 60px);right:max(10px,env(safe-area-inset-right,0px));height:26px}
 }
 @media (orientation:landscape) and (max-height:560px) and (max-width:760px){
-#tLeft{display:grid;grid-template-columns:repeat(3,auto);gap:2px;top:calc(env(safe-area-inset-top,0px) + 120px);bottom:auto;padding:3px}
-#tLeft button{width:50px;min-height:44px;font-size:11px}#tLeft button b{font-size:17px}#tLeft button b img{width:24px;height:24px}
+#tMenu{top:calc(env(safe-area-inset-top,0px) + 122px)}
+#tLeft{grid-template-columns:repeat(4,auto);top:calc(env(safe-area-inset-top,0px) + 170px)}
 #marq{top:calc(max(8px,env(safe-area-inset-top,0px)) + 80px);left:calc(max(10px,env(safe-area-inset-left,0px)) + 112px);right:max(10px,env(safe-area-inset-right,0px));height:26px}
+}
+@media (orientation:portrait){
+#tBot{justify-content:stretch}
+#tNav{flex:1;justify-content:space-around;border-radius:0 0 18px 18px;padding-top:2px}
+#tNav button{flex:1 1 0;width:auto;min-width:0}
+#tLeft{left:max(10px,env(safe-area-inset-left,0px))!important;right:max(10px,env(safe-area-inset-right,0px));top:auto!important;bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + var(--navh,62px))!important;display:flex;flex-direction:row;justify-content:space-around;
+  background:linear-gradient(#4a5c90,#3a4a78)!important;border-radius:18px 18px 0 0!important;padding:4px 4px 2px!important;gap:0;box-shadow:none;border-bottom:1px solid rgba(255,255,255,.12)}
+#tLeft button{flex:1 1 0;width:auto!important;min-width:0;min-height:44px!important;font-size:10.5px;padding:2px 0}#tLeft button b{font-size:18px!important}#tLeft button b img{width:24px;height:24px}
+#tLeft .cnt{right:50%;margin-right:-22px}
 }
 </style>
 </head><body>
@@ -503,7 +519,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
   <div id="editBar" hidden><div><b>🛠 佈置城鎮</b><small id="eMsg"></small></div><button class="blue" id="eInv">🛒 買裝飾</button><button class="go" id="eDone">完成</button></div>
   <button id="hpWarn" hidden></button>
   <div id="raid" hidden><span>⚔</span><div><b><span id="raidName"></span> 來攻打你的城!</b><br><small>對方戰力 <span id="raidPow"></span> · <span id="raidT"></span> 秒後自動迎戰<br><span>交給守城隊勝率約 <b id="raidPct">50</b>%;親自指揮可以集火、放指揮官技能、擋 Boss 大招</span></small></div><button class="go" id="raidGo">親自指揮</button><button id="raidAuto">交給守城隊</button></div>
-  <div id="marq" hidden><span class="mqi">📣</span><div class="mqw"><span id="marqT"></span></div></div><div id="tLeft"><button data-p="quest"><b><img src="assets/n_quest.webp" alt=""></b>任務<i class="dot" hidden></i></button><button data-p="sign"><b><img src="assets/n_sign.webp" alt=""></b>簽到<i class="dot" hidden></i></button><button data-p="event"><b><img src="assets/n_event.webp" alt=""></b>活動<i class="dot" hidden></i></button><button data-p="gift"><b><img src="assets/n_gift.webp" alt=""></b>福利<i class="dot" hidden></i></button><button id="tEdit"><b><img src="assets/n_build.webp" alt=""></b>佈置</button><button data-p="boss"><b><img src="assets/n_boss.webp" alt=""></b>副本<i class="dot" hidden></i></button><button data-p="todo"><b class="todoic">📋</b>待辦<i class="cnt" id="todoN" hidden>0</i></button></div>
+  <div id="marq" hidden><span class="mqi">📣</span><div class="mqw"><span id="marqT"></span></div></div><button id="tMenu" class="ib" title="選單">☰<i class="dot" hidden></i></button><div id="tLeft"><button data-p="quest"><b><img src="assets/n_quest.webp" alt=""></b>任務<i class="dot" hidden></i></button><button data-p="sign"><b><img src="assets/n_sign.webp" alt=""></b>簽到<i class="dot" hidden></i></button><button data-p="event"><b><img src="assets/n_event.webp" alt=""></b>活動<i class="dot" hidden></i></button><button data-p="gift"><b><img src="assets/n_gift.webp" alt=""></b>福利<i class="dot" hidden></i></button><button id="tEdit"><b><img src="assets/n_build.webp" alt=""></b>佈置</button><button data-p="boss"><b><img src="assets/n_boss.webp" alt=""></b>副本<i class="dot" hidden></i></button><button data-p="todo"><b class="todoic">📋</b>待辦<i class="cnt" id="todoN" hidden>0</i></button></div>
   <div id="tBot"><nav id="tNav"><button data-p="pets"><b><img src="assets/n_pets.webp" alt=""></b>萌獸<i class="dot" hidden></i></button><button data-p="bag"><b><img src="assets/n_bag.webp" alt=""></b>背包</button><button data-p="ach"><b><img src="assets/n_ach.webp" alt=""></b>成就<i class="dot" hidden></i></button><button data-p="rank"><b><img src="assets/n_rank.webp" alt=""></b>天梯<i class="dot" hidden></i></button><button data-p="friends"><b><img src="assets/n_friends.webp" alt=""></b>好友<i class="dot" hidden></i></button><button data-p="chat"><b class="todoic">💬</b>聊天<i class="dot" hidden></i></button></nav>
     <button id="goAdv"><b>⚔</b>開始冒險<small>下一關</small></button></div>
 </div>
@@ -1837,9 +1853,12 @@ function drawWalker(im,X,Y,h,faceS,ph,G,moving,sx,sy,rot){if(!im||!im.naturalWid
   // the leg pair further from the viewer first, then the nearer one, then the body over the hips
   leg(0,mid+.07,a);leg(mid-.07,1,b);
   const bob=-Math.abs(Math.cos(ph))*h*.03;ctx.drawImage(im,0,0,iw,ih*(ly+.09),-w/2,-h+bob,w,h*(ly+.09));ctx.restore()}
+const UIL={dock:0};function uiMeasure(){const n=$('tNav'),l=$('tLeft');if(!n)return;const nh=n.getBoundingClientRect().height;if(nh)document.documentElement.style.setProperty('--navh',nh+'px');const r=l&&l.getBoundingClientRect();UIL.dock=r&&r.height&&innerHeight>innerWidth?r.top:0;
+  const md=$('tMenu');if(md){const any=[...document.querySelectorAll('#tLeft .dot,#tLeft .cnt')].some(e=>!e.hidden);md.querySelector('.dot').hidden=!any}}
+addEventListener('resize',()=>setTimeout(uiMeasure,50));setInterval(uiMeasure,1500);
 let TOWNZ=.62,TP=[],TV={ox:0,oy:0,s:1,drag:null},tfx=[],raid=null;
 function homeLayout(){const wide=W>=H*1.15,s=wide?Math.min(W/HOME.w,H/HOME.h)*1.06:Math.max(W/HOME.w,H/HOME.h)*TOWNZ;TV.s=s;const w=HOME.w*s,h=HOME.h*s;
-  if(TV.lastW!==W||TV.lastH!==H){TV.ox=(W-w)/2;TV.oy=(H-h)/2;TV.lastW=W;TV.lastH=H}TV.ox=w<=W?(W-w)/2:clamp(TV.ox,W-w,0);TV.oy=h<=H?(wide?(H-h)/2:Math.max(0,H-h-130)):clamp(TV.oy,H-h,0)}
+  if(TV.lastW!==W||TV.lastH!==H){TV.ox=(W-w)/2;TV.oy=(H-h)/2;TV.lastW=W;TV.lastH=H}TV.ox=w<=W?(W-w)/2:clamp(TV.ox,W-w,0);TV.oy=h<=H?(wide?(H-h)/2:Math.max(0,(UIL.dock||H-130)-h)):clamp(TV.oy,H-h,0)}
 const hx=x=>TV.ox+x*MAPW*TV.s,hy=y=>TV.oy+(MT+y*MAPH)*TV.s;
 function townPets(){const gk=guardKeys().slice(0,3),src=(VISIT?VISIT.pets:owned().map(k=>[k,SV.pets[k].st,SV.pets[k].lv])).filter(x=>!gk.includes(x[0])),own=src.map(x=>x[0]);for(const [k,st,lv] of src){const q=TP.find(p=>p.k===k);if(q){q.st=st;q.lv=lv}}for(const [k,st,lv] of src)if(!TP.find(p=>p.k===k)){const ks=Object.keys(NODES),n=ks[Math.floor(rnd()*ks.length)];TP.push({k,st,lv,at:n,to:null,x:NODES[n][0],y:NODES[n][1],wait:rnd()*3,anim:rnd()*9,ph:0,face:1,emote:null,jump:0,act:null,actT:0,run:0})}
   TP=TP.filter(p=>own.includes(p.k))}
@@ -1881,7 +1900,7 @@ function bldInfo(k){const now=Date.now();if(k==='play'&&!VISIT)return unlocked('
   if(k==='summon'){const F=vfree();return {sub:F.left>0?'免費單抽!':null,dot:F.left>0||SV.gem>=160}}
   if(k==='fountain')return {dot:owned().some(canEvolve)};if(k==='shop')return {dot:SV.buy.free!==today()};
   return {}}
-function townTap(x,y){if(EDIT)return editTap(x,y);for(const g of GHIT)if(x>=g.x0&&x<=g.x1&&y>=g.y0&&y<=g.y1){sfx('click');return showPetCard(g.k)}for(const p of [...TP].sort((a,b)=>b.y-a.y))if(p.hit&&x>=p.hit.x0&&x<=p.hit.x1&&y>=p.hit.y0&&y<=p.hit.y1){p.jump=.45;p.act=null;p.actT=0;p.emote={s:'❤️',t:0,life:1.5};sfx('up');
+function townTap(x,y){if($('tLeft').classList.contains('open')){$('tLeft').classList.remove('open');return}if(EDIT)return editTap(x,y);for(const g of GHIT)if(x>=g.x0&&x<=g.x1&&y>=g.y0&&y<=g.y1){sfx('click');return showPetCard(g.k)}for(const p of [...TP].sort((a,b)=>b.y-a.y))if(p.hit&&x>=p.hit.x0&&x<=p.hit.x1&&y>=p.hit.y0&&y<=p.hit.y1){p.jump=.45;p.act=null;p.actT=0;p.emote={s:'❤️',t:0,life:1.5};sfx('up');
     return showPetCard(p.k)}
   for(const h of thits)if(x>=h.x0&&x<=h.x1&&y>=h.y0&&y<=h.y1){sfx('click');return building(h.b.k,x,y)}}
 function playTap(x,y){if(SV.playDay===today()){toast('萌獸們正在樂園玩,明天再來領禮物');for(const p of TP)p.emote={s:'🎵',t:0,life:1.4};return}SV.playDay=today();SV.candy=(SV.candy||0)+20;SV.gem+=10;save();townHud();sfx('coin');tfx.push({s:'🍬+20 💎+10',x,y:y-30,t:0,life:1.6,c:'#ffe27a'});for(const p of TP){p.jump=.45;p.emote={s:['🎉','🎈','😆'][Math.floor(rnd()*3)],t:0,life:1.6}}}
@@ -2815,7 +2834,8 @@ setInterval(a2hsBanner,3000);
 document.querySelector('#tTop .prof').onclick=()=>{if(tutBlock())return;sfx('click');openSheet('me','me')};
 $('vRep').onclick=()=>{sfx('click');helpRepair()};$('hpWarn').onclick=()=>{sfx('click');openSheet('castle','main')};
 $('vBack').onclick=()=>{sfx('click');endVisit()};$('vLike').onclick=()=>likeVisit();$('tEdit').onclick=()=>{sfx('click');if(SV.tut<9)return toast('完成新手教學後就能佈置城鎮');startEdit()};$('eDone').onclick=()=>{sfx('click');endEdit()};$('eInv').onclick=()=>{sfx('click');openSheet('shop','deco')};$('vSpar').onclick=()=>{sfx('click');spar($('vSpar').dataset.id)};
-document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(tutBlock())return;sfx('click');const p=b.dataset.p;selTeam='team';selSlot=0;petView=null;openSheet(p)});
+$('tMenu').onclick=e=>{e.stopPropagation();sfx('click');$('tLeft').classList.toggle('open')};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(tutBlock())return;$('tLeft').classList.remove('open');sfx('click');const p=b.dataset.p;selTeam='team';selSlot=0;petView=null;openSheet(p)});
 $('goAdv').onclick=()=>{sfx('click');selTeam='team';if(SV.tut===1)return tutBattle();if(SV.tut>=4&&!useSta())return;advGo(nextLevel(),false)};
 $('setBtn').onclick=()=>{sfx('click');openSheet('set')};[$('tGem'),$('shGem')].forEach(el=>{const c=el&&el.parentElement;if(c){c.style.cursor='pointer';c.title='儲值鑽石';c.onclick=ev=>{ev.stopPropagation();if(tutBlock())return;sfx('click');openSheet('pay')}}});
 $('sndBtn').onclick=()=>{SND.on=!SND.on;$('sndBtn').textContent=SND.on?'🔊':'🔇';au()};
