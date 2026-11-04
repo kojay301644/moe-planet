@@ -135,7 +135,7 @@ const A={};function bind(root){root.querySelectorAll('[data-a]').forEach(el=>{el
 const V={};
 // ---------- 總覽 ----------
 const LACT={town:'城鎮',adv:'冒險',siege:'攻城',defend:'守城',boss:'個人副本',raid:'團隊 Boss',pvp:'天梯',event:'每日活動',trial:'試煉塔',visit:'拜訪好友','td':'守塔挑戰'};
-const actName=a=>{a=a||'town';if(a.startsWith('td:')){const [,m,d]=a.split(':');return '守塔挑戰 · '+(m==='endless'?'無盡':m==='practice'?'練習('+['普通','困難','地獄'][+d||0]+')':['普通','困難','地獄'][+d||0])}return LACT[a]||a};
+const actName=a=>{a=a||'town';if(a.startsWith('td:')){const [,m,d]=a.split(':');return '守塔挑戰 · '+(m==='coop'?'好友合作':m==='endless'?'無盡':m==='practice'?'練習('+['普通','困難','地獄'][+d||0]+')':['普通','困難','地獄'][+d||0])}return LACT[a]||a};
 let LIVE=null,LIVEsel=null;
 async function liveCard(){let R;try{R=await rpc('admin_live_status')}catch(e){return `<div class="card"><h2>即時狀態</h2><p class="mut">需要先貼最新的 server.sql</p></div>`}LIVE=R;const P=R.players||[],g={};P.forEach(x=>{const k=(x.act||'town').startsWith('td:')?'td':(x.act||'town');(g[k]=g[k]||[]).push(x)});
   const ks=Object.keys(g).sort((a,b)=>g[b].length-g[a].length),mx=Math.max(1,...ks.map(k=>g[k].length));
