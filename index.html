@@ -483,19 +483,22 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 .hpbar.sm{height:10px;margin:4px 0}
 #tMenu{display:none}
 @media (orientation:landscape) and (max-height:560px){
-#tMenu{display:grid;place-items:center;position:absolute;left:max(10px,env(safe-area-inset-left,0px));width:48px;height:44px;border-radius:14px;font-size:22px;pointer-events:auto;background:rgba(20,30,60,.8);color:#fff;z-index:4}
-#tMenu .dot{position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#e04a4a;box-shadow:0 0 0 2px #fff}
-#tLeft{display:none!important;bottom:auto;padding:4px;gap:2px;z-index:4}#tLeft.open{display:grid!important;animation:popin .2s}
+#tMenu{display:grid;place-items:center;position:absolute;bottom:max(10px,env(safe-area-inset-bottom,0px));width:52px;height:52px;border-radius:50%;font-size:24px;pointer-events:auto;background:linear-gradient(#3a4a78,#24305a);color:#fff;z-index:4;box-shadow:0 4px 0 rgba(0,0,0,.3)}
+#tMenu .dot{position:absolute;top:0;right:0;width:12px;height:12px;border-radius:50%;background:#e04a4a;box-shadow:0 0 0 2px #fff}
+#tNav{display:none!important}#tNav.open{display:flex!important;animation:popin .2s}
+#tBot{padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:calc(max(10px,env(safe-area-inset-right,0px)) + 62px)}
 #tLeft button{width:52px;min-height:46px;font-size:11px}#tLeft button b{font-size:18px}#tLeft button b img{width:26px;height:26px}
 }
 @media (orientation:landscape) and (max-height:560px) and (min-width:761px){
-#tMenu{top:calc(env(safe-area-inset-top,0px) + 70px)}
-#tLeft{grid-template-columns:repeat(2,auto);top:calc(env(safe-area-inset-top,0px) + 120px)}
-#marq{top:calc(max(8px,env(safe-area-inset-top,0px)) + 74px);left:calc(max(10px,env(safe-area-inset-left,0px)) + 60px);right:max(10px,env(safe-area-inset-right,0px));height:26px}
+#tMenu{right:max(10px,env(safe-area-inset-right,0px))}
+#tLeft{display:grid;grid-template-columns:repeat(2,auto);gap:2px;top:calc(env(safe-area-inset-top,0px) + 70px)}
+#marq{top:calc(max(8px,env(safe-area-inset-top,0px)) + 62px);left:calc(max(10px,env(safe-area-inset-left,0px)) + 124px);right:max(10px,env(safe-area-inset-right,0px));height:26px}
 }
 @media (orientation:landscape) and (max-height:560px) and (max-width:760px){
-#tMenu{top:calc(env(safe-area-inset-top,0px) + 122px)}
-#tLeft{grid-template-columns:repeat(4,auto);top:calc(env(safe-area-inset-top,0px) + 170px)}
+#tMenu{left:max(10px,env(safe-area-inset-left,0px))}
+#tBot{padding-left:calc(max(10px,env(safe-area-inset-left,0px)) + 62px);padding-right:max(10px,env(safe-area-inset-right,0px));justify-content:flex-start}
+#tLeft{display:grid;grid-template-columns:repeat(3,auto);gap:2px;top:calc(env(safe-area-inset-top,0px) + 120px);bottom:auto;padding:3px}
+#tLeft button{width:50px;min-height:44px}#tLeft button b{font-size:17px}#tLeft button b img{width:24px;height:24px}
 #marq{top:calc(max(8px,env(safe-area-inset-top,0px)) + 80px);left:calc(max(10px,env(safe-area-inset-left,0px)) + 112px);right:max(10px,env(safe-area-inset-right,0px));height:26px}
 }
 @media (orientation:portrait){
@@ -1854,7 +1857,8 @@ function drawWalker(im,X,Y,h,faceS,ph,G,moving,sx,sy,rot){if(!im||!im.naturalWid
   leg(0,mid+.07,a);leg(mid-.07,1,b);
   const bob=-Math.abs(Math.cos(ph))*h*.03;ctx.drawImage(im,0,0,iw,ih*(ly+.09),-w/2,-h+bob,w,h*(ly+.09));ctx.restore()}
 const UIL={dock:0};function uiMeasure(){const n=$('tNav'),l=$('tLeft');if(!n)return;const nh=n.getBoundingClientRect().height;if(nh)document.documentElement.style.setProperty('--navh',nh+'px');const r=l&&l.getBoundingClientRect();UIL.dock=r&&r.height&&innerHeight>innerWidth?r.top:0;
-  const md=$('tMenu');if(md){const any=[...document.querySelectorAll('#tLeft .dot,#tLeft .cnt')].some(e=>!e.hidden);md.querySelector('.dot').hidden=!any}}
+  {const mq=$('marq'),pf=document.querySelector('#tTop .prof'),ch=document.querySelector('#tTop .chip');if(mq){if(innerWidth>innerHeight&&pf&&ch){const p=pf.getBoundingClientRect(),c=ch.getBoundingClientRect();mq.style.left=Math.round(p.right+8)+'px';mq.style.top=Math.round(c.bottom+6)+'px'}else{mq.style.left='';mq.style.top=''}}}
+  const md=$('tMenu');if(md){const any=[...document.querySelectorAll('#tNav .dot,#tNav .cnt')].some(e=>!e.hidden);md.querySelector('.dot').hidden=!any}}
 addEventListener('resize',()=>setTimeout(uiMeasure,50));setInterval(uiMeasure,1500);
 let TOWNZ=.62,TP=[],TV={ox:0,oy:0,s:1,drag:null},tfx=[],raid=null;
 function homeLayout(){const wide=W>=H*1.15,s=wide?Math.min(W/HOME.w,H/HOME.h)*1.06:Math.max(W/HOME.w,H/HOME.h)*TOWNZ;TV.s=s;const w=HOME.w*s,h=HOME.h*s;
@@ -1900,7 +1904,7 @@ function bldInfo(k){const now=Date.now();if(k==='play'&&!VISIT)return unlocked('
   if(k==='summon'){const F=vfree();return {sub:F.left>0?'免費單抽!':null,dot:F.left>0||SV.gem>=160}}
   if(k==='fountain')return {dot:owned().some(canEvolve)};if(k==='shop')return {dot:SV.buy.free!==today()};
   return {}}
-function townTap(x,y){if($('tLeft').classList.contains('open')){$('tLeft').classList.remove('open');return}if(EDIT)return editTap(x,y);for(const g of GHIT)if(x>=g.x0&&x<=g.x1&&y>=g.y0&&y<=g.y1){sfx('click');return showPetCard(g.k)}for(const p of [...TP].sort((a,b)=>b.y-a.y))if(p.hit&&x>=p.hit.x0&&x<=p.hit.x1&&y>=p.hit.y0&&y<=p.hit.y1){p.jump=.45;p.act=null;p.actT=0;p.emote={s:'❤️',t:0,life:1.5};sfx('up');
+function townTap(x,y){if($('tNav').classList.contains('open')){$('tNav').classList.remove('open');return}if(EDIT)return editTap(x,y);for(const g of GHIT)if(x>=g.x0&&x<=g.x1&&y>=g.y0&&y<=g.y1){sfx('click');return showPetCard(g.k)}for(const p of [...TP].sort((a,b)=>b.y-a.y))if(p.hit&&x>=p.hit.x0&&x<=p.hit.x1&&y>=p.hit.y0&&y<=p.hit.y1){p.jump=.45;p.act=null;p.actT=0;p.emote={s:'❤️',t:0,life:1.5};sfx('up');
     return showPetCard(p.k)}
   for(const h of thits)if(x>=h.x0&&x<=h.x1&&y>=h.y0&&y<=h.y1){sfx('click');return building(h.b.k,x,y)}}
 function playTap(x,y){if(SV.playDay===today()){toast('萌獸們正在樂園玩,明天再來領禮物');for(const p of TP)p.emote={s:'🎵',t:0,life:1.4};return}SV.playDay=today();SV.candy=(SV.candy||0)+20;SV.gem+=10;save();townHud();sfx('coin');tfx.push({s:'🍬+20 💎+10',x,y:y-30,t:0,life:1.6,c:'#ffe27a'});for(const p of TP){p.jump=.45;p.emote={s:['🎉','🎈','😆'][Math.floor(rnd()*3)],t:0,life:1.6}}}
@@ -2834,8 +2838,8 @@ setInterval(a2hsBanner,3000);
 document.querySelector('#tTop .prof').onclick=()=>{if(tutBlock())return;sfx('click');openSheet('me','me')};
 $('vRep').onclick=()=>{sfx('click');helpRepair()};$('hpWarn').onclick=()=>{sfx('click');openSheet('castle','main')};
 $('vBack').onclick=()=>{sfx('click');endVisit()};$('vLike').onclick=()=>likeVisit();$('tEdit').onclick=()=>{sfx('click');if(SV.tut<9)return toast('完成新手教學後就能佈置城鎮');startEdit()};$('eDone').onclick=()=>{sfx('click');endEdit()};$('eInv').onclick=()=>{sfx('click');openSheet('shop','deco')};$('vSpar').onclick=()=>{sfx('click');spar($('vSpar').dataset.id)};
-$('tMenu').onclick=e=>{e.stopPropagation();sfx('click');$('tLeft').classList.toggle('open')};
-document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(tutBlock())return;$('tLeft').classList.remove('open');sfx('click');const p=b.dataset.p;selTeam='team';selSlot=0;petView=null;openSheet(p)});
+$('tMenu').onclick=e=>{e.stopPropagation();sfx('click');$('tNav').classList.toggle('open')};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(tutBlock())return;$('tNav').classList.remove('open');sfx('click');const p=b.dataset.p;selTeam='team';selSlot=0;petView=null;openSheet(p)});
 $('goAdv').onclick=()=>{sfx('click');selTeam='team';if(SV.tut===1)return tutBattle();if(SV.tut>=4&&!useSta())return;advGo(nextLevel(),false)};
 $('setBtn').onclick=()=>{sfx('click');openSheet('set')};[$('tGem'),$('shGem')].forEach(el=>{const c=el&&el.parentElement;if(c){c.style.cursor='pointer';c.title='儲值鑽石';c.onclick=ev=>{ev.stopPropagation();if(tutBlock())return;sfx('click');openSheet('pay')}}});
 $('sndBtn').onclick=()=>{SND.on=!SND.on;$('sndBtn').textContent=SND.on?'🔊':'🔇';au()};
@@ -2882,7 +2886,7 @@ function tutBattle(){selTeam='team';advGo(0,false)}
 // the guide points at what to tap next
 const GUIDE={1:{t:'點「冒險之橋」,帶萌獸打第一場仗!',b:'bridge'},2:{t:'打贏了!點下方「萌獸」看看你的夥伴',el:'[data-p="pets"]'},4:{t:'準備好了!點「冒險之橋」挑戰森林 1',b:'bridge'},5:{t:'用送你的 💎160 到「召喚」單抽一次,找新夥伴加入隊伍!',b:'summon'}};
 function guideTick(){const g=GUIDE[SV.tut],box=$('guide');if(!g||!SV.started||B||!$('sheet').hidden||!$('town').hidden===false||!$('hatch').hidden||!$('result').hidden){box.hidden=true;return}
-  let r=null;if(g.b){const h=thits.find(h=>h.b.k===g.b);if(h)r={x:h.x0,y:h.y0,w:h.x1-h.x0,h:h.y1-h.y0}}else{const el=document.querySelector(g.el);if(el){const q=el.getBoundingClientRect();r={x:q.left,y:q.top,w:q.width,h:q.height}}}
+  let r=null;if(g.b){const h=thits.find(h=>h.b.k===g.b);if(h)r={x:h.x0,y:h.y0,w:h.x1-h.x0,h:h.y1-h.y0}}else{let el=document.querySelector(g.el);if(el&&el.closest('#tNav')&&!el.getBoundingClientRect().width)el=$('tMenu');if(el){const q=el.getBoundingClientRect();r={x:q.left,y:q.top,w:q.width,h:q.height}}}
   if(!r){box.hidden=true;return}
   // bring a building the guide points at into view on narrow screens
   if(g.b&&!TV.drag&&(r.x<20||r.x+r.w>W-20||r.y<90||r.y+r.h>H-170)){TV.ox+=(W/2-(r.x+r.w/2))*.12;TV.oy+=(H*.45-(r.y+r.h/2))*.12}
@@ -2907,7 +2911,7 @@ function ftTick(){if(FTS.on){ftDraw();return}if(!SV.started)return;if(!SV.ftd){S
   if(!ftIdle())return;const x=FTL.find(x=>!SV.ftd.includes(x.k)&&ftReady(x));if(x)ftStart(x)}
 function ftStart(x){FTS.on=x;FTS.step=-2;$('ftOv').hidden=false;$('ftBox').innerHTML=`<div class="ftnew">🎉 新功能開放</div><h3>${x.n}</h3><p>${x.d}</p><button class="go big" id="ftGo">開始介紹</button>`;$('ftBox').hidden=false;$('ftRing').hidden=true;$('ftTip').hidden=true;$('ftGo').onclick=e=>{e.stopPropagation();sfx('click');FTS.step=-1;$('ftBox').hidden=true;ftDraw()};sfx('egg')}
 function ftRect(){const x=FTS.on;if(FTS.step===-1){const g=x.go;if(g.b){const h=thits.find(h=>h.b.k===g.b);if(!h)return null;if(!TV.drag&&(h.x0<20||h.x1>W-20||h.y0<90||h.y1>H-170)){TV.ox+=(W/2-(h.x0+h.x1)/2)*.15;TV.oy+=(H*.45-(h.y0+h.y1)/2)*.15}return {x:h.x0,y:h.y0,w:h.x1-h.x0,h:h.y1-h.y0}}
-    const el=document.querySelector(g.el);if(!el)return null;const q=el.getBoundingClientRect();return q.width?{x:q.left,y:q.top,w:q.width,h:q.height}:null}
+    let el=document.querySelector(g.el);FTS.via=0;if(el&&el.closest('#tNav')&&!el.getBoundingClientRect().width){el=$('tMenu');FTS.via=1}if(!el)return null;const q=el.getBoundingClientRect();return q.width?{x:q.left,y:q.top,w:q.width,h:q.height}:null}
   const s=x.steps[FTS.step];if(!s||!s.sel)return null;const el=$('shBody').querySelector(s.sel)||document.querySelector('#sheet '+s.sel);if(!el)return null;const q=el.getBoundingClientRect();if(q.top<70||q.bottom>innerHeight-20){el.scrollIntoView({block:'center'});return null}return {x:q.left,y:q.top,w:q.width,h:q.height}}
 function ftDraw(){const x=FTS.on;if(!x||FTS.step<-1)return;const r=ftRect(),ring=$('ftRing'),tip=$('ftTip'),pad=8,last=FTS.step===x.steps.length-1;
   const txt=FTS.step===-1?`點這裡打開「${x.n}」`:x.steps[FTS.step].t;tip.hidden=false;tip.innerHTML=`<b>${txt}</b>${FTS.step>=0?`<small>${FTS.step+1} / ${x.steps.length} · 點任意處${last?'完成':'繼續'}</small>`:''}`;
@@ -2916,7 +2920,8 @@ function ftDraw(){const x=FTS.on;if(!x||FTS.step<-1)return;const r=ftRect(),ring
   else{ring.hidden=false;ring.classList.add('dim');ring.style.left='50%';ring.style.top='50%';ring.style.width='0px';ring.style.height='0px';tip.style.left=(innerWidth-tw)/2+'px';tip.style.top=(innerHeight/2-40)+'px'}FTS.r=r}
 function ftClick(e){const x=FTS.on;if(!x||FTS.step<-1)return;e.preventDefault();e.stopPropagation();
   if(FTS.step===-1){const r=FTS.r;if(!r||e.clientX<r.x-10||e.clientX>r.x+r.w+10||e.clientY<r.y-10||e.clientY>r.y+r.h+10){$('ftTip').classList.remove('shake');void $('ftTip').offsetWidth;$('ftTip').classList.add('shake');return}
-    sfx('click');openSheet(x.go.sheet,x.go.tab||null);FTS.step=0;setTimeout(ftDraw,120);return}
+    if(FTS.via){sfx('click');$('tNav').classList.add('open');setTimeout(ftDraw,250);return}
+    sfx('click');$('tNav').classList.remove('open');openSheet(x.go.sheet,x.go.tab||null);FTS.step=0;setTimeout(ftDraw,120);return}
   sfx('click');FTS.step++;if(FTS.step>=x.steps.length){SV.ftd=[...new Set([...(SV.ftd||[]),x.k])];save();FTS.on=null;$('ftOv').hidden=true;toast(`「${x.n}」介紹完成!`);return}const s=x.steps[FTS.step];if(s.sel){const el=$('shBody').querySelector(s.sel);if(el)el.scrollIntoView({block:'center'})}setTimeout(ftDraw,80)}
 $('ftOv').addEventListener('click',ftClick,true);
 setInterval(ftTick,800);addEventListener('resize',()=>{if(FTS.on)ftDraw()});
