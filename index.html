@@ -271,7 +271,8 @@ button.mini{background:#eee8dc;box-shadow:0 2px 0 #c8b896}
 .nd em{position:absolute;right:-8px;top:-8px;font-style:normal;font-size:10px;background:#e04a4a;color:#fff;border-radius:6px;padding:0 3px}
 .nd.clr{background:radial-gradient(#fff6c0,#ffc84a)}.nd.elite{width:46px;height:46px;background:radial-gradient(#ffe0d0,#ff8a5a);color:#fff;font-size:18px}
 .nd.boss{width:58px;height:58px;background:radial-gradient(#fff0f0,#ff6a6a)}.nd.boss img{width:48px;height:48px;object-fit:contain}
-.nd.lock{filter:grayscale(1) brightness(.75)}.nd.sel{outline:4px solid #ffd84a;outline-offset:2px;animation:ndp 1s ease-in-out infinite}
+.nd.lock{filter:grayscale(1) brightness(.75)}
+.nd:active{transform:translate(-50%,calc(-50% + 2px))}.nd::before{content:'';position:absolute;inset:-9px;border-radius:50%}.nd.sel{outline:4px solid #ffd84a;outline-offset:2px;animation:ndp 1s ease-in-out infinite}
 @keyframes ndp{50%{transform:translate(-50%,-50%) scale(1.12)}}
 .lvd .ens{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}.lvd .ens span{display:flex;flex-direction:column;align-items:center;width:62px}
 .lvd .ens img{width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 2px 0 rgba(0,0,0,.2))}.lvd .ens small{font-size:11px;text-align:center}.lvd .ens .b img{width:60px;height:60px}
