@@ -2197,7 +2197,7 @@ async function mkFetch(force){if(!SRV.on()||MKS.busy||(!force&&Date.now()-MKS.t<
 const MKT={
   rbuy(id){const L=MKS.list.find(x=>x.id===+id);if(!L)return;if(SV.gem<L.price)return toast('鑽石不足');if(MKT.busy)return;MKT.busy=1;
     SRV.op('market_buy',{p_id:+id}).then(()=>{MKT.busy=0;sfx('coin');MKS.list=MKS.list.filter(x=>x!==L);mkFetch(true)},e=>{MKT.busy=0;toast(e.message);mkFetch(true)})},
-  rlist(e,price){if(MKT.busy)return;MKT.busy=1;SRV.op('market_list',{p_item:mkClean(e),p_price:price}).then(()=>{MKT.busy=0;SV.equips=SV.equips.filter(x=>x!==e);mkSel=null;mkPV=null;save();cloudWrite(true);toast('已上架!真人玩家和電腦玩家都可能買走');mkFetch(true)},err=>{MKT.busy=0;toast(err.message)})},
+  rlist(e,price){if(MKT.busy)return;MKT.busy=1;SRV.op('market_list',{p_item:mkClean(e),p_price:price}).then(()=>{MKT.busy=0;SV.equips=SV.equips.filter(x=>x!==e);mkSel=null;mkPV=null;save();cloudWrite(true);toast('已上架!其他守護員隨時可能買走');mkFetch(true)},err=>{MKT.busy=0;toast(err.message)})},
   rcancel(id){SRV.op('market_cancel',{p_id:+id}).then(()=>{toast('已下架,裝備會退回背包');mkFetch(true)},e=>toast(e.message))},
   botItems(){const M=mkSV(),w=Math.floor(Date.now()/MK_WIN);if(M.bot.w!==w){const items=[];const ts=Object.keys(EQT);
       for(let i=0;i<10;i++){const r=rnd(),rar=r<.005?4:r<.02?-1:r<.12?3:r<.52?2:1;let e;
@@ -2211,7 +2211,7 @@ const MKT={
     if(e.tb&&Date.now()-e.tb<MK_HOLD)return toast('買來的裝備要 7 天後才能再上架');if(!SRV.on()&&M.my.length>=5)return toast('最多同時上架 5 件');
     const f=mkFair(e,SRV.on());price=Math.round(+price||0);if(price<f*.5||price>f*2)return toast(`價格要在 ${fmt(Math.ceil(f*.5))} ~ ${fmt(Math.floor(f*2))} 鑽石之間`);
     if(SRV.on()){if(!e.rar)return toast('普通裝備不能上架,可以分解');return MKT.rlist(e,price)}
-    SV.equips=SV.equips.filter(x=>x!==e);M.my.push({id:'m'+Date.now()+'_'+e.id,e,price,t:Date.now(),ck:Date.now()});mkSel=null;toast('已上架,電腦玩家會依價格決定要不要買')},
+    SV.equips=SV.equips.filter(x=>x!==e);M.my.push({id:'m'+Date.now()+'_'+e.id,e,price,t:Date.now(),ck:Date.now()});mkSel=null;toast('已上架!其他守護員隨時可能買走')},
   cancel(id){const M=mkSV(),L=M.my.find(x=>x.id===id);if(!L)return;M.my=M.my.filter(x=>x!==L);SV.equips.push(L.e);eqFix();toast('已下架,裝備回到背包')},
   settle(){const M=mkSV(),now=Date.now();mkDecay();M.t=now;let sold=0,gain=0,back=0;
     for(const L of M.my.slice()){const h=Math.max(0,(Math.min(now,L.t+MK_LIFE)-L.ck)/3600e3);L.ck=now;const f=mkFair(L.e),p=L.price>f*2?0:Math.max(.002,Math.min(.5,.12*Math.pow(f/L.price,4))),pr=1-Math.pow(1-p,h);
@@ -2222,11 +2222,11 @@ const MKT={
 const mkName=e=>e.uq?UQ[e.uq].n:(e.set&&e.set!=='basic'?EQSET[e.set].n:'一般')+EQT[e.type].n+(e.lv?' +'+e.lv:'');
 let mkSel=null,mkPV=null;
 function pMarket(){const M=mkSV(),ON=SRV.on();MKT.settle();mkFetch();const t=SV.mkTab||'buy';let h=`<div class="seg2">${[['buy','購買'],['sell','出售'],['my','上架中 '+(ON?MKS.mine.filter(x=>x.status==='open').length:M.my.length)],['log','紀錄']].map(([k,n])=>`<button data-act="mkTab:${k}" class="${t===k?'on':''}">${n}</button>`).join('')}</div>`;
-  h+=`<p class="mut">用 💎鑽石買賣裝備,價格依市場供需浮動。成交時賣家付 10% 手續費;買來的裝備 7 天後才能再上架。${ON?'真人玩家和電腦玩家都在這裡買賣;上架的裝備經伺服器鑑定,買到的裝備會自動放進背包。':'目前交易對象是電腦玩家,之後會開放真人交易。'}</p>`;
+  h+=`<p class="mut">用 💎鑽石買賣裝備,價格依市場供需浮動。成交時賣家付 10% 手續費;買來的裝備 7 天後才能再上架。${ON?'上架的裝備經伺服器鑑定,買到的裝備會自動放進背包。':''}</p>`;
   const row=(e,right,extra)=>`<div class="eq r${e.rar}"><span class="eqi r${e.rar}"><img src="${eqImg(e)}" alt=""></span><div><b>${eqLabel(e)}</b><small>${eqStat(e)}${extra||''}</small></div>${right}</div>`;
   const trend=e=>{const v=mkIdx(mkKey(e));return v>1.12?' · <b class="up">▲ 熱門</b>':v<.92?' · <b class="down">▼ 冷門</b>':''};
-  if(t==='buy'&&ON){h+=`<div class="card"><h3>玩家上架 <small>真人玩家賣的裝備 · 上架 48 小時</small></h3><div class="eqs">${MKS.list.length?MKS.list.map(x=>{const e={...x.item,id:-x.id};return row(e,`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button class="go" data-act="mkRBuy:${x.id}" ${SV.gem<x.price?'disabled':''}>購買</button></div>`,` · 賣家 ${esc(x.seller_name||'守護員')} <span class="real">真人</span>`)}).join(''):`<p class="mut">${MKS.t?'目前沒有玩家上架':'讀取中…'}</p>`}</div></div>`}
-  if(t==='buy'){const L=MKT.botItems(),left=MK_WIN-(Date.now()%MK_WIN);h+=`<div class="card"><h3>正在販售 <small>每 6 小時換一批 · ${Math.floor(left/3600e3)} 小時 ${Math.floor(left%3600e3/60000)} 分後刷新</small></h3><div class="eqs">${L.length?L.map(x=>row(x.e,`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button class="go" data-act="mkBuy:${x.id}" ${SV.gem<x.price?'disabled':''}>購買</button></div>`,` · 賣家 ${x.seller}${trend(x.e)}`)).join(''):'<p class="mut">這批都被買光了,等下一批吧</p>'}</div></div>`}
+  if(t==='buy'){const L=[...(ON?MKS.list.map(x=>({e:{...x.item,id:-x.id},price:x.price,seller:esc(x.seller_name||'守護員'),act:'mkRBuy:'+x.id,t:new Date(x.created).getTime()})):[]),...MKT.botItems().map((x,i)=>({...x,act:'mkBuy:'+x.id,t:Math.floor(Date.now()/MK_WIN)*MK_WIN+i*137e3}))].sort((a,b)=>b.t-a.t);
+    h+=`<div class="card"><h3>正在販售 <small>守護員們上架的裝備 · 上架 48 小時</small></h3><div class="eqs">${L.length?L.map(x=>row(x.e,`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button class="go" data-act="${x.act}" ${SV.gem<x.price?'disabled':''}>購買</button></div>`,` · 賣家 ${x.seller}${trend(x.e)}`)).join(''):'<p class="mut">這批都被買光了,等下一批吧</p>'}</div></div>`}
   else if(t==='sell'){const can=SV.equips.filter(e=>!wornBy(e)&&!e.lock&&!(e.tb&&Date.now()-e.tb<MK_HOLD)&&(!ON||e.rar>0)).sort((a,b)=>b.rar-a.rar||mkFair(b)-mkFair(a));
     if(mkSel!=null){const e=SV.equips.find(x=>x.id===mkSel);if(e){const f=mkFair(e,ON);h+=`<div class="card hero"><div><h3>上架 ${eqLabel(e)}</h3><p class="mut">市場參考價 💎${fmt(f)}(可設定 ${fmt(Math.ceil(f*.5))} ~ ${fmt(Math.floor(f*2))})。定價越接近參考價越快賣出;成交後實拿 90%。最多上架 48 小時。</p>
       <div class="row"><input id="mkPrice" type="number" inputmode="numeric" value="${mkPV??f}" min="${Math.ceil(f*.5)}" max="${Math.floor(f*2)}"><button class="go" data-act="mkList:${e.id}">確定上架</button><button data-act="mkSel:">取消</button></div>
@@ -2234,7 +2234,7 @@ function pMarket(){const M=mkSV(),ON=SRV.on();MKT.settle();mkFetch();const t=SV.
     h+=`<div class="card"><h3>選擇要賣的裝備 <small>穿著中、上鎖、7 天內買來的不能賣</small></h3><div class="eqs">${can.length?can.map(e=>row(e,`<div class="bt"><small>參考 💎${fmt(mkFair(e,ON))}</small><button class="blue" data-act="mkSel:${e.id}">上架</button></div>`,trend(e))).join(''):'<p class="mut">沒有可以賣的裝備</p>'}</div></div>`}
   else if(t==='my'&&ON){const O=MKS.mine;h+=`<div class="card"><h3>我的上架 <small>最多同時 5 件 · 每週可上架:稀有 30、史詩 10、傳說 2、神話 1、獨特 1</small></h3><div class="eqs">${O.length?O.map(x=>{const e={...x.item,id:-x.id},left=Math.max(0,MK_LIFE-(Date.now()-new Date(x.created).getTime()));
       return row(e,x.status==='open'?`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button data-act="mkRCancel:${x.id}">下架</button></div>`:`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><small>${x.status==='sold'?'已賣出':x.status==='cancelled'?'已下架':'已過期'}</small></div>`,x.status==='open'?` · 剩 ${Math.ceil(left/3600e3)} 小時`:'')}).join(''):`<p class="mut">${MKS.t?'沒有上架中的裝備':'讀取中…'}</p>`}</div></div>`}
-  else if(t==='my'){h+=`<div class="card"><h3>上架中 <small>最多 5 件 · 電腦玩家隨時可能買走</small></h3><div class="eqs">${M.my.length?M.my.map(x=>{const left=Math.max(0,MK_LIFE-(Date.now()-x.t)),f=mkFair(x.e);return row(x.e,`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button data-act="mkCancel:${x.id}">下架</button></div>`,` · 參考 💎${fmt(f)} · 剩 ${Math.ceil(left/3600e3)} 小時`)}).join(''):'<p class="mut">沒有上架中的裝備</p>'}</div></div>`}
+  else if(t==='my'){h+=`<div class="card"><h3>上架中 <small>最多 5 件 · 其他守護員隨時可能買走</small></h3><div class="eqs">${M.my.length?M.my.map(x=>{const left=Math.max(0,MK_LIFE-(Date.now()-x.t)),f=mkFair(x.e);return row(x.e,`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button data-act="mkCancel:${x.id}">下架</button></div>`,` · 參考 💎${fmt(f)} · 剩 ${Math.ceil(left/3600e3)} 小時`)}).join(''):'<p class="mut">沒有上架中的裝備</p>'}</div></div>`}
   else{h+=`<div class="card"><h3>交易紀錄</h3><div class="list">${M.log.length?M.log.map(l=>`<div class="li"><div><b>${l.k==='buy'?'🛒 買入':'💰 賣出'} ${l.n}</b><small>${l.k==='buy'?'向 '+l.who+' 購買':'賣給 '+l.who+',實拿 💎'+fmt(l.g)} · ${tAgo(l.t)}</small></div><b>💎${fmt(l.p)}</b></div>`).join(''):'<p class="mut">還沒有交易</p>'}</div></div>`}
   return h}
 function pForge(){if(!unlocked('forge'))return `<div class="card"><h3>🔒 鍛造</h3><p>${lockMsg('forge')}</p></div>`;eqFix();const t=sheetTab||'make',M=SV.mat,c=CRAFT();

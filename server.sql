@@ -258,7 +258,7 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
--- 電腦玩家也會買上架的裝備:定價越接近參考價越容易賣出(在伺服器上計算)
+-- 其他守護員(含系統買家)也會買上架的裝備:定價越接近參考價越容易賣出(在伺服器上計算)
 create or replace function public.market_tick(u uuid) returns void language plpgsql security definer set search_path = public as $$
 declare m market; h float; p float; g int;
 begin
@@ -270,7 +270,7 @@ begin
       g := floor(m.price * .9);
       update market set status = 'sold', sold_at = now() where id = m.id;
       update wallet set gem = gem + g, updated_at = now() where uid = u;
-      insert into inbox(uid, gem, note) values (u, g, '交易所賣出(電腦玩家購買,已扣 10% 手續費)');
+      insert into inbox(uid, gem, note) values (u, g, '交易所賣出(已扣 10% 手續費)');
       insert into gem_log(uid,delta,reason) values (u, g, 'market_sell_bot:'||m.id);
     end if;
   end loop;
