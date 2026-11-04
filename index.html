@@ -1593,9 +1593,10 @@ const HOME={w:1344,h:752+180},MAPW=1344,MAPH=752,MT=180;
 /* ---------- 城鎮佈置:9 個地基、可交換位置的建築、建築造型、裝飾 ---------- */
 // all positions are in pixels of the 1344x752 base map
 const PADS={1:[668,105,120,68],2:[366,180,95,57],3:[930,183,95,57],4:[322,345,97,58],5:[645,340,97,57],6:[935,345,97,58],7:[1190,420,100,60],8:[400,545,112,68],9:[693,565,82,50]};
-const BDEF={castle:{n:'主城',sc:1.0},summon:{n:'召喚',sc:1.05},academy:{n:'學院',sc:1.1},forge:{n:'鍛造',sc:1.08},fountain:{n:'進化之泉',sc:1.04},shop:{n:'商店',sc:1.08},farm:{n:'農場',sc:1.1},train:{n:'訓練場',sc:1.1},play:{n:'萌獸樂園',sc:1.1}};
+const BDEF={castle:{n:'主城',sc:1.0},summon:{n:'召喚',sc:1.05},academy:{n:'學院',sc:1.1},forge:{n:'鍛造',sc:1.08},fountain:{n:'進化之泉',sc:1.04},shop:{n:'商店',sc:1.08},farm:{n:'農場',sc:1.1},train:{n:'訓練場',sc:1.1},play:{n:'交易所',sc:1.1}};
 const BK=Object.keys(BDEF);
-const DEF_LAY={castle:1,summon:2,academy:3,forge:4,fountain:5,shop:6,farm:7,train:8};
+const DEF_LAY={castle:1,summon:2,academy:3,forge:4,fountain:5,shop:6,farm:7,train:8,play:9};
+function layFix(lay){if(!lay.play){const used=new Set(Object.values(lay));const f=[9,1,2,3,4,5,6,7,8].find(p=>!used.has(p));if(f)lay.play=f}return lay}
 const BSTY={def:{n:'經典',pre:'b_'},ice:{n:'冰晶',pre:'bi_',coin:25000,pr:30},candy:{n:'糖果',pre:'bc_',gem:200,pr:50}};
 const TCOL={def:{portal:'74,190,255',water:'150,220,255',fire:'255,150,50',crystal:'120,210,255'},ice:{portal:'120,240,255',water:'210,245,255',fire:'110,230,255',crystal:'170,240,255'},candy:{portal:'255,110,210',water:'255,170,220',fire:'255,110,190',crystal:'255,150,220'}};
 const BREF={farm:{def:[.38,.23],ice:[.37,.19],candy:[.41,.13]}};
@@ -1623,7 +1624,7 @@ const EDGES='N-NE NE-E E-SE SE-S S-SW SW-W W-NW NW-N N-p1 NW-p2a p2a-p2 NE-p3a p
 const NB={};for(const [a,b] of EDGES){(NB[a]=NB[a]||[]).push(b);(NB[b]=NB[b]||[]).push(a)}
 // ---- town state helpers (mine or the visited one)
 function myTown(){if(!SV.lay)SV.lay={...DEF_LAY};if(!SV.bst)SV.bst={};if(!SV.bown)SV.bown=[];if(!SV.deco)SV.deco={};if(!SV.dinv)SV.dinv={};if(SV.dslots==null)SV.dslots=SLOT_FREE;
-  return {lay:SV.lay,bst:SV.bst,deco:SV.deco,pad9:!!SV.pad9,dslots:SV.dslots}}
+  layFix(SV.lay);return {lay:SV.lay,bst:SV.bst,deco:SV.deco,pad9:true,dslots:SV.dslots}}
 function curTown(){return VISIT&&VISIT.town?VISIT.town:myTown()}
 const plotOf=(T,p)=>Object.keys(T.lay).find(k=>T.lay[k]===+p);
 function bImgName(k,sty){return (BSTY[sty]||BSTY.def).pre+k}
@@ -1789,7 +1790,7 @@ function editTap(x,y){const T=myTown();
   let hit=null;for(const p of PHITS){const dx=(x-p.x)/p.rx,dy=(y-p.y)/p.ry;if(dx*dx+dy*dy<=1.15){hit=p.pad;break}}
   if(!hit)for(const b of PL){if(x>=mx(b.bx-b.bw*.4)&&x<=mx(b.bx+b.bw*.4)&&y>=my(b.by-b.bh*.9)&&y<=my(b.by)){hit=b.pad;break}}
   if(!hit){EDIT.sel=null;editMsg('點一棟建築,再點另一個地基,就能交換位置;點「+」放裝飾');return}
-  if(hit===9&&!T.pad9)return toast('第 9 塊地基要先到商店「擴建」解鎖');
+
   const k=plotOf(T,hit);
   if(!EDIT.sel){if(!k)return toast('這塊地是空的,先點一棟建築');EDIT.sel={pad:hit,k};bAnim(k).tap=.45;sfx('click');editMsg(`已選「${BDEF[k].n}」:點另一塊地基來交換,點自己取消`);return}
   if(EDIT.sel.pad===hit){EDIT.sel=null;editMsg('已取消選取');return}
@@ -1804,18 +1805,16 @@ function pShopBld(){const T=myTown();return `<p class="note">每棟建築可以�
     return `<div class="bs ${on?'on':''}"><img src="assets/${S.pre}${k}.webp" alt=""><b>${S.n}</b>${on?'<button disabled>使用中</button>':own?`<button class="blue" data-act="bUse:${k}:${s}">換上</button>`:`<button class="go" data-act="bBuy:${k}:${s}">${S.coin?'⭐'+fmt(S.coin):'💎'+S.gem}</button>`}</div>`}).join('')}</div></div>`).join('')}
 function pShopExp(){const T=myTown(),nb=SLOT_BUY.filter((_,i)=>T.dslots<SLOT_FREE+5*(i+1)),next=nb[0];
   return `<div class="card"><div class="list">
-   <div class="li q"><span class="ic">🟫</span><div><b>擴建第 9 塊地基</b><small>多一塊地,可以放新建築,或讓建築換到下方的位置 · 繁榮度 +20</small></div><button class="go" data-act="xPad" ${T.pad9?'disabled':''}>${T.pad9?'已擴建':'💎'+PAD9.gem}</button></div>
-   <div class="li q"><span class="ic">🎠</span><div><b>新建築:萌獸樂園</b><small>萌獸會在這裡玩;每天點一次領 🍬20、💎10 · 繁榮度 +50${T.pad9?'':' · 需要先擴建第 9 塊地基'}</small></div><button class="go" data-act="xPlay" ${T.lay.play||!T.pad9?'disabled':''}>${T.lay.play?'已建造':'⭐'+fmt(PLAYB.coin)}</button></div>
    <div class="li q"><span class="ic">🌼</span><div><b>裝飾格 +5</b><small>目前 ${T.dslots} / ${SLOTS.length} 格 · 繁榮度 +20</small></div><button class="go" data-act="xSlot" ${next?'':'disabled'}>${next?(next.coin?'⭐'+fmt(next.coin):'💎'+next.gem):'已全部開放'}</button></div></div></div>`}
-function prosperity(T,own){let p=0;for(const sl in T.deco){const D=DECOS[T.deco[sl]];if(D)p+=decoPr(D)}for(const k in T.bst){const S=BSTY[T.bst[k]];if(S&&S.pr)p+=S.pr}if(T.pad9)p+=20;if(T.lay.play)p+=50;p+=(T.dslots-SLOT_FREE)*4;
+function prosperity(T,own){let p=0;for(const sl in T.deco){const D=DECOS[T.deco[sl]];if(D)p+=decoPr(D)}for(const k in T.bst){const S=BSTY[T.bst[k]];if(S&&S.pr)p+=S.pr}p+=(T.dslots-SLOT_FREE)*4;
   if(own){(SV.skins||[]).forEach(id=>{const s=skinOf(id);p+=s.coin?Math.round(s.coin/2000):s.gem?Math.round(s.gem/20):0})}return p}
 const enc=T=>({lay:Object.entries(T.lay).map(([k,v])=>k+':'+v).join(','),bst:Object.entries(T.bst).filter(([k,v])=>v!=='def').map(([k,v])=>k+':'+v),deco:Object.entries(T.deco).map(([s,id])=>s+':'+id),p9:T.pad9?1:0,ds:T.dslots});
 function dec(d){const lay={};String(d.lay||'').split(',').filter(Boolean).forEach(s=>{const [k,v]=s.split(':');if(BDEF[k]&&PADS[+v])lay[k]=+v});
   const bst={};(d.bst||[]).forEach(s=>{const [k,v]=String(s).split(':');if(BDEF[k]&&BSTY[v])bst[k]=v});const deco={};(d.deco||[]).forEach(s=>{const [a,id]=String(s).split(':');if(DECOS[id]&&SLOTS[+a])deco[+a]=id});
-  return {lay:Object.keys(lay).length?lay:{...DEF_LAY},bst,deco,pad9:!!d.p9,dslots:d.ds||SLOT_FREE}}
+  return {lay:layFix(Object.keys(lay).length?lay:{...DEF_LAY}),bst,deco,pad9:true,dslots:d.ds||SLOT_FREE}}
 function lordTown(L){const r=seeded(L.i*977+3),deco={},ids=Object.keys(DECOS),n=3+Math.floor(r()*7);for(let i=0;i<n;i++){deco[Math.floor(r()*SLOTS.length)]=ids[Math.floor(r()*ids.length)]}
   const bst={};BK.forEach(k=>{const q=r();if(q<.15)bst[k]='ice';else if(q<.25)bst[k]='candy'});const lay={...DEF_LAY};if(r()<.4){const a=BK[Math.floor(r()*8)],b=BK[Math.floor(r()*8)];if(a!==b&&lay[a]&&lay[b]){const t=lay[a];lay[a]=lay[b];lay[b]=t}}
-  return {lay,bst,deco,pad9:r()<.3,dslots:SLOT_FREE}}
+  return {lay,bst,deco,pad9:true,dslots:SLOT_FREE}}
 // likes: each player lists whom they liked today in their own record; the owner counts them
 async function likeCheck(){if(!ACC.db||!ACC.uid)return;try{const q=await withTimeout(ACC.db.collection('arena').where('lk','array-contains',ACC.uid).get(),8000);const n=q.docs.filter(d=>d.data().lkDay===today()).length;
   if(!SV.lkGot||SV.lkGot.day!==today())SV.lkGot={day:today(),n:0};const nw=Math.max(0,Math.min(10,n)-SV.lkGot.n);if(nw>0){SV.lkGot.n+=nw;SV.likes=(SV.likes||0)+nw;SV.coin+=nw*500;save();toast(`今天有 ${n} 位好友幫你的城鎮按讚!⭐+${fmt(nw*500)}`)}}catch(e){}}
@@ -1876,7 +1875,7 @@ function plate(text,x,y,dot,sub){ctx.font='900 16px "Noto Sans TC",sans-serif';c
   if(dot){ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.arc(x+w/2-4,y-h/2+3,8,0,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#fff';ctx.font='900 11px sans-serif';ctx.fillText('!',x+w/2-4,y-h/2+7)}
   return {x0:x-w/2,x1:x+w/2,y0:y-h/2,y1:y+h/2}}
 let thits=[];
-function bldInfo(k){const now=Date.now();if(k==='play'&&!VISIT)return {dot:SV.playDay!==today(),sub:'🎠'};if(VISIT)return k==='castle'?{sub:'Lv.'+VISIT.castle}:{};if(k==='forge'&&!unlocked('forge'))return {sub:'🔒 Lv.'+UNLOCK.forge};if(k==='castle')return {sub:'Lv.'+SV.castle,dot:SV.reports.some(r=>!r.seen)};
+function bldInfo(k){const now=Date.now();if(k==='play'&&!VISIT)return unlocked('market')?{dot:SRV.on()&&MKS.mine.some(x=>x.status==='sold'&&Date.now()-new Date(x.sold_at)<864e5)}:{sub:'🔒 Lv.'+UNLOCK.market};if(VISIT)return k==='castle'?{sub:'Lv.'+VISIT.castle}:{};if(k==='forge'&&!unlocked('forge'))return {sub:'🔒 Lv.'+UNLOCK.forge};if(k==='castle')return {sub:'Lv.'+SV.castle,dot:SV.reports.some(r=>!r.seen)};
   if(k==='farm'){const n=farmStock();return {sub:n>0?'⭐ '+fmt(n):null,dot:n>=farmCap()*.25}}
   if(k==='train'){const Q=SV.potQ||[],done=Q.filter(x=>x.until<=Date.now()).length;return {sub:done?'✅ 完成 '+done:Q.length?'訓練中 '+Q.length:'潛能特訓',dot:done>0||(Q.length<potSlots()&&SV.coin>=200000)}}
   if(k==='summon'){const F=vfree();return {sub:F.left>0?'免費單抽!':null,dot:F.left>0||SV.gem>=160}}
@@ -1886,7 +1885,7 @@ function townTap(x,y){if(EDIT)return editTap(x,y);for(const g of GHIT)if(x>=g.x0
     return showPetCard(p.k)}
   for(const h of thits)if(x>=h.x0&&x<=h.x1&&y>=h.y0&&y<=h.y1){sfx('click');return building(h.b.k,x,y)}}
 function playTap(x,y){if(SV.playDay===today()){toast('萌獸們正在樂園玩,明天再來領禮物');for(const p of TP)p.emote={s:'🎵',t:0,life:1.4};return}SV.playDay=today();SV.candy=(SV.candy||0)+20;SV.gem+=10;save();townHud();sfx('coin');tfx.push({s:'🍬+20 💎+10',x,y:y-30,t:0,life:1.6,c:'#ffe27a'});for(const p of TP){p.jump=.45;p.emote={s:['🎉','🎈','😆'][Math.floor(rnd()*3)],t:0,life:1.6}}}
-function building(k,x,y){bAnim(k).tap=.45;if(VISIT){toast(`這是 ${VISIT.n} 的城鎮`);return}if(k==='play')return playTap(x,y);if(SV.tut<9){const ok=SV.tut===1||SV.tut===4?'bridge':SV.tut===5?'summon':null;if(k!==ok)return toast(ok==='summon'?'先到「召喚」單抽一次':'先跟著指引點「冒險之橋」')}if(k==='bridge'&&SV.tut===1)return tutBattle();if(k==='forge'&&!unlocked('forge'))return toast(lockMsg('forge'));
+function building(k,x,y){bAnim(k).tap=.45;if(VISIT){toast(`這是 ${VISIT.n} 的城鎮`);return}if(k==='play'){if(!unlocked('market'))return toast(lockMsg('market'));sfx('click');return openSheet('market')}if(SV.tut<9){const ok=SV.tut===1||SV.tut===4?'bridge':SV.tut===5?'summon':null;if(k!==ok)return toast(ok==='summon'?'先到「召喚」單抽一次':'先跟著指引點「冒險之橋」')}if(k==='bridge'&&SV.tut===1)return tutBattle();if(k==='forge'&&!unlocked('forge'))return toast(lockMsg('forge'));
   if(k==='farm'){const n=farmStock();if(n>=1){SV.coin+=n;SV.farmT=Date.now();bump('farm');save();townHud();sfx('coin');tfx.push({s:'⭐ +'+fmt(n),x,y:y-30,t:0,life:1.4,c:'#ffe27a'})}openSheet('farm');return}
 
   const sh={bridge:'adv',summon:'summon',castle:'castle',academy:'academy',forge:'forge',fountain:'evo',shop:'shop',train:'train'}[k];if(sh)openSheet(sh)}
@@ -1916,7 +1915,7 @@ function openSheet(k,tab){sheetK=k;sheetTab=tab||null;$('sheet').hidden=false;re
 function closeSheet(){if(SV.tut===2&&sheetK==='pets')SV.tut=owned().length<3?5:9;sheetK=null;petView=null;$('sheet').hidden=true;townHud();document.querySelectorAll('#tNav button').forEach(b=>b.classList.remove('on'))}
 $('shClose').onclick=()=>{if(SV.tut===5&&sheetK==='summon')return toast('先用 💎160 單抽一次,完成新手教學');closeSheet()};
 const tutBlock=()=>{if(SV.started&&SV.tut<9){toast('先跟著指引完成新手教學喔');return true}return false};
-const TITLES={mail:'信箱',todo:'今日待辦',set:'設定',adv:'冒險之橋',summon:'召喚',castle:'主城',academy:'學院',forge:'鍛造',evo:'進化之泉',shop:'商店',farm:'農場',train:'訓練場 · 潛能特訓',pets:'萌獸',bag:'背包',ach:'成就',rank:'天梯 · 排行榜',friends:'好友',chat:'聊天',pay:'儲值',me:'守護員',boss:'Boss 副本',deco:'擺放裝飾',vip:'VIP 特權',quest:'每日任務',sign:'每日簽到',event:'活動',gift:'福利'};
+const TITLES={market:'交易所',mail:'信箱',todo:'今日待辦',set:'設定',adv:'冒險之橋',summon:'召喚',castle:'主城',academy:'學院',forge:'鍛造',evo:'進化之泉',shop:'商店',farm:'農場',train:'訓練場 · 潛能特訓',pets:'萌獸',bag:'背包',ach:'成就',rank:'天梯 · 排行榜',friends:'好友',chat:'聊天',pay:'儲值',me:'守護員',boss:'Boss 副本',deco:'擺放裝飾',vip:'VIP 特權',quest:'每日任務',sign:'每日簽到',event:'活動',gift:'福利'};
 const petImgTag=(k,cls='')=>`<img class="${cls}" src="assets/${imgName(k)}.webp" alt="">`;
 function costOk(c){return SV.coin>=(c.coin||0)&&SV.fruit>=(c.fruit||0)&&SV.gem>=(c.gem||0)&&SV.stones>=(c.stones||0)}
 function pay(c){SV.coin-=c.coin||0;SV.fruit-=c.fruit||0;if(c.gem)spendGem(c.gem);SV.stones-=c.stones||0}
@@ -1930,7 +1929,7 @@ const EMI={'⭐':'i_coin','💎':'i_gem','🍎':'i_fruit','🍬':'i_candy','💠
 function iconize(root){const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),ns=[];while(w.nextNode())if(EMR.test(w.currentNode.nodeValue))ns.push(w.currentNode);
   for(const n of ns){const parts=n.nodeValue.split(/(⭐|💎|🍎|🍬|💠|🧃|⚡|🎫|🥚)/),fr=document.createDocumentFragment();for(const t of parts){if(EMI[t]){const im=document.createElement('img');im.className='ic';im.src='assets/'+EMI[t]+'.webp';im.alt=t;fr.appendChild(im)}else if(t)fr.appendChild(document.createTextNode(t))}n.parentNode.replaceChild(fr,n)}}
 function renderSheet(soft){if(!sheetK)return;regen();$('shTitle').textContent=TITLES[sheetK]||'';$('shCoin').textContent=fmt(SV.coin);$('shGem').textContent=fmt(SV.gem);$('shFruit').textContent=fmt(SV.candy||0);$('shStone').textContent=SV.stones;
-  const body=$('shBody');let h='';const R={mail:pMail,todo:pTodo,set:pSet,adv:pAdv,summon:pSummon,castle:pCastle,academy:pAcademy,forge:pForge,evo:pEvo,shop:pShop,farm:pFarm,train:pTrain,pets:pPets,bag:pBag,ach:pAch,rank:pRank,vip:pVip,boss:pBoss,friends:pFriends,chat:pChat,pay:pPay,me:pMe,deco:pDeco,quest:pQuest,sign:pSign,event:pEvent,gift:pGift}[sheetK];
+  const body=$('shBody');let h='';const R={market:()=>unlocked('market')?pMarket():`<div class="card"><h3>🔒 交易所</h3><p>${lockMsg('market')}</p></div>`,mail:pMail,todo:pTodo,set:pSet,adv:pAdv,summon:pSummon,castle:pCastle,academy:pAcademy,forge:pForge,evo:pEvo,shop:pShop,farm:pFarm,train:pTrain,pets:pPets,bag:pBag,ach:pAch,rank:pRank,vip:pVip,boss:pBoss,friends:pFriends,chat:pChat,pay:pPay,me:pMe,deco:pDeco,quest:pQuest,sign:pSign,event:pEvent,gift:pGift}[sheetK];
   h=R();if(soft===1&&h===body._h&&sheetK===body._k)return;const ci=$('chatIn'),cv=ci?ci.value:'',cf=document.activeElement===ci;body._h=h;body._k=sheetK;body.innerHTML=h;{const n=$('chatIn');if(n){n.value=cv;if(cf)n.focus();n.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();const [a,...arg]=(body.querySelector('[data-act^="csend"]')||{dataset:{act:''}}).dataset.act.split(':');ACT[a]&&ACT[a](...arg)}}}const lg=$('clog');if(lg)lg.scrollTop=lg.scrollHeight}iconize(body);body.querySelectorAll('canvas[data-sk]').forEach(drawPreview);body.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{sheetTab=b.dataset.tab;sfx('click');renderSheet()});
   body.querySelectorAll('[data-act]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();const [a,...arg]=b.dataset.act.split(':');if(SV.tut===5&&sheetK==='summon'&&a!=='egg1')return toast('先按「單抽 💎160」');ACT[a]&&ACT[a](...arg);sfx('click');save();renderSheet();townHud()})}
 const DEXSRC={armad:'召喚,或攻城勝利累積碎片合成',seal:'召喚,或團隊 Boss 累積碎片合成',marten:'召喚,或任一個人副本第 10 層首次通關贈送',phoenix:'召喚(神獸,每抽約 0.5%;200 抽保底神獸)',dragon:'召喚(神獸,每抽約 0.5%;200 抽保底神獸)'};
@@ -2236,7 +2235,7 @@ const MKS={list:[],mine:[],t:0,busy:0};
 const mkClean=e=>{const o={type:e.type,rar:e.rar,lv:e.lv||0,set:e.set||'basic',subs:(e.subs||[]).map(s=>[s[0],s[1]])};if(e.uq)o.uq=e.uq;return o};
 async function mkFetch(force){if(!SRV.on()||MKS.busy||(!force&&Date.now()-MKS.t<20e3))return;MKS.busy=1;
   try{await mailFetch(true);const [a,b]=await Promise.all([SRV.rpc('market_browse'),SRV.rpc('market_mine')]);MKS.list=a||[];MKS.mine=b||[];MKS.t=Date.now()}catch(e){}
-  MKS.busy=0;if(sheetK==='forge'&&sheetTab==='mkt')renderSheet()}
+  MKS.busy=0;if(sheetK==='market')renderSheet()}
 /* ---------- 信箱 ---------- */
 const MAIL={list:[],t:0,busy:0,seen:0};
 const mHas=m=>!!(m.item||m.credit&&m.gem||m.bonus&&Object.keys(m.bonus).length);
@@ -2342,11 +2341,10 @@ function pMarket(){const M=mkSV(),ON=SRV.on();MKT.settle();mkFetch();const t=SV.
   else{h+=`<div class="card"><h3>交易紀錄</h3><div class="list">${M.log.length?M.log.map(l=>`<div class="li"><div><b>${l.k==='buy'?'🛒 買入':'💰 賣出'} ${l.n}</b><small>${l.k==='buy'?'向 '+l.who+' 購買':'賣給 '+l.who+',實拿 💎'+fmt(l.g)} · ${tAgo(l.t)}</small></div><b>💎${fmt(l.p)}</b></div>`).join(''):'<p class="mut">還沒有交易</p>'}</div></div>`}
   return h}
 function pForge(){if(!unlocked('forge'))return `<div class="card"><h3>🔒 鍛造</h3><p>${lockMsg('forge')}</p></div>`;eqFix();const t=sheetTab||'make',M=SV.mat,c=CRAFT();
-  if(t==='dex')return tabs([['make','打造'],['up','強化'],['re','洗練'],['asc','升階'],['sal','分解'],['mkt','交易所'],['dex','圖鑑']])+pEqDex();
-  if(t==='asc')return tabs([['make','打造'],['up','強化'],['re','洗練'],['asc','升階'],['sal','分解'],['mkt','交易所'],['dex','圖鑑']])+pAsc();
-  if(t==='mkt'&&!unlocked('market'))return tabs([['make','打造'],['up','強化'],['re','洗練'],['asc','升階'],['sal','分解'],['mkt','交易所'],['dex','圖鑑']])+`<div class="card"><h3>🔒 交易所</h3><p>${lockMsg('market')}</p></div>`;
-  if(t==='mkt')return tabs([['make','打造'],['up','強化'],['re','洗練'],['asc','升階'],['sal','分解'],['mkt','交易所'],['dex','圖鑑']])+pMarket();
-  let h=tabs([['make','打造'],['up','強化'],['re','洗練'],['asc','升階'],['sal','分解'],['mkt','交易所'],['dex','圖鑑']])+`<div class="mats">${[['ore','礦石'],['enh','強化石'],['reroll','洗練石']].map(([k,n])=>`<span><img src="assets/i_${k==='ore'?'ore':k}.webp" alt="">${n} <b>${M[k]||0}</b></span>`).join('')}</div>`;
+  if(t==='dex')return tabs([['make','打造'],['up','強化'],['re','洗練'],['asc','升階'],['sal','分解'],['dex','圖鑑']])+pEqDex();
+  if(t==='asc')return tabs([['make','打造'],['up','強化'],['re','洗練'],['asc','升階'],['sal','分解'],['dex','圖鑑']])+pAsc();
+  if(t==='mkt'){setTimeout(()=>openSheet('market'),0);return ''}
+  let h=tabs([['make','打造'],['up','強化'],['re','洗練'],['asc','升階'],['sal','分解'],['dex','圖鑑']])+`<div class="mats">${[['ore','礦石'],['enh','強化石'],['reroll','洗練石']].map(([k,n])=>`<span><img src="assets/i_${k==='ore'?'ore':k}.webp" alt="">${n} <b>${M[k]||0}</b></span>`).join('')}</div>`;
   if(t==='make'){const free=vip()>=2&&SV.fFree!==today();h+=`<div class="card hero forge"><div><h3>打造裝備</h3><p class="mut">隨機打造項圈(攻擊)、帽子(血量)、護符(防禦)${glv()>=20?'、鈴鐺(技能冷卻)':';守護員 Lv.20 開放鈴鐺'}。鍛造只出「一般裝備」(沒有套裝,副屬性條數 = 品質);套裝要打頭目。</p>
     <p class="mut">機率:普通 60%、稀有 30%、史詩 9.5%、傳說 0.5%。連續 ${50-(SV.fPity||0)} 次沒出史詩以上保證史詩;${120-(SV.fLeg||0)} 次內保證傳說。</p>
     <div class="row">${free?`<button class="blue" data-act="craft:1:free">VIP 每日免費打造</button>`:''}<button class="go" data-act="craft:1">打造 1 件 ⭐${c.coin} + 礦石 ${c.ore}</button><button class="go" data-act="craft:10">打造 10 件 ⭐${fmt(c.coin*10)} + 礦石 ${c.ore*10}</button></div></div></div>
@@ -2880,7 +2878,7 @@ const FTL=[
  {k:'ladder',f:'ladder',n:'天梯',d:'和其他守護員 3 對 3 對戰,爭奪段位和賽季獎勵!',go:{el:'[data-p="rank"]',sheet:'rank'},steps:[{t:'每天有 5 張挑戰券,選一位對手開戰'},{t:'贏了加分、輸了扣分;打贏比你高分的對手加更多分'},{t:'每個賽季 14 天,結算時依最高段位發獎勵;天梯幣可以到天梯商店換指定裝備'}]},
  {k:'boss',f:'boss',n:'Boss 副本',d:'挑戰強大的頭目,拿到套裝裝備!',go:{el:'[data-p="boss"]',sheet:'boss'},steps:[{sel:'[data-tab="solo"]',t:'個人副本:打頭目掉套裝裝備,層數越高掉越好的'},{sel:'[data-tab="raid"]',t:'團隊 Boss:全服一起打,依傷害排名發獎勵,好友也能來支援'}]},
  {k:'forge',f:'forge',n:'鍛造',d:'打造和強化裝備,讓萌獸變得更強!',go:{b:'forge',sheet:'forge'},steps:[{sel:'[data-tab="make"]',t:'打造:用星星幣和礦石打造隨機裝備'},{sel:'[data-tab="up"]',t:'強化:提升裝備數值,每 +3 會強化一條副屬性'},{sel:'[data-tab="re"]',t:'洗練:用洗練石重新隨機副屬性'},{sel:'[data-tab="sal"]',t:'分解:把用不到的裝備拆成材料'}]},
- {k:'market',f:'market',n:'交易所',d:'用鑽石和其他守護員買賣裝備,價格隨市場供需浮動。',go:{b:'forge',sheet:'forge',tab:'mkt'},steps:[{sel:'[data-act="mkTab:buy"]',t:'「購買」看大家上架的裝備,買到的裝備會放進背包'},{sel:'[data-act="mkTab:sell"]',t:'「出售」選裝備上架,價格要在參考價的 0.5～2 倍之間'},{t:'賣出時收 10% 手續費;賣出的鑽石和交易通知都會寄到信箱'}]},
+ {k:'market',f:'market',n:'交易所',d:'用鑽石和其他守護員買賣裝備,價格隨市場供需浮動。',go:{b:'play',sheet:'market'},steps:[{sel:'[data-act="mkTab:buy"]',t:'「購買」看大家上架的裝備,買到的裝備會放進背包'},{sel:'[data-act="mkTab:sell"]',t:'「出售」選裝備上架,價格要在參考價的 0.5～2 倍之間'},{t:'賣出時收 10% 手續費;賣出的鑽石和交易通知都會寄到信箱'}]},
  {k:'mail',c:()=>SRV.on()&&mailUnread()>0,n:'信箱',d:'你收到了第一封信!營運獎勵、交易所的裝備、客服回覆都會寄到這裡。',go:{el:'#mailBtn',sheet:'mail'},steps:[{sel:'[data-act="mailAll"]',t:'按「全部領取」一次拿走所有附件'}]}];
 const FTS={on:null,step:-2};
 function ftReady(x){return x.f?unlocked(x.f):x.c?x.c():false}
