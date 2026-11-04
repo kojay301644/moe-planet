@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>萌獸星球 營運後台</title>
+<link rel="icon" href="assets/icon_180.png">
+<style>
+:root{--bg:#f6f2ea;--panel:#fffdf8;--ink:#2f2418;--mut:#8a7a66;--line:#eadfcd;--acc:#e8702a;--acc2:#fff0e2;--ok:#2a9a5a;--okbg:#e3f6ea;--bad:#d0443a;--badbg:#fde8e5;--warn:#c88a10;--warnbg:#fff4d8;--blue:#2f7ad8;--chip:#f2ebdf;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17130f;--panel:#221c16;--ink:#f1e8dc;--mut:#a8977f;--line:#3a3027;--acc:#ff8a45;--acc2:#3a2618;--ok:#5ad08a;--okbg:#17321f;--bad:#ff6a5a;--badbg:#3a1a16;--warn:#f0b840;--warnbg:#3a2e12;--blue:#6aa8ff;--chip:#2e261e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17130f;--panel:#221c16;--ink:#f1e8dc;--mut:#a8977f;--line:#3a3027;--acc:#ff8a45;--acc2:#3a2618;--ok:#5ad08a;--okbg:#17321f;--bad:#ff6a5a;--badbg:#3a1a16;--warn:#f0b840;--warnbg:#3a2e12;--blue:#6aa8ff;--chip:#2e261e;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:7px 12px;font-weight:600}
+button:hover{border-color:var(--acc)}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+button.d{background:var(--badbg);border-color:transparent;color:var(--bad)}
+button.s{padding:4px 9px;font-size:12px}
+button:disabled{opacity:.5;cursor:default}
+input,select,textarea{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 10px;min-width:0}
+textarea{width:100%;min-height:90px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-1px}
+.top{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.top .r1{display:flex;align-items:center;gap:10px;max-width:1180px;margin:0 auto}
+.top img{width:30px;height:30px;border-radius:8px}
+.top h1{font-size:16px;margin:0;flex:1}
+.top h1 small{color:var(--mut);font-weight:500;margin-left:6px}
+nav{display:flex;gap:2px;overflow-x:auto;max-width:1180px;margin:8px auto 0;scrollbar-width:none}
+nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--mut);white-space:nowrap}
+nav button.on{color:var(--acc);border-bottom-color:var(--acc)}
+main{max-width:1180px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 60px max(16px,env(safe-area-inset-left,0px));display:grid;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.card h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 small{color:var(--mut);font-weight:500;font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.kpi small{color:var(--mut);display:block;font-size:12px}
+.kpi b{font-size:22px;font-variant-numeric:tabular-nums}
+.kpi.warn b{color:var(--warn)}.kpi.bad b{color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>input{flex:1 1 160px}
+.tw{overflow-x:auto;margin:0 -4px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--mut);font-weight:600}
+td.n,th.n{text-align:right}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--acc2)}
+.tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:11px;font-weight:700;background:var(--chip);color:var(--mut)}
+.tag.bad{background:var(--badbg);color:var(--bad)}.tag.ok{background:var(--okbg);color:var(--ok)}.tag.warn{background:var(--warnbg);color:var(--warn)}.tag.vip{background:var(--acc2);color:var(--acc)}
+.mut{color:var(--mut)}
+.bars{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;align-items:end;height:120px;margin-top:6px}
+.bars div{background:var(--acc);border-radius:4px 4px 0 0;min-height:2px;position:relative}
+.bars.b2 div{background:var(--blue)}.bars.b3 div{background:var(--ok)}
+.bl{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;font-size:10px;color:var(--mut);text-align:center}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.charts h3{font-size:13px;margin:0;display:flex;justify-content:space-between}
+.charts h3 b{font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0}
+dt{color:var(--mut)}dd{margin:0;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
+.drawer{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.35);display:flex;justify-content:flex-end}
+.drawer .in{background:var(--bg);width:min(720px,100%);height:100%;overflow-y:auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 40px 16px;display:grid;gap:14px;align-content:start}
+.drawer .hd{display:flex;align-items:center;gap:10px}
+.drawer .hd h2{margin:0;flex:1;font-size:18px}
+.act{display:grid;gap:8px}
+.act label{font-size:12px;color:var(--mut);font-weight:600}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;z-index:50;font-weight:600;max-width:calc(100% - 32px)}
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login .card{width:min(380px,100%);display:grid;gap:10px;text-align:center}
+.login img{width:64px;height:64px;border-radius:16px;margin:0 auto}
+.login h1{margin:0;font-size:20px}
+.item b{font-weight:700}.r1c{color:#3fa9ff}.r2c{color:#b45cff}.r3c{color:#e8a010}.r4c{color:#ff3a6a}
+.empty{padding:20px;text-align:center;color:var(--mut)}
+.notice{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.notice p{margin:0;white-space:pre-wrap;color:var(--mut)}
+code{background:var(--chip);padding:1px 5px;border-radius:5px;font-size:12px}
+</style></head><body>
+<div id="loginV" class="login"><div class="card">
+  <img src="assets/icon_180.png" alt=""><h1>萌獸星球 營運後台</h1>
+  <p class="mut" style="margin:0">用你在遊戲裡建立的帳號密碼登入</p>
+  <input id="lu" placeholder="帳號" autocomplete="username" autocapitalize="off">
+  <input id="lp" type="password" placeholder="密碼" autocomplete="current-password">
+  <button class="p" id="lgo">登入</button>
+  <div id="lmsg" class="mut"></div>
+</div></div>
+<div id="appV" hidden>
+  <div class="top"><div class="r1"><img src="assets/icon_180.png" alt=""><h1>營運後台<small id="who"></small></h1><button class="s" id="refresh">重新整理</button><button class="s" id="logout">登出</button></div>
+    <nav id="nav"></nav></div>
+  <main id="main"></main>
+</div>
+<div id="drawer" class="drawer" hidden><div class="in" id="dIn"></div></div>
+<div id="toast" hidden></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+const C=window.MOE_CFG,sb=supabase.createClient(C.url,C.key,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'moe-admin-auth'}});
+const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>(+n||0).toLocaleString('zh-TW'),tm=t=>t?new Date(t).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'-';
+const ago=t=>{if(!t)return '-';const s=(Date.now()-new Date(t))/1e3;return s<60?'剛剛':s<3600?Math.floor(s/60)+' 分鐘前':s<86400?Math.floor(s/3600)+' 小時前':Math.floor(s/86400)+' 天前'};
+let toastT;function toast(m){const el=$('toast');el.textContent=m;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600)}
+async function rpc(fn,a){const {data,error}=await sb.rpc(fn,a||{});if(error){const m=error.message||'';throw new Error(/[\u4e00-\u9fff]/.test(m)?m:/does not exist|Could not find/.test(m)?'伺服器還沒安裝後台功能,請先在 Supabase 執行最新的 server.sql':m)}return data}
+const PET={fox:'小焰狐',otter:'泡泡獺',penguin:'雪糰企鵝',pango:'小石甲',ferret:'靜電毛球',whale:'小鯨鈴',bear:'苔苔熊',dragon:'星晶龍寶',bunny:'蘑菇兔',mouse:'火花鼠',mole:'礦石鼴',puffer:'泡泡豚',owl:'雪絨鴞',lizard:'火蜥寶',deer:'雷光鹿',moth:'花芽蝶',armad:'小鋼甲',seal:'雪球海豹',marten:'影絨貂',phoenix:'火鳥雛'};
+const EQT={collar:'項圈',hat:'帽子',charm:'護符',bell:'鈴鐺'},SET={basic:'一般',fire:'烈焰',ice:'冰霜',elec:'雷鳴',guard:'守護',wind:'疾風',siege:'攻城',hunt:'獵王'},UQ={vamp:'吸血項圈',wind:'疾風帽',thorn:'荊棘護符',revenge:'復仇鈴鐺'},RAR=['普通','稀有','史詩','傳說','神話'];
+const SUB={atk:'攻擊',hp:'血量',def:'防禦',crit:'爆擊率',critd:'爆擊傷害',cdr:'技能冷卻',boss:'對Boss',siege:'對城門塔',heal:'治療'};
+const itemName=e=>e?`<span class="item r${e.rar}c"><b>${e.uq?UQ[e.uq]:SET[e.set||'basic']+EQT[e.type]}${e.lv?' +'+e.lv:''}</b></span> <span class="tag">${RAR[e.rar]||''}</span>`:'-';
+const itemSubs=e=>(e&&e.subs||[]).map(s=>`${SUB[s[0]]||s[0]} +${s[1]}`).join('、');
+const REASON=r=>{r=r||'';return r==='earn'?'遊戲獲得':r==='spend'?'遊戲花費':r==='mail'?'信件領取':r.startsWith('summon')?'召喚 ×'+r.slice(6):r.startsWith('topup:')?'儲值 '+r.slice(6):r.startsWith('admin:')?'營運調整 '+r.slice(6):r.startsWith('market_buy')?'交易所購買':r.startsWith('market_sell_bot')?'交易所賣出(系統)':r.startsWith('market_sell')?'交易所賣出':r==='ladder_ticket'?'天梯挑戰券':r};
+const ACTN={claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',admin_remove:'移除管理員'};
+let ME=null,TAB='home',PQ={q:'',sort:'recent'},MKS='open';
+const TABS=[['home','總覽'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告'],['market','交易所'],['admins','管理員'],['logs','操作紀錄']];
+// ---------- login ----------
+const em=u=>String(u).trim().toLowerCase()+'@player.moe-planet.app';
+$('lgo').onclick=async()=>{const u=$('lu').value.trim(),p=$('lp').value;if(!u||!p)return toast('請輸入帳號和密碼');$('lgo').disabled=true;$('lmsg').textContent='登入中…';
+  const {error}=await sb.auth.signInWithPassword({email:em(u),password:p});$('lgo').disabled=false;if(error){$('lmsg').textContent=/Invalid/.test(error.message)?'帳號或密碼錯誤':error.message;return}boot()};
+$('lp').onkeydown=e=>{if(e.key==='Enter')$('lgo').click()};
+$('logout').onclick=async()=>{await sb.auth.signOut();location.reload()};
+$('refresh').onclick=()=>render();
+async function boot(){const {data:{session}}=await sb.auth.getSession();if(!session){$('loginV').hidden=false;$('appV').hidden=true;return}
+  let w;try{w=await rpc('admin_whoami')}catch(e){$('lmsg').textContent=e.message;$('loginV').hidden=false;return}
+  if(!w.admin){$('loginV').hidden=false;$('appV').hidden=true;
+    $('lmsg').innerHTML=w.anyAdmin?'這個帳號沒有管理員權限。<br>請現有管理員到「管理員」頁新增你。<br><button class="s" id="lout">換帳號</button>':'目前還沒有任何管理員。<br><button class="p" id="lclaim">設定我為第一位管理員</button> <button class="s" id="lout">換帳號</button>';
+    $('lout').onclick=async()=>{await sb.auth.signOut();location.reload()};if($('lclaim'))$('lclaim').onclick=async()=>{try{await rpc('admin_claim');toast('你已經是管理員了');boot()}catch(e){toast(e.message)}};return}
+  const {data:{user}}=await sb.auth.getUser();ME={uid:user.id,acct:(user.email||'').split('@')[0]};$('who').textContent=ME.acct;$('loginV').hidden=true;$('appV').hidden=false;
+  TAB=(location.hash||'#home').slice(1);if(!TABS.some(t=>t[0]===TAB))TAB='home';render()}
+addEventListener('hashchange',()=>{const t=location.hash.slice(1);if(TABS.some(x=>x[0]===t)&&t!==TAB){TAB=t;render()}});
+function navR(){$('nav').innerHTML=TABS.map(([k,n])=>`<button class="${k===TAB?'on':''}" data-t="${k}">${n}</button>`).join('');$('nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{TAB=b.dataset.t;location.hash=TAB;render()})}
+async function render(){navR();const m=$('main');m.innerHTML='<div class="empty">讀取中…</div>';try{m.innerHTML=await V[TAB]();bind(m)}catch(e){m.innerHTML=`<div class="card"><h2>讀取失敗</h2><p>${esc(e.message)}</p></div>`}}
+// click handlers: data-a="name:arg"
+const A={};function bind(root){root.querySelectorAll('[data-a]').forEach(el=>{el.onclick=e=>{e.stopPropagation();e.preventDefault();const [k,...a]=el.dataset.a.split(':');A[k]&&A[k](...a)}})}
+const V={};
+// ---------- 總覽 ----------
+V.home=async()=>{const s=await rpc('admin_stats'),D=s.days||[];
+  const bar=(k,cls)=>{const mx=Math.max(1,...D.map(d=>+d[k]||0));return `<div class="bars ${cls||''}">${D.map(d=>`<div style="height:${(+d[k]||0)/mx*100}%" title="${d.d}:${fmt(d[k])}"></div>`).join('')}</div><div class="bl">${D.map((d,i)=>`<span>${i%2?'':d.d.slice(5).replace('-','/')}</span>`).join('')}</div>`};
+  const sum=k=>D.reduce((a,d)=>a+(+d[k]||0),0);
+  return `<div class="kpis">
+    <div class="kpi"><small>玩家總數</small><b>${fmt(s.players)}</b><small>已建帳號 ${fmt(s.registered)}</small></div>
+    <div class="kpi"><small>今日新增</small><b>${fmt(s.new_today)}</b></div>
+    <div class="kpi"><small>今日活躍</small><b>${fmt(s.active_today)}</b><small>7 天活躍 ${fmt(s.active_7d)}</small></div>
+    <div class="kpi"><small>今日儲值(鑽石)</small><b>💎${fmt(s.topup_today)}</b></div>
+    <div class="kpi"><small>累積儲值</small><b>💎${fmt(s.topup_total)}</b><small>付費玩家 ${fmt(s.payers)} 人</small></div>
+    <div class="kpi"><small>全服鑽石存量</small><b>💎${fmt(s.gem_total)}</b></div>
+    <div class="kpi ${s.flagged?'warn':''}"><small>可疑玩家</small><b>${fmt(s.flagged)}</b><small><a href="#players" data-a="pf:!flag">查看</a></small></div>
+    <div class="kpi ${s.banned?'bad':''}"><small>停權中</small><b>${fmt(s.banned)}</b></div>
+    <div class="kpi"><small>交易所上架中</small><b>${fmt(s.market_open)}</b><small>7 天成交 ${fmt(s.market_sold_7d)}</small></div>
+  </div>
+  <div class="card"><h2>最近 14 天</h2><div class="charts">
+    <div><h3>新增玩家 <b>${fmt(sum('new'))}</b></h3>${bar('new')}</div>
+    <div><h3>活躍玩家(每日) <b class="mut">平均 ${fmt(Math.round(sum('active')/Math.max(1,D.length)))}</b></h3>${bar('active','b2')}</div>
+    <div><h3>儲值鑽石 <b>💎${fmt(sum('topup'))}</b></h3>${bar('topup','b3')}</div></div></div>
+  <div class="card"><h2>小提醒</h2><p class="mut" style="margin:0">「可疑」代表伺服器擋下過異常行為:一天想入帳的鑽石超過上限、花費超過餘額、天梯戰鬥時間太短或戰力差太多卻獲勝。偶爾一次可能是網路問題,次數很多才需要處理。<br>目前儲值是測試模式(按了就給鑽石),串接金流後這裡的儲值數字就會是真實營收。</p></div>`};
+A.pf=q=>{PQ.q=q;TAB='players';location.hash='players';render()};
+// ---------- 玩家 ----------
+V.players=async()=>{const L=await rpc('admin_players',{p_q:PQ.q,p_sort:PQ.sort,p_limit:100});
+  return `<div class="card"><div class="row"><input id="pq" placeholder="搜尋帳號、守護員名稱或 UID" value="${esc(PQ.q.startsWith('!')?'':PQ.q)}"><select id="ps">${[['recent','最近上線'],['gem','鑽石最多'],['topup','儲值最多'],['pts','天梯分最高'],['flags','可疑次數']].map(([k,n])=>`<option value="${k}" ${PQ.sort===k?'selected':''}>${n}</option>`).join('')}</select><button class="p" data-a="psearch">搜尋</button></div>
+    <div class="row" style="margin-top:8px">${[['','全部'],['!flag','⚠ 可疑'],['!ban','⛔ 停權'],['!pay','💰 付費']].map(([k,n])=>`<button class="s ${PQ.q===k?'p':''}" data-a="pf:${k}">${n}</button>`).join('')}</div></div>
+  <div class="card"><h2>玩家 <small>${L.length} 位${L.length>=100?'(只顯示前 100 位,請用搜尋)':''} · 點一下看詳細</small></h2><div class="tw"><table><thead><tr><th>守護員</th><th>帳號</th><th class="n">主城</th><th class="n">鑽石</th><th class="n">儲值</th><th class="n">天梯</th><th>狀態</th><th>最後上線</th></tr></thead><tbody>
+  ${L.map(p=>`<tr class="click" data-a="pdet:${p.uid}"><td><b>${esc(p.name||'(未命名)')}</b></td><td>${p.acct?esc(p.acct):'<span class="tag">訪客</span>'}</td><td class="n">${p.castle||'-'}</td><td class="n">${fmt(p.gem)}</td><td class="n">${p.topup?fmt(p.topup)+' <span class="tag vip">VIP'+p.vip+'</span>':'-'}</td><td class="n">${fmt(p.pts)}</td><td>${p.banned?'<span class="tag bad">停權</span> ':''}${p.flags?`<span class="tag warn">可疑 ${p.flags}</span>`:''}${!p.banned&&!p.flags?'<span class="tag ok">正常</span>':''}</td><td class="mut">${ago(p.seen)}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">沒有符合的玩家</td></tr>'}
+  </tbody></table></div></div>`};
+A.psearch=()=>{PQ.q=$('pq').value.trim();PQ.sort=$('ps').value;render()};
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pq')A.psearch();if(e.key==='Escape')$('drawer').hidden=true});
+$('drawer').onclick=e=>{if(e.target.id==='drawer')$('drawer').hidden=true};
+let CUR=null;
+A.pdet=async uid=>{CUR=uid;const d=$('drawer'),I=$('dIn');d.hidden=false;I.innerHTML='<div class="empty">讀取中…</div>';let P;try{P=await rpc('admin_player',{p_uid:uid})}catch(e){I.innerHTML=`<div class="card">${esc(e.message)}</div>`;return}
+  const u=P.user||{},w=P.wallet||{},l=P.ladder||{},a=P.arena||{},b=P.ban,team=(a.team||[]).map(s=>String(s).split(',')).map(([k,lv,st,,,,,q])=>`${PET[k]||k} Lv${lv}${q!==undefined&&q!==''?' <span class="tag">'+(RAR[q]||'')+'</span>':''}`);
+  I.innerHTML=`<div class="hd"><h2>${esc(a.n||'(未命名)')}</h2><button data-a="close">關閉</button></div>
+  ${b?`<div class="card" style="border-color:var(--bad)"><b style="color:var(--bad)">⛔ 停權中</b> · ${esc(b.reason||'')} · ${b.until?'到 '+tm(b.until):'永久'} <button class="s" data-a="unban">解除停權</button></div>`:''}
+  <div class="grid2"><div class="card"><h2>基本資料</h2><dl><dt>帳號</dt><dd>${u.acct?esc(u.acct):'訪客(沒有帳號密碼)'}</dd><dt>UID</dt><dd><code>${uid}</code></dd><dt>註冊</dt><dd>${tm(u.created)}</dd><dt>最後登入</dt><dd>${tm(u.last)}</dd><dt>主城</dt><dd>Lv${a.lv||'-'} · 守護員 Lv${a.gl||'-'}</dd><dt>隊伍戰力</dt><dd>${fmt(a.pw)}</dd><dt>出戰隊伍</dt><dd>${team.join('、')||'-'}</dd><dt>萌獸數</dt><dd>${(a.pets||[]).length}</dd></dl></div>
+  <div class="card"><h2>鑽石與天梯</h2><dl><dt>鑽石</dt><dd><b>💎${fmt(w.gem)}</b></dd><dt>待入帳</dt><dd>💎${fmt(w.bank)} <span class="mut">(超過每日上限,之後陸續入帳)</span></dd><dt>今日已入帳</dt><dd>💎${fmt(w.earn_today)} / 1000</dd><dt>累積儲值</dt><dd>💎${fmt(w.topup)}</dd><dt>召喚保底</dt><dd>傳說 ${w.pity||0}/80 · 神獸 ${w.dpity||0}/200</dd><dt>天梯</dt><dd>${fmt(l.pts)} 分(最高 ${fmt(l.best)})· ${l.w||0} 勝 ${l.l||0} 敗</dd><dt>可疑紀錄</dt><dd>${(w.flags||0)+(l.flags||0)?`<span class="tag warn">錢包 ${w.flags||0} · 天梯 ${l.flags||0}</span> <button class="s" data-a="clrflag">清除</button>`:'<span class="tag ok">無</span>'}</dd></dl></div></div>
+  <div class="card act"><h2>操作</h2>
+    <label>加 / 扣鑽石(扣請輸入負數,玩家信箱會收到說明)</label><div class="row"><input id="ag" type="number" inputmode="numeric" placeholder="例如 500 或 -200"><input id="agr" placeholder="原因(玩家看得到)"><button class="p" data-a="gem">執行</button></div>
+    <label>寄信給這位玩家(可附鑽石,玩家下次上線領取)</label><div class="row"><input id="mg" type="number" inputmode="numeric" placeholder="附鑽石(可空白)"><input id="mn" placeholder="信件內容"><button class="p" data-a="mail1">寄出</button></div>
+    <label>天梯分數</label><div class="row"><input id="lp2" type="number" inputmode="numeric" value="${l.pts||0}"><button data-a="setpts">設定</button></div>
+    ${b?'':`<label>停權</label><div class="row"><input id="br" placeholder="原因,例如:使用外掛"><select id="bh"><option value="24">1 天</option><option value="72">3 天</option><option value="168">7 天</option><option value="720">30 天</option><option value="0">永久</option></select><button class="d" data-a="ban">停權</button></div>`}
+  </div>
+  <div class="card"><h2>鑽石紀錄 <small>最近 60 筆</small></h2><div class="tw"><table><thead><tr><th>時間</th><th>項目</th><th class="n">變動</th></tr></thead><tbody>${(P.log||[]).map(g=>`<tr><td class="mut">${tm(g.at)}</td><td>${esc(REASON(g.reason))}</td><td class="n" style="color:${g.delta>0?'var(--ok)':'var(--bad)'}">${g.delta>0?'+':''}${fmt(g.delta)}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">沒有紀錄</td></tr>'}</tbody></table></div></div>
+  <div class="card"><h2>交易所紀錄</h2><div class="tw"><table><thead><tr><th>時間</th><th>裝備</th><th class="n">價格</th><th>狀態</th></tr></thead><tbody>${(P.market||[]).map(m=>`<tr><td class="mut">${tm(m.created)}</td><td>${itemName(m.item)}</td><td class="n">💎${fmt(m.price)}</td><td>${m.seller===uid?'賣出 · ':'買入 · '}${{open:'上架中',sold:'已成交',cancelled:'已下架',expired:'已過期'}[m.status]||m.status}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">沒有紀錄</td></tr>'}</tbody></table></div></div>`;bind(I)};
+A.close=()=>{$('drawer').hidden=true};
+const confirm2={};function sure(k,msg){if(confirm2[k]&&Date.now()-confirm2[k]<4000){delete confirm2[k];return true}confirm2[k]=Date.now();toast(msg+'(再按一次確認)');return false}
+const after=async m=>{toast(m);await A.pdet(CUR);if(TAB==='players'||TAB==='home')render()};
+A.gem=async()=>{const n=Math.round(+$('ag').value||0),r=$('agr').value.trim();if(!n)return toast('請輸入數量');if(!r)return toast('請填寫原因');if(!sure('gem'+n,`${n>0?'加':'扣'} 💎${fmt(Math.abs(n))}`))return;try{await rpc('admin_gem',{p_uid:CUR,p_delta:n,p_reason:r});after('已調整鑽石')}catch(e){toast(e.message)}};
+A.mail1=async()=>{const g=Math.round(+$('mg').value||0),n=$('mn').value.trim();if(!n)return toast('請填寫信件內容');try{await rpc('admin_mail',{p_uid:CUR,p_gem:g,p_note:n});after('信件已寄出')}catch(e){toast(e.message)}};
+A.setpts=async()=>{try{await rpc('admin_player_set',{p_uid:CUR,p_field:'pts',p_val:Math.round(+$('lp2').value||0)});after('天梯分已設定')}catch(e){toast(e.message)}};
+A.clrflag=async()=>{try{await rpc('admin_player_set',{p_uid:CUR,p_field:'flags',p_val:0});after('已清除可疑紀錄')}catch(e){toast(e.message)}};
+A.ban=async()=>{const r=$('br').value.trim(),h=+$('bh').value;if(!r)return toast('請填寫停權原因');if(!sure('ban','停權這位玩家'))return;try{await rpc('admin_ban',{p_uid:CUR,p_reason:r,p_hours:h});after('已停權,上架中的裝備也已下架')}catch(e){toast(e.message)}};
+A.unban=async()=>{try{await rpc('admin_unban',{p_uid:CUR});after('已解除停權')}catch(e){toast(e.message)}};
+// ---------- 寄信 ----------
+V.mail=async()=>`<div class="card act"><h2>寄信 / 補償 <small>玩家下次上線時自動領取,附的鑽石直接入帳</small></h2>
+  <label>對象</label><div class="row"><select id="mt"><option value="all">全服(所有玩過的玩家)</option><option value="one">指定玩家 UID</option></select><input id="mu" placeholder="玩家 UID(在玩家詳細頁可以複製)" hidden></div>
+  <label>附鑽石</label><input id="mg2" type="number" inputmode="numeric" placeholder="0 = 只寄訊息" value="0">
+  <label>信件內容(玩家會在畫面上看到)</label><input id="mn2" placeholder="例如:伺服器維護補償,感謝大家耐心等候!">
+  <div class="row"><button class="p" data-a="mailSend">寄出</button></div>
+  <p class="mut" style="margin:0">常用範本:<button class="s" data-a="tpl:維護補償:伺服器維護補償,感謝耐心等候!:200">維護補償 💎200</button> <button class="s" data-a="tpl:封測:感謝參加封閉測試!:300">封測感謝 💎300</button> <button class="s" data-a="tpl:活動:活動獎勵已發送,恭喜!:100">活動獎勵 💎100</button></p></div>`;
+A.tpl=(n,txt,g)=>{$('mn2').value=txt;$('mg2').value=g};
+document.addEventListener('change',e=>{if(e.target.id==='mt')$('mu').hidden=e.target.value!=='one'});
+A.mailSend=async()=>{const all=$('mt').value==='all',uid=$('mu').value.trim(),g=Math.round(+$('mg2').value||0),n=$('mn2').value.trim();if(!n)return toast('請填寫信件內容');if(!all&&!/^[0-9a-f-]{36}$/i.test(uid))return toast('UID 格式不對');
+  if(!sure('mail',all?`寄給全服${g?'(每人 💎'+fmt(g)+')':''}`:'寄出'))return;try{const r=await rpc('admin_mail',{p_uid:all?null:uid,p_gem:g,p_note:n});toast(`已寄出 ${fmt(r.sent)} 封`);$('mn2').value=''}catch(e){toast(e.message)}};
+// ---------- 公告 ----------
+V.notice=async()=>{const L=await rpc('admin_notices');return `<div class="card act"><h2 id="nh">新增公告 <small>玩家打開遊戲時跳出最新一則沒看過的公告,設定頁也看得到</small></h2><input type="hidden" id="nid"><label>標題</label><input id="nt" placeholder="例如:封測開始!"><label>內容</label><textarea id="nb" placeholder="公告內容,可以換行"></textarea><div class="row"><button class="p" data-a="nsave">發布</button><button data-a="nclear">清空</button></div></div>
+  <div class="card"><h2>所有公告</h2><div style="display:grid;gap:8px">${L.map(n=>`<div class="notice"><div class="row"><b style="flex:1">${esc(n.title)}</b>${n.active?'<span class="tag ok">顯示中</span>':'<span class="tag">已隱藏</span>'}<span class="mut">${tm(n.created)}</span></div><p>${esc(n.body)}</p><div class="row"><button class="s" data-a="nedit:${n.id}">編輯</button><button class="s" data-a="ntog:${n.id}">${n.active?'隱藏':'重新顯示'}</button><button class="s d" data-a="ndel:${n.id}">刪除</button></div></div>`).join('')||'<div class="empty">還沒有公告</div>'}</div></div>`};
+let NL=[];const nl=async()=>NL=await rpc('admin_notices');
+A.nsave=async()=>{const id=$('nid').value,t=$('nt').value.trim(),b=$('nb').value;if(!t)return toast('請填寫標題');try{await rpc('admin_notice_save',{p_id:id?+id:null,p_title:t,p_body:b,p_active:true});toast(id?'公告已更新':'公告已發布');render()}catch(e){toast(e.message)}};
+A.nclear=()=>{$('nid').value='';$('nt').value='';$('nb').value='';$('nh').firstChild.textContent='新增公告 '};
+A.nedit=async id=>{await nl();const n=NL.find(x=>x.id===+id);if(!n)return;$('nid').value=n.id;$('nt').value=n.title;$('nb').value=n.body;$('nh').firstChild.textContent='編輯公告 ';scrollTo({top:0,behavior:'smooth'})};
+A.ntog=async id=>{await nl();const n=NL.find(x=>x.id===+id);if(!n)return;try{await rpc('admin_notice_save',{p_id:n.id,p_title:n.title,p_body:n.body,p_active:!n.active});render()}catch(e){toast(e.message)}};
+A.ndel=async id=>{if(!sure('nd'+id,'刪除公告'))return;try{await rpc('admin_notice_delete',{p_id:+id});render()}catch(e){toast(e.message)}};
+// ---------- 交易所 ----------
+V.market=async()=>{const L=await rpc('admin_market',{p_status:MKS});return `<div class="card"><div class="row">${[['open','上架中'],['sold','已成交'],['cancelled','已下架'],['expired','已過期'],['all','全部']].map(([k,n])=>`<button class="s ${MKS===k?'p':''}" data-a="mks:${k}">${n}</button>`).join('')}</div></div>
+  <div class="card"><h2>交易所 <small>最近 100 筆 · 價格明顯高於參考價會標示</small></h2><div class="tw"><table><thead><tr><th>時間</th><th>裝備</th><th>副屬性</th><th class="n">價格</th><th class="n">參考價</th><th>賣家</th><th>狀態</th><th></th></tr></thead><tbody>
+  ${L.map(m=>{const r=m.price/Math.max(1,m.fair);return `<tr><td class="mut">${tm(m.created)}</td><td>${itemName(m.item)}</td><td class="mut">${esc(itemSubs(m.item))}</td><td class="n">💎${fmt(m.price)}${r>1.6?' <span class="tag warn">偏高</span>':''}</td><td class="n mut">${fmt(m.fair)}</td><td><a href="#" data-a="pdet:${m.seller}">${esc(m.seller_name||'守護員')}</a></td><td>${{open:'上架中',sold:m.buyer?'玩家買走':'系統買走',cancelled:'已下架',expired:'已過期'}[m.status]||m.status}</td><td>${m.status==='open'?`<button class="s d" data-a="mkrm:${m.id}">下架</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="8" class="empty">沒有資料</td></tr>'}</tbody></table></div></div>`};
+A.mks=k=>{MKS=k;render()};
+A.mkrm=async id=>{if(!sure('mk'+id,'下架這件裝備並退回賣家'))return;try{await rpc('admin_market_remove',{p_id:+id,p_reason:'違反交易規範'});toast('已下架');render()}catch(e){toast(e.message)}};
+// ---------- 管理員 ----------
+V.admins=async()=>{const L=await rpc('admin_admins');return `<div class="card act"><h2>新增管理員 <small>對方要先在遊戲裡建立帳號密碼</small></h2><div class="row"><input id="aa" placeholder="對方的遊戲帳號" autocapitalize="off"><button class="p" data-a="aadd">新增</button></div></div>
+  <div class="card"><h2>管理員</h2><div class="tw"><table><thead><tr><th>帳號</th><th>加入時間</th><th></th></tr></thead><tbody>${L.map(x=>`<tr><td><b>${esc(x.acct)}</b>${x.uid===ME.uid?' <span class="tag">你</span>':''}</td><td class="mut">${tm(x.added)}</td><td>${x.uid===ME.uid?'':`<button class="s d" data-a="arm:${esc(x.acct)}">移除</button>`}</td></tr>`).join('')}</tbody></table></div></div>`};
+A.aadd=async()=>{const a=$('aa').value.trim();if(!a)return toast('請輸入帳號');try{await rpc('admin_admin_set',{p_acct:a,p_add:true});toast('已新增管理員');render()}catch(e){toast(e.message)}};
+A.arm=async a=>{if(!sure('arm'+a,'移除管理員 '+a))return;try{await rpc('admin_admin_set',{p_acct:a,p_add:false});toast('已移除');render()}catch(e){toast(e.message)}};
+// ---------- 紀錄 ----------
+V.logs=async()=>{const L=await rpc('admin_logs',{p_limit:200});const det=l=>{const d=l.detail||{};return l.action==='gem'?`${d.delta>0?'+':''}${fmt(d.delta)} 💎 · ${esc(d.reason||'')}`:l.action==='mail'?`${d.gem?'💎'+fmt(d.gem)+' · ':''}${esc(d.note||'')}${d.n>1?' · 共 '+fmt(d.n)+' 封':''}`:l.action==='ban'?`${esc(d.reason||'')} · ${d.hours?d.hours+' 小時':'永久'}`:l.action==='notice'?esc(d.title||''):l.action==='set:pts'?'設為 '+fmt(d.val):l.action==='market_remove'?'#'+d.id:''};
+  return `<div class="card"><h2>操作紀錄 <small>每位管理員做過的事都會留下紀錄</small></h2><div class="tw"><table><thead><tr><th>時間</th><th>管理員</th><th>動作</th><th>對象</th><th>內容</th></tr></thead><tbody>${L.map(l=>`<tr><td class="mut">${tm(l.at)}</td><td>${esc(l.admin)}</td><td>${ACTN[l.action]||esc(l.action)}</td><td>${l.target?`<a href="#" data-a="pdet:${l.target}">${esc(l.tname||'玩家')}</a>`:(l.action==='mail'?'全服':'-')}</td><td>${det(l)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">還沒有紀錄</td></tr>'}</tbody></table></div></div>`};
+boot();
+</script></body></html>
