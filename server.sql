@@ -748,7 +748,7 @@ create or replace function public.admin_bot_save(p_id bigint, p_name text, p_rol
 declare a uuid := moe_admin(); n text := left(trim(coalesce(p_name,'')), 12); i bigint;
 begin
   if n = '' then raise exception '請填寫名字'; end if;
-  if p_role not in ('lord','player') then raise exception '類型不對'; end if;
+  p_role := coalesce(nullif(p_role,''),'lord'); if p_role not in ('lord','player') then p_role := 'lord'; end if;
   if exists (select 1 from bots where name = n and id is distinct from p_id) then raise exception '這個名字已經有了'; end if;
   if p_id is null then insert into bots(name, role, mul, active, sort) values (n, p_role, least(greatest(coalesce(p_mul,1),.5),2), coalesce(p_active,true), coalesce((select max(sort) from bots),0) + 1) returning id into i;
   else update bots set name = n, role = p_role, mul = least(greatest(coalesce(p_mul,1),.5),2), active = coalesce(p_active,true) where id = p_id returning id into i; end if;
@@ -784,3 +784,90 @@ begin
   return jsonb_build_object('ok', true, 'fair', f);
 end $$;
 grant execute on function public.market_list_mat(text,text,int,int) to authenticated;
+
+-- ============ 電腦玩家真實活動:攻城、天梯、團隊 Boss(有玩家在線時,伺服器每 10 分鐘補跑一次) ============
+alter table public.bots add column if not exists power int not null default 0;
+alter table public.bots add column if not exists stock bigint not null default 20000;
+alter table public.bots add column if not exists w int not null default 0;
+alter table public.bots add column if not exists l int not null default 0;
+alter table public.bots add column if not exists ticked timestamptz;
+alter table public.bots add column if not exists pts int not null default 0;
+alter table public.bots add column if not exists ss int not null default 0;
+alter table public.bots add column if not exists lw int not null default 0;
+alter table public.bots add column if not exists ll int not null default 0;
+alter table public.bots add column if not exists wk int not null default 0;
+alter table public.bots add column if not exists wk_w int not null default 0;
+alter table public.bots add column if not exists wk_loot bigint not null default 0;
+alter table public.bots add column if not exists wk_d int not null default 0;
+alter table public.bots add column if not exists rid int not null default 0;
+alter table public.bots add column if not exists rdmg bigint not null default 0;
+alter table public.bots add column if not exists rt timestamptz;
+create or replace function public.moe_week() returns int language sql stable as $$ select floor(extract(epoch from (now() - timestamptz '2026-11-01 16:00:00+00')) / (7*86400))::int + 1 $$;
+create or replace function public.moe_raid() returns int language sql stable as $$ select floor(extract(epoch from (now() - timestamptz '2026-11-01 16:00:00+00')) / (3*86400))::int + 1 $$;
+create or replace function public.bot_power(b bots) returns int language sql stable as $$
+  select greatest(300, round((2500 + (b.id % 7) * 450 + least(extract(epoch from now() - b.created) / 86400, 60) * 120)
+    * b.mul * case when b.reset_at is null then 1 else least(1, greatest(.15, extract(epoch from now() - b.reset_at) / (3*86400))) end))::int $$;
+create or replace function public.bot_tick() returns int language plpgsql security definer set search_path = public as $$
+declare last timestamptz; rounds int; n int := 0; a bots; d bots; ap int; dp int; win boolean; loot int; g int; kk int; rr int; cs int := moe_season(); cw int := moe_week(); cr int := moe_raid(); tot float;
+begin
+  if not pg_try_advisory_xact_lock(7781) then return 0; end if;
+  select (v->>'t')::timestamptz into last from settings where k = 'bot_tick';
+  if last is not null and last > now() - interval '10 minutes' then return 0; end if;
+  rounds := case when last is null then 1 else least(6, floor(extract(epoch from now() - last) / 600))::int end;
+  insert into settings(k, v) values ('bot_tick', jsonb_build_object('t', now())) on conflict (k) do update set v = excluded.v;
+  -- 換季、換週、換團隊 Boss、重玩;庫存隨時間增加;更新戰力
+  update bots set pts = floor(pts * .5), lw = 0, ll = 0, ss = cs where ss <> cs;
+  update bots set wk_w = 0, wk_loot = 0, wk_d = 0, wk = cw where wk <> cw;
+  update bots set rdmg = 0, rid = cr, rt = greatest(timestamptz '2026-11-01 16:00:00+00' + make_interval(days => (cr - 1) * 3), coalesce(rt, now())) where rid <> cr;
+  update bots set pts = 0, lw = 0, ll = 0, wk_w = 0, wk_loot = 0, wk_d = 0, rdmg = 0, stock = 20000, w = 0, l = 0 where reset_at is not null and reset_at > coalesce(last, now() - interval '1 day');
+  update bots set stock = least(300000, stock + floor(extract(epoch from now() - coalesce(ticked, now())) / 3600 * (1500 + (id % 4) * 800))), ticked = now(), power = bot_power(bots) where active;
+  -- 團隊 Boss:依經過時間和戰力累積傷害(全部電腦合計約打掉 95% 血量 / 3 天)
+  select sum(power) into tot from bots where active;
+  update bots set rdmg = rdmg + floor(4000000 * .95 * extract(epoch from now() - coalesce(rt, now())) / (3*86400) * power / greatest(tot,1) * (.7 + random() * .6)), rt = now() where active;
+  for rr in 1..rounds loop
+    -- 攻城 1~3 場
+    for kk in 1..(1 + floor(random() * 3))::int loop
+      select * into a from bots where active and (reset_at is null or reset_at < now() - interval '1 day') order by random() limit 1;
+      select * into d from bots where active and id <> coalesce(a.id, 0) order by random() limit 1;
+      exit when a.id is null or d.id is null;
+      ap := a.power; dp := d.power;
+      win := random() < (ap::float ^ 2) / (ap::float ^ 2 + (dp * 1.1)::float ^ 2);
+      if win then
+        loot := floor(d.stock * (.08 + random() * .07));
+        update bots set stock = stock + loot, w = w + 1, wk_w = wk_w + 1, wk_loot = wk_loot + loot where id = a.id;
+        update bots set stock = greatest(0, stock - loot), l = l + 1 where id = d.id;
+        insert into events(uid, kind, txt, at) values (null, 'bot', '⚔️ ' || a.name || ' 攻破了 ' || d.name || ' 的城門,搶走 ⭐' || to_char(loot, 'FM999,999,999'), now() - make_interval(secs => floor(random() * 590)::int));
+      else
+        update bots set l = l + 1 where id = a.id;
+        update bots set w = w + 1, wk_d = wk_d + 1 where id = d.id;
+        if random() < .5 then insert into events(uid, kind, txt, at) values (null, 'bot', '🛡️ ' || d.name || ' 擋下了 ' || a.name || ' 的進攻', now() - make_interval(secs => floor(random() * 590)::int)); end if;
+      end if;
+      n := n + 1;
+    end loop;
+    -- 天梯 2 場:找分數接近的對手(每位電腦一天約打 7 場,和一般玩家差不多)
+    for kk in 1..2 loop
+      select * into a from bots where active order by random() limit 1;
+      exit when a.id is null;
+      select * into d from bots where active and id <> a.id order by abs(pts - a.pts) + random() * 150 limit 1;
+      exit when d.id is null;
+      win := random() < (a.power::float ^ 2) / (a.power::float ^ 2 + d.power::float ^ 2);
+      if win then g := round(least(greatest(25 + (d.pts - a.pts) / 10.0, 12), 40));
+        update bots set pts = pts + g, lw = lw + 1 where id = a.id;
+        update bots set pts = greatest(0, pts - round(least(greatest(15 + (d.pts - a.pts) / 12.0, 6), 25))), ll = ll + 1 where id = d.id;
+      else g := round(least(greatest(15 + (a.pts - d.pts) / 12.0, 6), 25));
+        update bots set pts = greatest(0, pts - g), ll = ll + 1 where id = a.id;
+        update bots set pts = pts + round(least(greatest(25 + (a.pts - d.pts) / 10.0, 12), 40)), lw = lw + 1 where id = d.id;
+      end if;
+    end loop;
+  end loop;
+  delete from events where at < now() - interval '1 day';
+  return n;
+end $$;
+-- 跑馬燈讀取:順便讓電腦玩家活動,回傳最近 1 小時最新 5 則
+create or replace function public.events_feed() returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  perform bot_tick();
+  return (select coalesce(jsonb_agg(jsonb_build_object('txt', txt, 'at', at) order by at desc), '[]'::jsonb) from (select txt, at from events where at > now() - interval '1 hour' order by at desc limit 5) x);
+end $$;
+revoke execute on function public.bot_tick() from public, anon, authenticated;
+grant execute on function public.events_feed() to authenticated;

@@ -446,7 +446,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 .evb{background:linear-gradient(90deg,#fff1c8,#ffe0b0)!important;border-color:#ffb84a!important;font-size:14px}
 .tkf{display:grid;gap:8px}.tkf select,.tkf textarea{padding:10px;border-radius:12px;border:2px solid #e6cfa8;font-size:15px;width:100%;box-sizing:border-box;background:#fff}.tkf textarea{min-height:80px;resize:vertical}
 #marq{position:absolute;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));top:calc(max(8px,env(safe-area-inset-top,0px)) + 182px);height:30px;display:flex;align-items:center;gap:6px;background:linear-gradient(90deg,rgba(40,20,10,.78),rgba(40,20,10,.6));border:1px solid rgba(255,210,140,.5);border-radius:99px;padding:0 10px;z-index:3;pointer-events:none;overflow:hidden}
-#mailBtn{position:relative}#mailBtn .cnt{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:#e04a4a;color:#fff;font-size:11px;font-style:normal;font-weight:800;display:grid;place-items:center;padding:0 4px;box-shadow:0 0 0 2px #fff}
+#mailBtn,#todoBtn{position:relative}#mailBtn .cnt,#todoBtn .cnt{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:#e04a4a;color:#fff;font-size:11px;font-style:normal;font-weight:800;display:grid;place-items:center;padding:0 4px;box-shadow:0 0 0 2px #fff}
 #marq .mqi{flex-shrink:0;font-size:15px}#marq .mqw{flex:1;overflow:hidden;position:relative;height:100%;min-width:0}
 #marqT{position:absolute;top:50%;margin-top:-10px;line-height:20px;white-space:nowrap;color:#fff;font-weight:800;font-size:14px;text-shadow:0 1px 2px #000;will-change:transform}#marqT.ntc{color:#ffe27a}
 .mails{display:grid;gap:8px}.mail{display:flex;gap:10px;align-items:flex-start;background:#fff8ec;border:2px solid #ecd6b0;border-radius:14px;padding:10px}.mail.read{opacity:.6}
@@ -502,7 +502,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 #marq{top:calc(max(8px,env(safe-area-inset-top,0px)) + 80px);left:calc(max(10px,env(safe-area-inset-left,0px)) + 112px);right:max(10px,env(safe-area-inset-right,0px));height:26px}
 }
 @media (orientation:portrait){
-#tBot{justify-content:stretch}
+#tBot{justify-content:stretch;gap:0}
 #tNav{flex:1;justify-content:space-around;border-radius:0 0 18px 18px;padding-top:2px}
 #tNav button{flex:1 1 0;width:auto;min-width:0}
 #tLeft{left:max(10px,env(safe-area-inset-left,0px))!important;right:max(10px,env(safe-area-inset-right,0px));top:auto!important;bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + var(--navh,62px))!important;display:flex;flex-direction:row;justify-content:space-around;
@@ -517,12 +517,12 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 <div id="town" hidden>
   <div id="tTop"><div class="prof"><img id="pAva" src="assets/fox1.webp" alt=""><div><b><i class="ttag" id="pTitle" hidden></i><span id="pName">萌獸守護員</span> <span class="glv">Lv.<span id="pGl">1</span></span> <span class="vipb" id="vipB">VIP<span id="pLv">0</span></span></b><small>戰力 <span id="pPow">0</span></small><div class="xpb"><i id="pXp"></i></div></div></div>
     <div class="res"><span class="chip" title="冒險體力(每場 6)"><img class="ic" src="assets/i_sta.webp" alt=""><span id="tSta">60/60</span></span><span class="chip" title="攻打次數"><img class="ic" src="assets/i_att.webp" alt=""><span id="tEn">5/5</span></span><span class="chip"><img class="ic" src="assets/i_coin.webp" alt=""><span id="tCoin">0</span></span><span class="chip"><img class="ic" src="assets/i_candy.webp" alt=""><span id="tFruit">0</span></span><span class="chip gemc"><img class="ic" src="assets/i_gem.webp" alt=""><span id="tGem">0</span><i class="gplus">+</i></span></div>
-    <button class="ib mailb" data-p="mail" id="mailBtn" title="信箱">📬<i class="cnt" id="mailN" hidden>0</i></button><button class="ib" id="sndBtn" title="音效">🔊</button><button class="ib" id="setBtn" title="設定與帳號"><img src="assets/n_set.webp" alt="" style="width:26px"></button></div>
+    <button class="ib mailb" data-p="mail" id="mailBtn" title="信箱">📬<i class="cnt" id="mailN" hidden>0</i></button><button class="ib" data-p="todo" id="todoBtn" title="今日待辦">📋<i class="cnt" id="todoN" hidden>0</i></button><button class="ib" id="sndBtn" title="音效">🔊</button><button class="ib" id="setBtn" title="設定與帳號"><img src="assets/n_set.webp" alt="" style="width:26px"></button></div>
   <div id="visitBar" hidden><div><b>🏡 <span id="vName"></span> 的城鎮</b><small id="vInfo"></small></div><button class="go" id="vLike">👍 按讚</button><button class="go" id="vRep" hidden>🔧 幫忙修理</button><button class="go" id="vSpar">⚔ 切磋</button><button class="blue" id="vBack">回我的城鎮</button></div>
   <div id="editBar" hidden><div><b>🛠 佈置城鎮</b><small id="eMsg"></small></div><button class="blue" id="eInv">🛒 買裝飾</button><button class="go" id="eDone">完成</button></div>
   <button id="hpWarn" hidden></button>
   <div id="raid" hidden><span>⚔</span><div><b><span id="raidName"></span> 來攻打你的城!</b><br><small>對方戰力 <span id="raidPow"></span> · <span id="raidT"></span> 秒後自動迎戰<br><span>交給守城隊勝率約 <b id="raidPct">50</b>%;親自指揮可以集火、放指揮官技能、擋 Boss 大招</span></small></div><button class="go" id="raidGo">親自指揮</button><button id="raidAuto">交給守城隊</button></div>
-  <div id="marq" hidden><span class="mqi">📣</span><div class="mqw"><span id="marqT"></span></div></div><button id="tMenu" class="ib" title="選單">☰<i class="dot" hidden></i></button><div id="tLeft"><button data-p="quest"><b><img src="assets/n_quest.webp" alt=""></b>任務<i class="dot" hidden></i></button><button data-p="sign"><b><img src="assets/n_sign.webp" alt=""></b>簽到<i class="dot" hidden></i></button><button data-p="event"><b><img src="assets/n_event.webp" alt=""></b>活動<i class="dot" hidden></i></button><button data-p="gift"><b><img src="assets/n_gift.webp" alt=""></b>福利<i class="dot" hidden></i></button><button id="tEdit"><b><img src="assets/n_build.webp" alt=""></b>佈置</button><button data-p="boss"><b><img src="assets/n_boss.webp" alt=""></b>副本<i class="dot" hidden></i></button><button data-p="todo"><b class="todoic">📋</b>待辦<i class="cnt" id="todoN" hidden>0</i></button></div>
+  <div id="marq" hidden><span class="mqi">📣</span><div class="mqw"><span id="marqT"></span></div></div><button id="tMenu" class="ib" title="選單">☰<i class="dot" hidden></i></button><div id="tLeft"><button data-p="quest"><b><img src="assets/n_quest.webp" alt=""></b>任務<i class="dot" hidden></i></button><button data-p="sign"><b><img src="assets/n_sign.webp" alt=""></b>簽到<i class="dot" hidden></i></button><button data-p="event"><b><img src="assets/n_event.webp" alt=""></b>活動<i class="dot" hidden></i></button><button data-p="gift"><b><img src="assets/n_gift.webp" alt=""></b>福利<i class="dot" hidden></i></button><button id="tEdit"><b><img src="assets/n_build.webp" alt=""></b>佈置</button><button data-p="boss"><b><img src="assets/n_boss.webp" alt=""></b>副本<i class="dot" hidden></i></button></div>
   <div id="tBot"><nav id="tNav"><button data-p="pets"><b><img src="assets/n_pets.webp" alt=""></b>萌獸<i class="dot" hidden></i></button><button data-p="bag"><b><img src="assets/n_bag.webp" alt=""></b>背包</button><button data-p="ach"><b><img src="assets/n_ach.webp" alt=""></b>成就<i class="dot" hidden></i></button><button data-p="rank"><b><img src="assets/n_rank.webp" alt=""></b>天梯<i class="dot" hidden></i></button><button data-p="friends"><b><img src="assets/n_friends.webp" alt=""></b>好友<i class="dot" hidden></i></button><button data-p="chat"><b class="todoic">💬</b>聊天<i class="dot" hidden></i></button></nav>
     <button id="goAdv"><b>⚔</b>開始冒險<small>下一關</small></button></div>
 </div>
@@ -1019,7 +1019,7 @@ function bossReward(key,tier,first,lines){eqFix();const D=PBOSS[key],L=[];const 
   if(rnd()<pbDrop(tier)){const e=rollPiece(D.set,pieceRar(tier));L.push({img:eqImg(e),n:EQSET[e.set].n+EQT[e.type].n,rar:e.rar})}
   if(first){const g=30*tier;SV.gem+=g;SV.stones+=tier;L.push({img:'assets/i_gem.webp',n:'首通 💎'+g},{img:'assets/i_stone.webp',n:'進化石 ×'+tier})}
   if(lines)lines.push(`${D.n} 第 ${tier} 層${first?'首次':''}通關!`);return L}
-function raidBots(id,prog){const r=seeded(id*7717+3),bots=[...LORD_NAMES,...BOT_NAMES].slice(0,30).map(n=>({n,w:(.2+r())*botGrow(n,Date.now()-RCYC,RCYC)})),sw=bots.reduce((a,b)=>a+b.w,0);bots.forEach(b=>b.d=Math.round(b.w/sw*RHP*.95*prog));return bots}
+function raidBots(id,prog){const r=seeded(id*7717+3),bots=[...LORD_NAMES,...BOT_NAMES].slice(0,BOTX.__t?60:30).map(n=>({n,w:(.2+r())*botGrow(n,Date.now()-RCYC,RCYC)})),sw=bots.reduce((a,b)=>a+b.w,0);bots.forEach(b=>{const sx=BOTX[b.n];b.d=sx&&sx.rid===id?Math.round(sx.rdmg):Math.round(b.w/sw*RHP*.95*prog)});return bots}
 function raidState(){const id=raidId(),key=raidKey(id),prog=clamp((Date.now()-raidEnd(id-1))/RCYC,0,1),bots=raidBots(id,prog);
   if(!SV.rb||SV.rb.id!==id){if(SV.rb&&SV.rb.id!==id)raidSettle();SV.rb={id,dmg:0,best:0,kill:0}}
   const real=(NET.rbList||[]).filter(d=>d.rbid===id&&d.id!==ACC.uid).map(d=>({n:d.n,d:d.rbd||0,real:1})),me={n:(SV.name||'你')+'(你)',d:SV.rb.dmg,me:1};
@@ -1563,13 +1563,13 @@ const towerSlots=()=>SV.castle>=5?3:SV.castle>=3?2:1;
 const lootPct=()=>(typeof hpT==='function'&&hpT().prot)?.45:.3;
 function raidLoss(){const st=farmStock(),c=Math.floor(st*lootPct());if(c>0)SV.farmT=Date.now()-(st-c)/farmRate()*60000;return {c,f:0}}
 // what happened while the player was away: keepers attack, unlimited times, with protection and falling loot
-function offlineRaids(){if(!unlocked('siege')||shielded()){SV.lastSeen=Date.now();return 0}const now=Date.now(),away=Math.min(24*3600e3,now-(SV.lastSeen||now));const Ls=lords();let n=0,lossIdx=0,t=SV.lastSeen||now;const LOSS=[.15,.1,.07];
+let OFFB=null;function offlineRaids(){OFFB=null;if(!unlocked('siege')||shielded()){SV.lastSeen=Date.now();return 0}const now=Date.now(),away=Math.min(24*3600e3,now-(SV.lastSeen||now));const Ls=lords();let n=0,lossIdx=0,t=SV.lastSeen||now;const LOSS=[.15,.1,.07];
   while(t+90*60e3<=now&&away>20*60e3){t+=60*60e3+rnd()*60*60e3;if(t>now)break;
     const pool=Ls.filter(L=>LTYPE[L.ty].raid>0&&t-(L.last||0)>4*3600e3&&botRook(L.rs)>=1);if(!pool.length)continue;const w=pool.map(L=>LTYPE[L.ty].raid),s=w.reduce((a,b)=>a+b,0);let r=rnd()*s,L=pool[0];for(let i=0;i<pool.length;i++){r-=w[i];if(r<=0){L=pool[i];break}}
     L.last=t;const A=L.power*(.8+rnd()*.4),D=defensePower(),win=D>=A;let c=0,f=0;
     if(win){c=150+SV.castle*80;SV.coin+=c;hpHit(.08);twHit(.02,.08)}else{const p=LOSS[lossIdx++]??.05;const r2=raidLoss(p);c=-r2.c;f=-r2.f;hpHit(.25);twHit(.15,.3)}if(shielded())break;
-    SV.reports.unshift({t,lord:L.name,li:L.i,win,c,f,off:1,seen:0});n++}
-  SV.reports=SV.reports.slice(0,20);
+    SV.reports.unshift({t,lord:L.name,li:L.i,win,c,f,off:1,seen:0});if(!win&&(!OFFB||-c>OFFB.c))OFFB={n:L.name,c:-c};n++}
+  SV.reports=SV.reports.slice(0,20);if(OFFB){const o=OFFB;setTimeout(()=>evSiege('breach',o.n,o.c),8000)}
   // gate repairs itself 10% an hour
   hpRegen();return n}
 /* ---------- VIP: experience = gems spent (once real top-ups exist, switch to top-up amount) ---------- */
@@ -2208,7 +2208,7 @@ function pCastle(){const t=sheetTab||'main';let h=tabs([['main','主城'],['wall
       ${cur&&!lock?`<div class="btns">${hp<.999?`<button class="go" data-act="twFix:${i}">修理 ⭐${fmt(twRep(i))}</button>`:''}<button class="blue" data-act="twUp:${cur}" ${towerLv(cur)>=5?'disabled':''}>升級 ${TOWERS[cur].n} → Lv${towerLv(cur)+1} · ⭐${fmt(towerUpCost(cur))}</button></div>`:''}</div>`}).join('')}
   else if(t==='def'){selTeam='def';h+=teamBlock()+`<div class="card"><h3>選擇萌獸</h3>${petGrid('put')}</div>`}
   else if(t==='siege'&&!unlocked('siege'))h+=`<div class="card"><h3>🔒 攻城</h3><p>${lockMsg('siege')}。在那之前也不會有人來攻打你的城。</p></div>`;
-  else if(t==='siege'){regen();const Ls=lords().slice().sort((a,b)=>a.power-b.power);const next=SV.en<enMax()?Math.ceil((SV.enT+ENT-Date.now())/60000):0;
+  else if(t==='siege'){regen();const myP=teamPower(SV.team.filter(k=>k&&SV.pets[k])),Ls=lords().slice().sort((a,b)=>Math.abs(a.power-myP)-Math.abs(b.power-myP)).slice(0,20).sort((a,b)=>a.power-b.power);const next=SV.en<enMax()?Math.ceil((SV.enT+ENT-Date.now())/60000):0;
     h+=`<div class="card"><h3>攻打其他守護員 <small>⚡ ${SV.en}/${enMax()}${next?` · ${next} 分後 +1`:''}</small></h3><p class="mut">我方戰力 ${fmt(teamPower(SV.team.filter(Boolean)))}。每次攻打消耗 1 次攻打次數;打破城門可搶走對方一部分星星幣。</p>
       <div class="lords">${Ls.map(L=>{const rev=SV.reports.some(r=>r.li===L.i&&!r.win&&!r.rev);const rel=L.power/Math.max(1,teamPower(SV.team.filter(Boolean)));
       return `<div class="lord ${rev?'rev':''}"><div class="lt"><span class="on" style="background:${L.online?'#5ad65a':'#aaa'}"></span><b>${L.name}</b><small>${tiTag(lordTi(L))} Lv${L.lv}</small></div>
@@ -2281,9 +2281,9 @@ function pMail(){mailFetch();if(!SRV.on())return `<div class="card"><h3>📬 信
 const EVT={list:[],t:0},EVN={xp2:'雙倍經驗',drop2:'雙倍掉落',sumup:'召喚機率 UP'};
 const evOn=k=>EVT.list.some(e=>e.kind===k&&new Date(e.starts)<=Date.now()&&new Date(e.ends)>Date.now());
 const evEnd=k=>{const e=EVT.list.find(e=>e.kind===k&&new Date(e.ends)>Date.now());return e?new Date(e.ends).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):''};
-async function botFetch(){if(!window.MOE_SB)return;try{const {data,error}=await MOE_SB.from('bots').select('id,name,role,mul,active,reset_at,sort').order('sort').order('id');if(!error&&data&&data.length)botApply(data)}catch(e){}}
+async function botFetch(){if(!window.MOE_SB)return;try{const {data,error}=await MOE_SB.from('bots').select('id,name,role,mul,active,reset_at,sort,power,pts,ss,wk,wk_w,wk_loot,wk_d,rid,rdmg').order('sort').order('id');if(!error&&data&&data.length)botApply(data)}catch(e){}}
 function botApply(rows){const act=rows.filter(b=>b.active),pad=(arr,def,min)=>{const ns=arr.map(b=>b.name);for(const n of def){if(ns.length>=min)break;if(!ns.includes(n)&&!rows.some(b=>b.name===n))ns.push(n)}return ns};
-  LORD_NAMES=pad(act.filter(b=>b.role==='lord'),LORD0,5);BOT_NAMES=pad(act.filter(b=>b.role==='player'),BOT0,10);BOTX={};rows.forEach(b=>BOTX[b.name]={id:b.id,mul:+b.mul||1,rs:b.reset_at?new Date(b.reset_at).getTime():0});MQ.botW=-1;lordSync()}
+  LORD_NAMES=pad(act,[...LORD0,...BOT0],15);BOT_NAMES=[];BOTX={};rows.forEach(b=>BOTX[b.name]={id:b.id,mul:+b.mul||1,rs:b.reset_at?new Date(b.reset_at).getTime():0,pts:b.pts|0,ss:b.ss|0,wk:b.wk|0,wkw:b.wk_w|0,wkl:+b.wk_loot||0,wkd:b.wk_d|0,rid:b.rid|0,rdmg:+b.rdmg||0});BOTX.__t=Date.now();MQ.botW=-1;lordSync()}
 function lordSync(){lords();const byId={};for(const n in BOTX)byId[BOTX[n].id]=n;
   for(const L of SV.lords){if(L.bid&&byId[L.bid])L.name=byId[L.bid];else if(!L.bid&&BOTX[L.name])L.bid=BOTX[L.name].id;L.gone=!LORD_NAMES.includes(L.name);const x=BOTX[L.name],rs=x?x.rs:0;L.mul=x?x.mul:1;
     if(rs&&rs!==L.rs){SV.ctr=(SV.ctr||[]).filter(i=>i!==L.i);SV.reports=(SV.reports||[]).filter(r=>r.li!==L.i);L.beatT=0;L.last=0;L.rs=rs}}
@@ -2304,8 +2304,8 @@ async function evSiege(kind,target,loot){if(!SRV.on())return;try{await SRV.rpc('
 function mqBots(){const w=Math.floor(Date.now()/(12*60e3));if(MQ.botW!==w){MQ.botW=w;const r=seeded(w*131+7),N=[...LORD_NAMES,...BOT_NAMES],L=[];const n=1+Math.floor(r()*3);
     for(let i=0;i<n;i++){const a=N[Math.floor(r()*N.length)];let b=N[Math.floor(r()*N.length)];if(b===a)b=N[(N.indexOf(a)+7)%N.length];const loot=Math.round((3+r()*40)*1000);L.push({txt:`⚔️ ${a} 攻破了 ${b} 的城門,搶走 ⭐${loot.toLocaleString('en-US')}`,at:w*12*60e3+Math.floor(r()*12*60e3)})}MQ.bots=L}
   return MQ.bots.filter(x=>x.at<=Date.now())}
-async function mqEvents(){if(!window.MOE_SB||!ACC.cloud||Date.now()-MQ.evT<60e3)return;MQ.evT=Date.now();try{const {data}=await MOE_SB.from('events').select('id,txt,at').gte('at',new Date(Date.now()-3600e3).toISOString()).order('id',{ascending:false}).limit(5);MQ.ev=(data||[]).map(x=>({txt:x.txt,at:new Date(x.at).getTime()}))}catch(e){}}
-function mqBuild(){const N=[...(NET.notice||[]).map(n=>({txt:'📢 '+n.title,n})),...EVT.list.filter(e=>evOn(e.kind)).map(e=>({txt:`🎉 ${EVN[e.kind]}活動進行中${e.note?':'+e.note:''}(${evEnd(e.kind)} 結束)`}))];const E=[...MQ.ev,...mqBots()].sort((a,b)=>b.at-a.at).slice(0,5);return [...N,...E]}
+async function mqEvents(){if(!SRV.on()||Date.now()-MQ.evT<60e3)return;MQ.evT=Date.now();try{const data=await SRV.rpc('events_feed');MQ.ev=(data||[]).map(x=>({txt:x.txt,at:new Date(x.at).getTime()}))}catch(e){}}
+function mqBuild(){const N=[...(NET.notice||[]).map(n=>({txt:'📢 '+n.title,n})),...EVT.list.filter(e=>evOn(e.kind)).map(e=>({txt:`🎉 ${EVN[e.kind]}活動進行中${e.note?':'+e.note:''}(${evEnd(e.kind)} 結束)`}))];const E=[...MQ.ev].sort((a,b)=>b.at-a.at).slice(0,5);return [...N,...E]}
 function mqNext(){const bar=$('marq');if(!bar)return;if(!MQ.q.length)MQ.q=mqBuild();const it=MQ.q.shift();MQ.cur=it||null;if(!it){bar.hidden=true;setTimeout(mqNext,15e3);return}
   bar.hidden=false;const s=$('marqT');s.textContent=it.txt;s.classList.toggle('ntc',!!it.n);s.style.transition='none';const W=bar.clientWidth||300;s.style.transform=`translateX(${W}px)`;void s.offsetWidth;
   const dist=W+s.scrollWidth,dur=Math.max(6,dist/70);s.style.transition=`transform ${dur}s linear`;s.style.transform=`translateX(${-s.scrollWidth}px)`;clearTimeout(MQ.tm);MQ.tm=setTimeout(mqNext,dur*1000+600)}
@@ -2639,7 +2639,7 @@ function pFriends(){if(!unlocked('friends'))return `<div class="card"><h3>🔒 �
     <div class="card"><h3>輸入好友代碼</h3><div class="row"><input id="frIn" maxlength="8" placeholder="例如 K7QX2M" autocomplete="off"><button class="go" data-act="frAdd">加好友</button></div></div>`;
     const ids=new Set((SV.friends||[]).map(f=>f.id)),rec=[...NET.pw,...NET.ld].filter((d,i,a)=>!ids.has(d.id)&&a.findIndex(x=>x.id===d.id)===i).slice(0,10);
     h+=`<div class="card"><h3>推薦玩家 <small>最近有上線的真人守護員</small></h3><div class="list">${rec.length?rec.map(d=>`<div class="li"><div><b>${d.n} <span class="real">真人</span></b><small>戰力 ${fmt(d.pw||0)}</small></div><button class="go" data-act="frAddId:${d.id}">加好友</button></div>`).join(''):'<p class="mut">目前沒有其他真人玩家。</p>'}</div></div>`}
-  else{h+=`<div class="card"><h3>附近的守護員 <small>電腦玩家;可以拜訪城鎮、切磋練習</small></h3><div class="list">${lords().slice().sort((a,b)=>a.power-b.power).map(L=>frRow(lordDoc(L),'L'+L.i)).join('')}</div></div>`}
+  else{h+=`<div class="card"><h3>附近的守護員 <small>電腦玩家;可以拜訪城鎮、切磋練習</small></h3><div class="list">${lords().slice().sort((a,b)=>a.power-b.power).slice(0,20).map(L=>frRow(lordDoc(L),'L'+L.i)).join('')}</div></div>`}
   return h}
 // ===== chat (phase 1): world channel, friend DMs, hearts. Each player writes only their own arena doc =====
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2714,9 +2714,9 @@ function myLv(){const tm=SV.team.filter(k=>k&&SV.pets[k]);return Math.max(1,Math
 // computer ladder players for a season; their points grow over the season so the board feels alive
 function seasonBots(ss){const r=seeded(ss*7919+11),prog=clamp((Date.now()-seasonEnd(ss-1))/(14*DAY),0,1),day=Math.floor(Date.now()/DAY);
   return [...LORD_NAMES,...BOT_NAMES].map((n,i)=>{const fin=Math.round(1950*Math.pow(r(),1.5)),rich=fin/1950,team=pickTeam(r,rich),jit=seeded(day*31+i)();
-    const gr=botGrow(n,seasonEnd(ss-1),14*DAY);return {id:'bot'+i,n,pts:Math.max(0,Math.round((gr<1?fin*gr:fin*(.2+.8*prog))+(jit-.5)*30)),team,bot:1}})}
+    const gr=botGrow(n,seasonEnd(ss-1),14*DAY),sx=BOTX[n];if(sx&&sx.ss===ss)return {id:'bot'+i,n,pts:sx.pts,team,bot:1};return {id:'bot'+i,n,pts:Math.max(0,Math.round((gr<1?fin*gr:fin*(.2+.8*prog))+(jit-.5)*30)),team,bot:1}})}
 function weekBots(wk,final){const r=seeded(wk*104729+5),prog=final?1:clamp((Date.now()-weekEnd(wk-1))/(7*DAY),0,1);
-  return [...LORD_NAMES,...BOT_NAMES].map((n,i)=>{const fin=Math.round(32*Math.pow(r(),1.9)*botGrow(n,weekEnd(wk-1),7*DAY)),ws=Math.round(fin*prog),loot=Math.round(ws*(1800+r()*2600));r();return {id:'bot'+i,n,ws,wl:loot,wd:Math.round(fin*prog*r()),bot:1}})}
+  return [...LORD_NAMES,...BOT_NAMES].map((n,i)=>{const fin=Math.round(32*Math.pow(r(),1.9)*botGrow(n,weekEnd(wk-1),7*DAY)),ws=Math.round(fin*prog),loot=Math.round(ws*(1800+r()*2600));r();const sx=BOTX[n];if(sx&&sx.wk===wk&&!final)return {id:'bot'+i,n,ws:sx.wkw,wl:sx.wkl,wd:sx.wkd,bot:1};return {id:'bot'+i,n,ws,wl:loot,wd:Math.round(fin*prog*r()),bot:1}})}
 function botTeam(b,pts){const tm=SV.team.filter(k=>k&&SV.pets[k]),av=f=>tm.length?tm.reduce((a,k)=>a+SV.pets[k][f],0)/tm.length:0,st=Math.round(av('st')),stars=Math.max(1,Math.round(av('stars'))),
   lv=clamp(myLv()+Math.round((b.pts-pts)/120),1,st<2?LVCAP[st]:50);return b.team.map(k=>[k,lv,st,stars,1+st])}
 // the computer controls the defending side less cleverly than a player attacks, so defenders get a stat bonus by stage
@@ -2764,7 +2764,7 @@ function ladSync(){if(!SRV.on())return;SRV.rpc('ladder_me').then(r=>{ladApply(r)
 const ladGain=(me,op)=>Math.round(clamp(25+(op-me)/10,12,40)),ladLoss=(me,op)=>Math.round(clamp(15+(me-op)/12,6,25));
 const teamIcons=t=>`<span class="tic">${t.map(([k,lv,st])=>`<img src="assets/${PETS[k].img}${st+1}.webp" alt="" title="${PETS[k].n[st]} Lv${lv}">`).join('')}</span>`;
 const badge=(p,big)=>{const t=tierOf(p);return `<span class="tier ${big?'big':''}" style="--tc:${t.T.c}"><i><img src="assets/t_${t.i}.webp" alt=""></i>${t.name}</span>`};
-function pRank(){const t=sheetTab||'ladder';netFetch();if(SRV.on()&&Date.now()-(SRV.ladT||0)>30e3){SRV.ladT=Date.now();ladSync()}if(Date.now()-NET.pubT>120e3)netPublish();
+function pRank(){const t=sheetTab||'ladder';netFetch();if(window.MOE_SB&&Date.now()-(BOTX.__t||0)>60e3){BOTX.__t=Date.now();botFetch().then(()=>{if(sheetK==='rank')renderSheet(1)})}if(SRV.on()&&Date.now()-(SRV.ladT||0)>30e3){SRV.ladT=Date.now();ladSync()}if(Date.now()-NET.pubT>120e3)netPublish();
   let h=tabs([['ladder','天梯'],['lshop','天梯商店'],['week','攻城週榜'],['power','戰力榜'],['pros','繁榮榜']]);
   const note=!ACC.cloud?`<p class="note">👤 目前是遊客模式:只會和電腦玩家比,成績不會上雲端榜。連線到伺服器後就能和其他真人一起排名。</p>`:NET.noWrite?`<p class="note">你目前只有檢視權限,能看排行但成績無法上榜。</p>`:NET.err?`<p class="note">${NET.err}</p>`:'';
   if(t==='ladder'&&!unlocked('ladder'))h+=`<div class="card"><h3>🔒 天梯</h3><p>${lockMsg('ladder')}。先看看排行榜,打冒險升級吧!</p></div>`;
