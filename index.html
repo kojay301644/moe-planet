@@ -662,7 +662,22 @@ async function accInit(){const C=window.claude;let user=null,db=null;
     if(cloud&&(wantCloud||!SV.started||SV.uid===id&&(cloud.t||0)>=(SV.t||0))){SV=cloud;SV.uid=id;saveLocalOnly()}
     else if(cloud&&SV.started&&SV.uid!==id){await chooseSave(cloud)}
     else if(SV.started){SV.uid=id;save();await cloudWrite(true);if(!cloud)toast('已把這台裝置的進度綁定到你的帳號')}}
-  setAcc();titleReady();if(ACC.cloud){netPublish(true);netFetch(true);setTimeout(likeCheck,3000)}}
+  setAcc();titleReady();if(ACC.cloud){SRV.init();netPublish(true);netFetch(true);setTimeout(likeCheck,3000)}}
+/* ---------- 伺服器驗證:鑽石錢包、抽卡、天梯、玩家交易所(只有網頁版、而且伺服器 SQL 已安裝時才啟用) ---------- */
+const SRV={ok:0,last:null,earn:0,spend:0,q:Promise.resolve(),bankT:0,
+  on(){return !!(SRV.ok&&window.MOE_SB&&ACC.cloud)},
+  msg(m){m=String(m||'');return /not enough gem/.test(m)?'鑽石不足':/no tickets/.test(m)?'今天的挑戰券用完了':/too fast/.test(m)?'太快了,請稍等幾秒再試':/^limit/.test(m)?'今天已買滿 10 次':/not signed/.test(m)?'還沒連上伺服器,請重新整理':/[一-鿿]/.test(m)?m:'伺服器忙碌中,請稍後再試'},
+  async rpc(fn,a){const {data,error}=await withTimeout(MOE_SB.rpc(fn,a||{}),12000);if(error){const e=new Error(SRV.msg(error.message));e.raw=error.message;throw e}return data},
+  watch(){if(SRV.last==null)return;const d=Math.round(SV.gem-SRV.last);if(d>0)SRV.earn+=d;else if(d<0)SRV.spend-=d;SRV.last=SV.gem},
+  adopt(g){if(g==null)return;const x=SV.gem-SRV.last;SV.gem=g+x;SRV.last=g;townHud()},
+  run(f){const p=SRV.q.then(f,f);SRV.q=p.catch(()=>{});return p},
+  async flush(){SRV.watch();const e=SRV.earn,s=SRV.spend;if(!e&&!s)return;SRV.earn=0;SRV.spend=0;
+    try{const r=await SRV.rpc('gem_sync',{p_earn:e,p_spend:s});SRV.adopt(r.gem);SV.topup=r.topup;if(r.bank>0&&Date.now()-SRV.bankT>600e3){SRV.bankT=Date.now();toast(`今天的鑽石收入已達上限,還有 💎${fmt(r.bank)} 會在之後每天陸續入帳`)}save()}
+    catch(err){SRV.earn+=e;SRV.spend+=s;throw err}},
+  sync(){if(!SRV.on())return Promise.resolve();return SRV.run(()=>SRV.flush()).catch(()=>{})},
+  op(fn,a){return SRV.run(async()=>{await SRV.flush();const r=await SRV.rpc(fn,a);if(r&&r.gem!=null){SRV.watch();SRV.adopt(r.gem);SRV.earn=0;SRV.spend=0;SRV.last=SV.gem}save();return r})},
+  async init(){if(!window.MOE_SB||!ACC.cloud)return;try{const r=await SRV.rpc('wallet_init',{p_local:0});SV.gem=r.gem;SRV.last=r.gem;SRV.earn=SRV.spend=0;SV.topup=r.topup;SV.pity=r.pity;SV.dpity=r.dpity;SRV.ok=1;save();townHud();ladSync()}catch(e){console.warn('MOE: 伺服器驗證未啟用',e&&e.raw||e)}}};
+setInterval(()=>SRV.sync(),15000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')SRV.sync()});
 function saveLocalOnly(){try{localStorage.setItem(LSKEY,JSON.stringify(SV))}catch(e){}}
 const brief=S=>`主城 Lv${S.castle} · 萌獸 ${Object.keys(S.pets).length} 隻 · ⭐${fmt(S.coin)}<br><small>${S.t?new Date(S.t).toLocaleString('zh-TW'):''}</small>`;
 function chooseSave(cloud){return new Promise(res=>{$('choose').hidden=false;$('cfA').innerHTML='<b>帳號裡的雲端進度</b><br>'+brief(cloud);$('cfB').innerHTML='<b>這台裝置的遊客進度</b><br>'+brief(SV);
@@ -1303,7 +1318,8 @@ function end(win){if(B.over)return;const RET=B.retreat;if(RET)eqFix();const SNAP
     lines.unshift(win?`切磋勝利!贏了 ${o.n}`:`切磋落敗,${o.n} 比較強`);lines.push(rw?`今日切磋獎勵 ${SV.fb.n}/5`:'今天的切磋獎勵已領完,還是可以繼續練習')}
   else if(B.mode==='pvp'){const L=lad(),o=B.cfg.opp,before=tierOf(L.pts).name;bump('pvp');bump('battle');eqFix();{if(L.cday!==today()){L.cday=today();L.cn=0}L.cn=(L.cn||0)+1;const div=SV.team.filter(k=>k&&SV.pets[k]&&PETS[k].rar<=1).length>=2,dbl=L.cn<=5,up=win&&o.pts>L.pts+50;let g=Math.round((win?10:7)*(div?1.5:1)*(dbl?2:1))+(up?5:0);SV.mat.lc=(SV.mat.lc||0)+g;lines.push(`天梯幣 +${g}${dbl?`(今日前 5 場 ×2,第 ${L.cn} 場)`:''}${div?'(多元隊伍 ×1.5)':''}${up?'(以下剋上 +5)':''}`)}if(win){let g=ladGain(L.pts,o.pts);if((L.ls||0)>=3){g=Math.round(g*1.5);lines.push('🔥 逆轉勝:連敗後的勝利,天梯分 ×1.5')}L.ls=0;L.pts+=g;L.w++;coin+=300+tierOf(L.pts).i*150;gem=5;lines.push(`打贏 ${o.n}!天梯分 +${g}`)}else{const g=ladLoss(L.pts,o.pts);L.ls=(L.ls||0)+1;if(L.ls>=3)lines.push(`連敗 ${L.ls} 場,下一場勝利天梯分 ×1.5`);L.pts=Math.max(0,L.pts-g);L.l++;coin+=80;lines.push(`輸給 ${o.n},天梯分 -${g}`)}
     L.best=Math.max(L.best,L.pts);const after=tierOf(L.pts).name;if(after!==before)lines.push(win?`🎉 升段:${after}!`:`段位下降:${after}`);lines.push(`目前 ${fmt(L.pts)} 分 · ${after}`);
-    addXp(win?40:13,lines);L.hist.unshift({t:Date.now(),n:o.n,win,pts:L.pts});L.hist=L.hist.slice(0,10);L.opp=[];setTimeout(()=>netPublish(true),50)}
+    addXp(win?40:13,lines);L.hist.unshift({t:Date.now(),n:o.n,win,pts:L.pts});L.hist=L.hist.slice(0,10);L.opp=[];
+    if(SRV.on()){const H=L.hist[0];SRV.op('ladder_report',{p_win:!!win&&!RET,p_opp_pts:o.pts|0,p_opp_pw:o.pw|0,p_my_pw:teamPower(SV.team.filter(k=>k&&SV.pets[k]))|0,p_secs:B.t||0}).then(r=>{ladApply(r);H.pts=r.pts;if(!r.ok)toast('這場戰鬥資料異常,天梯以輸掉計算');netPublish(true)},e=>{toast('天梯結算:'+e.message);ladSync()})}else setTimeout(()=>netPublish(true),50)}
   else if(B.mode==='defend'){const Lr=B.cfg.lord;hpRegen();if(!SV.twHp)SV.twHp=[1,1,1];B.ally.forEach(a=>{SV.twHp[a.i]=clamp(a.hp/a.max,0,1)*(win?1:.7)});if(B.ally.some(a=>a.hp<a.max))lines.push('🏹 砲塔受損了,到主城→城牆砲塔花星星幣修理(不會自己恢復)');SV.gate=clamp(B.gate.hp/B.gate.max,0,1);if(SV.gate<=0)SV.shieldT=Date.now()+2*3600e3;SV.gateT=Date.now();if(win&&B.gate.hp/B.gate.max>=.8)SV.gate=1;
     if(win){coin+=300+SV.castle*150;SV.stat.defWins++;wk().def++;
       if(defensePower()<Lr.power){gem+=20;stones+=2;lines.push('💪 以弱勝強!額外 💎20、💠2')}
@@ -1503,10 +1519,15 @@ const enMax=()=>ENMAX+(vip()>=3)+(vip()>=9),capH=()=>vip()>=6?12:vip()>=2?10:8,v
 // PAY.buy() is the hook for a real payment gateway later; for now pressing a package grants the gems right away.
 const PAYX={card:{nt:150,g:300,n:'月卡',d:'立即 💎300,之後 30 天每天登入領 💎50(共 💎1,800)'},fund:{nt:300,g:600,n:'成長基金',d:'守護員 Lv.10/20/30/40/50 各領 💎500(共 💎2,500),限購一次'}};
 const PAYP=[{id:'p30',nt:30,g:60,b:0},{id:'p150',nt:150,g:300,b:30},{id:'p300',nt:300,g:600,b:80},{id:'p790',nt:790,g:1580,b:300},{id:'p1490',nt:1490,g:2980,b:700},{id:'p3290',nt:3290,g:6580,b:1900}];
-const PAY={async buy(id){if(PAYX[id]){const X=PAYX[id];/* TODO 串接金流 */if(id==='fund'&&SV.fund)return toast('已購買過');if(id==='card'&&SV.card&&SV.card.until>Date.now()+3*864e5)return toast('月卡剩 3 天內才能續購');const before=vip();SV.gem+=X.g;SV.topup=(SV.topup||0)+X.g;if(id==='card')SV.card={until:Math.max(Date.now(),(SV.card&&SV.card.until)||0)+30*864e5,day:''};else SV.fund={got:[]};SV.payLog=[{t:Date.now(),id,nt:X.nt,g:X.g,b:0},...(SV.payLog||[])].slice(0,30);save();sfx('egg');toast(`購買 ${X.n} 成功!💎+${X.g}`);const v=vip();if(v>before)setTimeout(()=>toast(`🎉 升到 VIP${v}!`),1200);renderSheet();townHud();return}const P=PAYP.find(x=>x.id===id);if(!P)return;
+const PAY={async buy(id){if(SRV.on())return PAY.srv(id);if(PAYX[id]){const X=PAYX[id];/* TODO 串接金流 */if(id==='fund'&&SV.fund)return toast('已購買過');if(id==='card'&&SV.card&&SV.card.until>Date.now()+3*864e5)return toast('月卡剩 3 天內才能續購');const before=vip();SV.gem+=X.g;SV.topup=(SV.topup||0)+X.g;if(id==='card')SV.card={until:Math.max(Date.now(),(SV.card&&SV.card.until)||0)+30*864e5,day:''};else SV.fund={got:[]};SV.payLog=[{t:Date.now(),id,nt:X.nt,g:X.g,b:0},...(SV.payLog||[])].slice(0,30);save();sfx('egg');toast(`購買 ${X.n} 成功!💎+${X.g}`);const v=vip();if(v>before)setTimeout(()=>toast(`🎉 升到 VIP${v}!`),1200);renderSheet();townHud();return}const P=PAYP.find(x=>x.id===id);if(!P)return;
     /* TODO 串接金流:在這裡呼叫付款,付款成功後才往下執行 */
     const first=!(SV.payFirst||[]).includes(id),bonus=first?P.g:P.b;const before=vip();SV.gem+=P.g+bonus;SV.topup=(SV.topup||0)+P.g;if(first)SV.payFirst=[...(SV.payFirst||[]),id];
     SV.payLog=[{t:Date.now(),id,nt:P.nt,g:P.g,b:bonus},...(SV.payLog||[])].slice(0,30);save();cloudWrite(true);sfx('egg');toast(`儲值成功!💎+${fmt(P.g+bonus)}${first?'(首儲雙倍)':''}`);
+    const v=vip();if(v>before)setTimeout(()=>toast(`🎉 升到 VIP${v}!到 VIP 頁領取升級禮包`),1200);renderSheet();townHud()},
+  async srv(id){const X=PAYX[id],P=PAYP.find(x=>x.id===id);if(!X&&!P)return;if(id==='fund'&&SV.fund)return toast('已購買過');if(id==='card'&&SV.card&&SV.card.until>Date.now()+3*864e5)return toast('月卡剩 3 天內才能續購');
+    if(PAY.busy)return;PAY.busy=1;const before=vip();let r;try{r=await SRV.op('topup_test',{p_pkg:id})}catch(e){PAY.busy=0;return toast(e.message)}PAY.busy=0;SV.topup=r.topup;const g=(X||P).g,b=r.bonus||0;
+    if(id==='card')SV.card={until:Math.max(Date.now(),(SV.card&&SV.card.until)||0)+30*864e5,day:''};else if(id==='fund')SV.fund={got:[]};if(P&&r.first)SV.payFirst=[...(SV.payFirst||[]),id];
+    SV.payLog=[{t:Date.now(),id,nt:(X||P).nt,g,b},...(SV.payLog||[])].slice(0,30);save();cloudWrite(true);sfx('egg');toast(X?`購買 ${X.n} 成功!💎+${g}`:`儲值成功!💎+${fmt(g+b)}${r.first?'(首儲雙倍)':''}`);
     const v=vip();if(v>before)setTimeout(()=>toast(`🎉 升到 VIP${v}!到 VIP 頁領取升級禮包`),1200);renderSheet();townHud()}};
 function pPay(){const v=vip(),nx=VIPN[v+1],x=SV.topup||0;return `<div class="card vipcard"><div class="vipbig">VIP${v}</div><div class="lm"><h3>儲值鑽石</h3><small>${nx?`累積儲值 💎${fmt(x)},再 💎${fmt(nx-x)} 升到 VIP${v+1}`:'已達 VIP 最高等級'}</small><button class="blue" data-act="goVip">查看 VIP 特權</button></div></div>
   <p class="note">⚠️ 測試版:目前按下就會直接得到鑽石,不會真的扣款。正式上線會改成串接金流付款。</p>
@@ -1932,7 +1953,7 @@ const ACT={
     for(let i=0;i<n;i++){c+=Math.round(L.reward*.8*(vip()>=8?1.2:vip()>=4?1.1:1));o+=1+Math.floor(li/6);if(rnd()<.2)st++}const cd=n*(2+Math.floor(li/10));SV.candy=(SV.candy||0)+cd;SV.coin+=c;SV.mat.ore+=o;SV.stones+=st;bump('adv',n);SV.stat.wins+=n;addXp(15*n,[]);
     showLoot(`掃蕩 ×${n}`,[{img:'assets/i_coin.webp',n:'⭐'+fmt(c)},{img:'assets/i_candy.webp',n:'經驗糖果 ×'+cd},{img:'assets/i_ore.webp',n:'礦石 ×'+o},...(st?[{img:'assets/i_stone.webp',n:'進化石 ×'+st}]:[])])},
   chest:(c,t)=>{c=+c;t=+t;const need=[10,20,30][t];SV.chest=SV.chest||{};const got=SV.chest[c]||0;if(got&(1<<t))return;if(chStars(c)<need)return toast(`需要 ${need} 顆星`);SV.chest[c]=got|(1<<t);eqFix();const R=chestRw(c,t);R.f();showLoot(`${CH[c].n} 星星寶箱`,R.show)},
-  egg1:()=>summon(1),rtix:()=>{if(!(SV.rtix>0))return;SV.rtix--;const r=rnd(),q=r<.05?3:r<.25?2:1,x=grantPet(rollSpecies(),q);bump('summon');if(x.isNew)celebrate(x.k,PETS[x.k].n[0]+' 搬進城鎮了');showHatch(x.k,x)},vfree:()=>{const F=vfree();if(F.left<1)return;SV.vfree={day:today(),n:F.used+1};summon(1,true)},pay:id=>{PAY.buy(id)},a2inst:()=>{if(A2.prompt){A2.prompt.prompt();A2.prompt.userChoice.then(()=>{A2.prompt=null})}},cardDay:()=>{if(!SV.card||SV.card.until<Date.now()||SV.card.day===today())return;SV.card.day=today();SV.gem+=50;toast('月卡:💎+50')},fundGet:()=>{if(!SV.fund)return;let g=0;for(const L of [10,20,30,40,50])if(glv()>=L&&!SV.fund.got.includes(L)){SV.fund.got.push(L);g+=500}if(g){SV.gem+=g;toast('成長基金:💎+'+g)}},goPay:()=>{openSheet('pay')},goVip:()=>{openSheet('me','vip')},mkTab:k=>{SV.mkTab=k;mkSel=null},mkBuy:id=>MKT.buy(id),mkSel:id=>{mkSel=id===''?null:+id;mkPV=null},mkP:v=>{mkPV=+v},mkList:id=>{const i=$('mkPrice');MKT.list(id,i?i.value:0)},mkCancel:id=>MKT.cancel(id),uqX:id=>{eqFix();if(!UQ[id]||(SV.mat.ess||0)<300)return;SV.mat.ess-=300;const e=mkUq(id);sfx('win');showLoot('獨特傳說兌換',[{img:eqImg(e),n:UQ[id].n,rar:e.rar}])},brk:k=>{const s=SV.pets[k];if(!s||s.st<2||(s.bt||0)>=2||s.lv<lvCap(s))return toast('三階滿級後才能突破');const c=BRK[s.bt||0];if(SV.coin<c.coin||SV.stones<c.stones||(SV.candy||0)<c.candy)return toast('材料不足');SV.coin-=c.coin;SV.stones-=c.stones;SV.candy-=c.candy;s.bt=(s.bt||0)+1;sfx('win');celebrate(k,`${PETS[k].n[2]} 突破!等級上限 Lv.${lvCap(s)}`)},qUp:k=>{const s=SV.pets[k];if(!s)return;const q=qOf(k);if(q>=3)return;const need=QNEED[q+1];if((s.qe||0)<need)return toast('品質精華不足');s.qe-=need;s.q=q+1;sfx('win');showHatch(k,{up:1,q:s.q})},egg10:()=>summon(10),
+  egg1:()=>summon(1),rtix:()=>{if(!(SV.rtix>0))return;SV.rtix--;const r=rnd(),q=r<.05?3:r<.25?2:1,x=grantPet(rollSpecies(),q);bump('summon');if(x.isNew)celebrate(x.k,PETS[x.k].n[0]+' 搬進城鎮了');showHatch(x.k,x)},vfree:()=>{const F=vfree();if(F.left<1)return;SV.vfree={day:today(),n:F.used+1};summon(1,true)},pay:id=>{PAY.buy(id)},a2inst:()=>{if(A2.prompt){A2.prompt.prompt();A2.prompt.userChoice.then(()=>{A2.prompt=null})}},cardDay:()=>{if(!SV.card||SV.card.until<Date.now()||SV.card.day===today())return;SV.card.day=today();SV.gem+=50;toast('月卡:💎+50')},fundGet:()=>{if(!SV.fund)return;let g=0;for(const L of [10,20,30,40,50])if(glv()>=L&&!SV.fund.got.includes(L)){SV.fund.got.push(L);g+=500}if(g){SV.gem+=g;toast('成長基金:💎+'+g)}},goPay:()=>{openSheet('pay')},goVip:()=>{openSheet('me','vip')},mkTab:k=>{SV.mkTab=k;mkSel=null},mkBuy:id=>MKT.buy(id),mkRBuy:id=>MKT.rbuy(id),mkRCancel:id=>MKT.rcancel(id),mkSel:id=>{mkSel=id===''?null:+id;mkPV=null},mkP:v=>{mkPV=+v},mkList:id=>{const i=$('mkPrice');MKT.list(id,i?i.value:0)},mkCancel:id=>MKT.cancel(id),uqX:id=>{eqFix();if(!UQ[id]||(SV.mat.ess||0)<300)return;SV.mat.ess-=300;const e=mkUq(id);sfx('win');showLoot('獨特傳說兌換',[{img:eqImg(e),n:UQ[id].n,rar:e.rar}])},brk:k=>{const s=SV.pets[k];if(!s||s.st<2||(s.bt||0)>=2||s.lv<lvCap(s))return toast('三階滿級後才能突破');const c=BRK[s.bt||0];if(SV.coin<c.coin||SV.stones<c.stones||(SV.candy||0)<c.candy)return toast('材料不足');SV.coin-=c.coin;SV.stones-=c.stones;SV.candy-=c.candy;s.bt=(s.bt||0)+1;sfx('win');celebrate(k,`${PETS[k].n[2]} 突破!等級上限 Lv.${lvCap(s)}`)},qUp:k=>{const s=SV.pets[k];if(!s)return;const q=qOf(k);if(q>=3)return;const need=QNEED[q+1];if((s.qe||0)<need)return toast('品質精華不足');s.qe-=need;s.q=q+1;sfx('win');showHatch(k,{up:1,q:s.q})},egg10:()=>summon(10),
   castleUp:()=>{const c=castleCost();if(SV.castle>=10)return;if(!costOk(c))return toast('星星幣不足');pay(c);SV.castle++;sfx('egg');toast('主城升到 Lv.'+SV.castle+'!')},
   repair:()=>{hpRegen();const c=repCost();if(c.coin<=0)return;if(SV.coin<c.coin)return toast('星星幣不足');eqFix();if((SV.mat.ore||0)<c.ore)return toast('礦石不足(冒險可以拿到)');SV.coin-=c.coin;SV.mat.ore-=c.ore;SV.gate=1;SV.gateT=Date.now();SV.repT=Date.now();SV.shieldT=0;sfx('egg');toast('主城修好了!')},
   tw:(i,t)=>{if(SV.towers[+i]===t)return;const c=towerBuild(t);if(!SV.twLv[t]&&SV.coin<c)return toast('星星幣不足');if(!SV.twLv[t]){SV.coin-=c;SV.twLv[t]=1}SV.towers[+i]=t;toast(`第 ${+i+1} 座換成 ${TOWERS[t].n}`)},
@@ -1986,7 +2007,7 @@ const ACT={
   cosOn:(kd,id)=>{if(!(SV.cos||[]).includes(id))return;if(kd==='t')SV.title=SV.title===id?null:id;else SV.frame=SV.frame===id?null:id;applyCos()},
   ladSeen:()=>{lad().last.seen=1},wkSeen:()=>{SV.wkLast.seen=1},goSiege:()=>{openSheet('castle','siege')},
   ladRef:()=>{lad().opp=[];refreshOpp()},
-  ladBuy:()=>{const L=lad();if(SV.gem<30)return toast('寶石不足');if(L.buy>=10)return toast('今天已買滿 10 次');spendGem(30);L.buy++;L.tix++;toast('挑戰券 +1')},
+  ladBuy:()=>{const L=lad();if(SV.gem<30)return toast('寶石不足');if(L.buy>=10)return toast('今天已買滿 10 次');if(SRV.on())return SRV.op('ladder_buy').then(r=>{ladApply(r);toast('挑戰券 +1');renderSheet()},e=>toast(e.message));spendGem(30);L.buy++;L.tix++;toast('挑戰券 +1')},
   ladFight:i=>{const L=lad(),o=L.opp[+i];if(!o)return;if(L.tix<1)return toast('今天的挑戰券用完了');if(!SV.team.some(k=>k&&SV.pets[k]))return toast('先到「萌獸」排好出戰隊伍');L.tix--;$('sheet').hidden=true;startBattle({mode:'pvp',opp:o,bg:L.pts>=900?'bg_volcano':'bg_forest'})},
   skUp:k=>ACT.sk(k),
   craft:(n,free)=>{n=+n;eqFix();const c=CRAFT();if(free){if(vip()<2||SV.fFree===today())return;SV.fFree=today()}else{if(SV.coin<c.coin*n)return toast('星星幣不足');if(SV.mat.ore<c.ore*n)return toast('礦石不足(冒險可以拿到)');SV.coin-=c.coin*n;SV.mat.ore-=c.ore*n}
@@ -2075,9 +2096,13 @@ const NOSUM=[];
 function vfree(){const n=vip()>=10?2:vip()>=5?1:0,used=SV.vfree&&SV.vfree.day===today()?SV.vfree.n:0;return {n,used,left:n-used}}
 function rollSpecies(){const ks=PK,w=ks.map(spW),tot=w.reduce((a,b)=>a+b,0);let r=rnd()*tot;for(let i=0;i<ks.length;i++){r-=w[i];if(r<=0)return ks[i]}return ks[0]}
 function grantPet(k,q){const s=SV.pets[k];if(!s){SV.pets[k]=P0();SV.pets[k].q=q;for(const T of [SV.team,SV.defTeam]){const i=T.findIndex(x=>!x);if(i>=0&&i<3)T[i]=k}return {k,q,isNew:1}}const cur=qOf(k);if(q>cur){s.q=q;return {k,q,up:1,from:cur}}const sh=[5,10,20,40][q];s.shards+=sh;s.qe=(s.qe||0)+sh;return {k,q,sh}}
-function summon(n,free){const cost=free?0:n===10?1440:160;if(SV.gem<cost)return toast('寶石不足,可到福利或任務領取');if(cost)spendGem(cost);bump('summon',n);
+async function summon(n,free){const cost=free?0:n===10?1440:160;if(SV.gem<cost)return toast('寶石不足,可到福利或任務領取');
+  if(cost&&SRV.on()){if(SRV.sumBusy)return;SRV.sumBusy=1;let r;try{r=await SRV.op('summon',{p_n:n,p_wish:SV.wish||null})}catch(e){SRV.sumBusy=0;return toast(e.message)}SRV.sumBusy=0;bump('summon',n);SV.pity=r.pity;SV.dpity=r.dpity;return summonDone(r.res.map(x=>grantPet(x.k,x.q)))}
+  if(cost)spendGem(cost);bump('summon',n);
   const res=[];for(let i=0;i<n;i++){SV.pity=(SV.pity||0)+1;SV.dpity=(SV.dpity||0)+1;const r=rnd();let q=r<.015?3:r<.1?2:r<.4?1:0;if(SV.pity>=80)q=3;if(n===10&&i===9&&!res.some(g=>g.q>=1)&&q<1)q=1;if(q===3)SV.pity=0;
     let k=SV.dpity>=200?DIVINE[Math.floor(rnd()*DIVINE.length)]:rollSpecies();if(q>=2&&SV.wish&&PETS[SV.wish]&&!DIVINE.includes(k)&&rnd()<.5)k=SV.wish;if(DIVINE.includes(k))SV.dpity=0;res.push(grantPet(k,q))}
+  summonDone(res)}
+function summonDone(res){
   if(SV.tut===5){SV.tut=9;townHud();setTimeout(()=>toast('新手教學完成!新夥伴已經自動上陣,現在可以自由探索了'),2500)}
   res.filter(x=>x.isNew).forEach(x=>celebrate(x.k,`${PETS[x.k].n[0]} 搬進城鎮了`));showSummon(res)}
 function eggsFix(){if(!SV.eggs||!SV.eggs.length)return;const res=SV.eggs.map(e=>grantPet(e.k,e.rar??PETS[e.k].rar));SV.eggs=[];save();setTimeout(()=>{toast('孵化室取消了,原本的蛋已經全部孵化');showSummon(res)},800)}
@@ -2158,11 +2183,22 @@ function mkSV(){const M=SV.mk=SV.mk||{};M.my=M.my||[];M.log=M.log||[];M.idx=M.id
 function mkKey(e){return e.uq?'uq':(e.set||'basic')+'.'+e.rar}
 function mkWeek(key){let h=0;for(const c of key+wkId())h=(h*31+c.charCodeAt(0))>>>0;return .85+(h%400)/1000}
 function mkIdx(key){const M=mkSV();return mkWeek(key)*(M.idx[key]||1)}
-function mkFair(e){const base=e.uq?7000:MK_BASE[e.rar]||12,sub=(e.subs||[]).reduce((a,[k,v])=>a+v,0);
-  return Math.max(5,Math.round(base*(1+.06*(e.lv||0))*(1+sub/60)*(e.type==='bell'?1.1:1)*mkIdx(mkKey(e))))}
+function mkFair(e,raw){const base=e.uq?7000:MK_BASE[e.rar]||12,sub=(e.subs||[]).reduce((a,[k,v])=>a+v,0);
+  return Math.max(5,Math.round(base*(1+.06*(e.lv||0))*(1+sub/60)*(e.type==='bell'?1.1:1)*(raw?1:mkIdx(mkKey(e)))))}
 function mkBump(key,f){const M=mkSV();M.idx[key]=Math.max(.6,Math.min(1.8,(M.idx[key]||1)*f))}
 function mkDecay(){const M=mkSV(),h=(Date.now()-M.t)/3600e3;if(h<.05)return h;for(const k in M.idx)M.idx[k]=1+(M.idx[k]-1)*Math.pow(.97,h);return h}
+const MKS={list:[],mine:[],t:0,busy:0};
+const mkClean=e=>{const o={type:e.type,rar:e.rar,lv:e.lv||0,set:e.set||'basic',subs:(e.subs||[]).map(s=>[s[0],s[1]])};if(e.uq)o.uq=e.uq;return o};
+async function mkFetch(force){if(!SRV.on()||MKS.busy||(!force&&Date.now()-MKS.t<20e3))return;MKS.busy=1;
+  try{const r=await SRV.op('inbox_claim');let got=[],gem=0;for(const x of r.items||[]){if(x.item){const e={...x.item,id:SV.eqId++,fail:0,lock:0};if(/購買/.test(x.note||''))e.tb=Date.now();SV.equips.push(e);got.push(e)}gem+=x.gem||0}
+    if(got.length){eqFix();save();cloudWrite(true);showLoot('交易所信箱',got.map(e=>({img:eqImg(e),n:mkName(e),rar:e.rar})))}if(gem)toast(`交易所:賣出裝備,💎+${fmt(gem)} 已入帳(已扣 10% 手續費)`);
+    const [a,b]=await Promise.all([SRV.rpc('market_browse'),SRV.rpc('market_mine')]);MKS.list=a||[];MKS.mine=b||[];MKS.t=Date.now()}catch(e){}
+  MKS.busy=0;if(sheetK==='forge'&&sheetTab==='mkt')renderSheet()}
 const MKT={
+  rbuy(id){const L=MKS.list.find(x=>x.id===+id);if(!L)return;if(SV.gem<L.price)return toast('鑽石不足');if(MKT.busy)return;MKT.busy=1;
+    SRV.op('market_buy',{p_id:+id}).then(()=>{MKT.busy=0;sfx('coin');MKS.list=MKS.list.filter(x=>x!==L);mkFetch(true)},e=>{MKT.busy=0;toast(e.message);mkFetch(true)})},
+  rlist(e,price){if(MKT.busy)return;MKT.busy=1;SRV.op('market_list',{p_item:mkClean(e),p_price:price}).then(()=>{MKT.busy=0;SV.equips=SV.equips.filter(x=>x!==e);mkSel=null;mkPV=null;save();cloudWrite(true);toast('已上架!真人玩家和電腦玩家都可能買走');mkFetch(true)},err=>{MKT.busy=0;toast(err.message)})},
+  rcancel(id){SRV.op('market_cancel',{p_id:+id}).then(()=>{toast('已下架,裝備會退回背包');mkFetch(true)},e=>toast(e.message))},
   botItems(){const M=mkSV(),w=Math.floor(Date.now()/MK_WIN);if(M.bot.w!==w){const items=[];const ts=Object.keys(EQT);
       for(let i=0;i<10;i++){const r=rnd(),rar=r<.005?4:r<.02?-1:r<.12?3:r<.52?2:1;let e;
         if(rar===-1){const id=UQK[Math.floor(rnd()*UQK.length)];e=mkEq(UQ[id].type,3,'basic');e.uq=id}else e=mkEq(ts[Math.floor(rnd()*ts.length)],rar,SETK[Math.floor(rnd()*SETK.length)]);
@@ -2172,8 +2208,9 @@ const MKT={
     spendGem(L.price);const e=L.e;e.id=SV.eqId++;e.tb=Date.now();SV.equips.push(e);eqFix();M.bot.items=M.bot.items.filter(x=>x.id!==id);mkBump(mkKey(e),1.06);
     M.log.unshift({t:Date.now(),k:'buy',n:mkName(e),p:L.price,who:L.seller});M.log=M.log.slice(0,30);sfx('coin');showLoot('交易所購買',[{img:eqImg(e),n:mkName(e),rar:e.rar}])},
   list(eid,price){const M=mkSV(),e=SV.equips.find(x=>x.id===+eid);if(!e)return;if(wornBy(e))return toast('先卸下這件裝備');if(e.lock)return toast('上鎖的裝備不能上架');
-    if(e.tb&&Date.now()-e.tb<MK_HOLD)return toast('買來的裝備要 7 天後才能再上架');if(M.my.length>=5)return toast('最多同時上架 5 件');
-    const f=mkFair(e);price=Math.round(+price||0);if(price<f*.5||price>f*2)return toast(`價格要在 ${fmt(Math.ceil(f*.5))} ~ ${fmt(Math.floor(f*2))} 鑽石之間`);
+    if(e.tb&&Date.now()-e.tb<MK_HOLD)return toast('買來的裝備要 7 天後才能再上架');if(!SRV.on()&&M.my.length>=5)return toast('最多同時上架 5 件');
+    const f=mkFair(e,SRV.on());price=Math.round(+price||0);if(price<f*.5||price>f*2)return toast(`價格要在 ${fmt(Math.ceil(f*.5))} ~ ${fmt(Math.floor(f*2))} 鑽石之間`);
+    if(SRV.on()){if(!e.rar)return toast('普通裝備不能上架,可以分解');return MKT.rlist(e,price)}
     SV.equips=SV.equips.filter(x=>x!==e);M.my.push({id:'m'+Date.now()+'_'+e.id,e,price,t:Date.now(),ck:Date.now()});mkSel=null;toast('已上架,電腦玩家會依價格決定要不要買')},
   cancel(id){const M=mkSV(),L=M.my.find(x=>x.id===id);if(!L)return;M.my=M.my.filter(x=>x!==L);SV.equips.push(L.e);eqFix();toast('已下架,裝備回到背包')},
   settle(){const M=mkSV(),now=Date.now();mkDecay();M.t=now;let sold=0,gain=0,back=0;
@@ -2184,16 +2221,19 @@ const MKT={
 };
 const mkName=e=>e.uq?UQ[e.uq].n:(e.set&&e.set!=='basic'?EQSET[e.set].n:'一般')+EQT[e.type].n+(e.lv?' +'+e.lv:'');
 let mkSel=null,mkPV=null;
-function pMarket(){const M=mkSV();MKT.settle();const t=SV.mkTab||'buy';let h=`<div class="seg2">${[['buy','購買'],['sell','出售'],['my','上架中 '+M.my.length],['log','紀錄']].map(([k,n])=>`<button data-act="mkTab:${k}" class="${t===k?'on':''}">${n}</button>`).join('')}</div>`;
-  h+=`<p class="mut">用 💎鑽石買賣裝備,價格依市場供需浮動。成交時賣家付 10% 手續費;買來的裝備 7 天後才能再上架。目前交易對象是電腦玩家,之後會開放真人交易。</p>`;
+function pMarket(){const M=mkSV(),ON=SRV.on();MKT.settle();mkFetch();const t=SV.mkTab||'buy';let h=`<div class="seg2">${[['buy','購買'],['sell','出售'],['my','上架中 '+(ON?MKS.mine.filter(x=>x.status==='open').length:M.my.length)],['log','紀錄']].map(([k,n])=>`<button data-act="mkTab:${k}" class="${t===k?'on':''}">${n}</button>`).join('')}</div>`;
+  h+=`<p class="mut">用 💎鑽石買賣裝備,價格依市場供需浮動。成交時賣家付 10% 手續費;買來的裝備 7 天後才能再上架。${ON?'真人玩家和電腦玩家都在這裡買賣;上架的裝備經伺服器鑑定,買到的裝備會自動放進背包。':'目前交易對象是電腦玩家,之後會開放真人交易。'}</p>`;
   const row=(e,right,extra)=>`<div class="eq r${e.rar}"><span class="eqi r${e.rar}"><img src="${eqImg(e)}" alt=""></span><div><b>${eqLabel(e)}</b><small>${eqStat(e)}${extra||''}</small></div>${right}</div>`;
   const trend=e=>{const v=mkIdx(mkKey(e));return v>1.12?' · <b class="up">▲ 熱門</b>':v<.92?' · <b class="down">▼ 冷門</b>':''};
+  if(t==='buy'&&ON){h+=`<div class="card"><h3>玩家上架 <small>真人玩家賣的裝備 · 上架 48 小時</small></h3><div class="eqs">${MKS.list.length?MKS.list.map(x=>{const e={...x.item,id:-x.id};return row(e,`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button class="go" data-act="mkRBuy:${x.id}" ${SV.gem<x.price?'disabled':''}>購買</button></div>`,` · 賣家 ${esc(x.seller_name||'守護員')} <span class="real">真人</span>`)}).join(''):`<p class="mut">${MKS.t?'目前沒有玩家上架':'讀取中…'}</p>`}</div></div>`}
   if(t==='buy'){const L=MKT.botItems(),left=MK_WIN-(Date.now()%MK_WIN);h+=`<div class="card"><h3>正在販售 <small>每 6 小時換一批 · ${Math.floor(left/3600e3)} 小時 ${Math.floor(left%3600e3/60000)} 分後刷新</small></h3><div class="eqs">${L.length?L.map(x=>row(x.e,`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button class="go" data-act="mkBuy:${x.id}" ${SV.gem<x.price?'disabled':''}>購買</button></div>`,` · 賣家 ${x.seller}${trend(x.e)}`)).join(''):'<p class="mut">這批都被買光了,等下一批吧</p>'}</div></div>`}
-  else if(t==='sell'){const can=SV.equips.filter(e=>!wornBy(e)&&!e.lock&&!(e.tb&&Date.now()-e.tb<MK_HOLD)).sort((a,b)=>b.rar-a.rar||mkFair(b)-mkFair(a));
-    if(mkSel!=null){const e=SV.equips.find(x=>x.id===mkSel);if(e){const f=mkFair(e);h+=`<div class="card hero"><div><h3>上架 ${eqLabel(e)}</h3><p class="mut">市場參考價 💎${fmt(f)}(可設定 ${fmt(Math.ceil(f*.5))} ~ ${fmt(Math.floor(f*2))})。定價越接近參考價越快賣出;成交後實拿 90%。最多上架 48 小時。</p>
+  else if(t==='sell'){const can=SV.equips.filter(e=>!wornBy(e)&&!e.lock&&!(e.tb&&Date.now()-e.tb<MK_HOLD)&&(!ON||e.rar>0)).sort((a,b)=>b.rar-a.rar||mkFair(b)-mkFair(a));
+    if(mkSel!=null){const e=SV.equips.find(x=>x.id===mkSel);if(e){const f=mkFair(e,ON);h+=`<div class="card hero"><div><h3>上架 ${eqLabel(e)}</h3><p class="mut">市場參考價 💎${fmt(f)}(可設定 ${fmt(Math.ceil(f*.5))} ~ ${fmt(Math.floor(f*2))})。定價越接近參考價越快賣出;成交後實拿 90%。最多上架 48 小時。</p>
       <div class="row"><input id="mkPrice" type="number" inputmode="numeric" value="${mkPV??f}" min="${Math.ceil(f*.5)}" max="${Math.floor(f*2)}"><button class="go" data-act="mkList:${e.id}">確定上架</button><button data-act="mkSel:">取消</button></div>
       <div class="row">${[[.9,'便宜賣'],[1,'參考價'],[1.3,'慢慢賣']].map(([m,n])=>`<button class="mini" data-act="mkP:${Math.round(f*m)}">${n} 💎${fmt(Math.round(f*m))}</button>`).join('')}</div></div></div>`}}
-    h+=`<div class="card"><h3>選擇要賣的裝備 <small>穿著中、上鎖、7 天內買來的不能賣</small></h3><div class="eqs">${can.length?can.map(e=>row(e,`<div class="bt"><small>參考 💎${fmt(mkFair(e))}</small><button class="blue" data-act="mkSel:${e.id}">上架</button></div>`,trend(e))).join(''):'<p class="mut">沒有可以賣的裝備</p>'}</div></div>`}
+    h+=`<div class="card"><h3>選擇要賣的裝備 <small>穿著中、上鎖、7 天內買來的不能賣</small></h3><div class="eqs">${can.length?can.map(e=>row(e,`<div class="bt"><small>參考 💎${fmt(mkFair(e,ON))}</small><button class="blue" data-act="mkSel:${e.id}">上架</button></div>`,trend(e))).join(''):'<p class="mut">沒有可以賣的裝備</p>'}</div></div>`}
+  else if(t==='my'&&ON){const O=MKS.mine;h+=`<div class="card"><h3>我的上架 <small>最多同時 5 件 · 每週可上架:稀有 30、史詩 10、傳說 2、神話 1、獨特 1</small></h3><div class="eqs">${O.length?O.map(x=>{const e={...x.item,id:-x.id},left=Math.max(0,MK_LIFE-(Date.now()-new Date(x.created).getTime()));
+      return row(e,x.status==='open'?`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button data-act="mkRCancel:${x.id}">下架</button></div>`:`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><small>${x.status==='sold'?'已賣出':x.status==='cancelled'?'已下架':'已過期'}</small></div>`,x.status==='open'?` · 剩 ${Math.ceil(left/3600e3)} 小時`:'')}).join(''):`<p class="mut">${MKS.t?'沒有上架中的裝備':'讀取中…'}</p>`}</div></div>`}
   else if(t==='my'){h+=`<div class="card"><h3>上架中 <small>最多 5 件 · 電腦玩家隨時可能買走</small></h3><div class="eqs">${M.my.length?M.my.map(x=>{const left=Math.max(0,MK_LIFE-(Date.now()-x.t)),f=mkFair(x.e);return row(x.e,`<div class="bt"><b class="mkp">💎${fmt(x.price)}</b><button data-act="mkCancel:${x.id}">下架</button></div>`,` · 參考 💎${fmt(f)} · 剩 ${Math.ceil(left/3600e3)} 小時`)}).join(''):'<p class="mut">沒有上架中的裝備</p>'}</div></div>`}
   else{h+=`<div class="card"><h3>交易紀錄</h3><div class="list">${M.log.length?M.log.map(l=>`<div class="li"><div><b>${l.k==='buy'?'🛒 買入':'💰 賣出'} ${l.n}</b><small>${l.k==='buy'?'向 '+l.who+' 購買':'賣給 '+l.who+',實拿 💎'+fmt(l.g)} · ${tAgo(l.t)}</small></div><b>💎${fmt(l.p)}</b></div>`).join(''):'<p class="mut">還沒有交易</p>'}</div></div>`}
   return h}
@@ -2571,7 +2611,7 @@ const NET={ld:[],wk:[],pw:[],pr:[],t:0,busy:0,err:'',pubT:0};
 const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);
 async function netFetch(force){if(!ACC.db||NET.busy||(!force&&Date.now()-NET.t<60e3))return;NET.busy=1;const col=ACC.db.collection('arena'),m=q=>q.docs.map(d=>safeD(d)).filter(d=>d.id!==ACC.uid);
   try{const [a,b,c,dd]=await withTimeout(Promise.all([col.where('ss','==',seasonId()).orderBy('pts','desc').limit(50).get(),col.where('wk','==',weekId()).orderBy('ws','desc').limit(50).get(),col.orderBy('pw','desc').limit(50).get(),col.orderBy('pr','desc').limit(50).get()]),10000);
-    NET.ld=m(a);NET.wk=m(b);NET.pw=m(c);NET.pr=m(dd);NET.t=Date.now();NET.err=''}catch(e){NET.err='暫時讀不到雲端排行,先顯示電腦玩家'}NET.busy=0;if(sheetK==='rank')renderSheet()}
+    NET.ld=m(a);NET.wk=m(b);NET.pw=m(c);NET.pr=m(dd);NET.t=Date.now();NET.err='';if(SRV.on()){try{const top=await SRV.rpc('ladder_top',{p_limit:50});NET.ld=(top||[]).filter(d=>d.uid!==ACC.uid).map(d=>({id:d.uid,n:d.n||'守護員',pts:d.pts,w:d.w,l:d.l,ti:d.ti||'',av:d.av||'',fr2:d.fr2||'',pw:d.pw||0}))}catch(e){}}}catch(e){NET.err='暫時讀不到雲端排行,先顯示電腦玩家'}NET.busy=0;if(sheetK==='rank')renderSheet()}
 function arenaDoc(){const L=lad(),W=wk(),team=SV.team.filter(k=>k&&SV.pets[k]).map(k=>{const p=SV.pets[k];return [k,p.lv,p.st,p.stars,p.sk,ownSkin(k),ownShiny(k)?1:0,qOf(k)]});
   return {av:avSrc()?SV.avatar:'',fr2:SV.frame||'',ti:([...LTITLE,...SPT].find(x=>x.id===SV.title)||{}).n||'',n:SV.name||'萌獸守護員',lv:SV.castle,ss:L.ss,pts:L.pts,w:L.w,l:L.l,team:team.map(t=>t.join(',')),pw:teamPower(SV.team.filter(k=>k&&SV.pets[k])),wk:W.id,ws:W.siege,wl:Math.round(W.loot),wd:W.def,t:Date.now(),fc:ACC.uid?fcOf(ACC.uid):'',gl:glv(),vip:vip(),skin:SV.skin||'spring',pets:owned().map(k=>`${k}:${SV.pets[k].st}:${SV.pets[k].lv}`),fr:(SV.friends||[]).map(f=>f.id).slice(0,50),pi:myPI(),dt:(SV.defTeam||[]).filter(Boolean),rbid:SV.rb?SV.rb.id:0,rbd:SV.rb?SV.rb.dmg:0,ghp:Math.round((SV.gate??1)*100)/100,rp:SV.rpDay&&SV.rpDay.day===today()?SV.rpDay.ids.filter(x=>x[0]!=='L'):[],rpDay:SV.rpDay?SV.rpDay.day:'',...enc(myTown()),pr:prosperity(myTown(),1),...chatFields(),likes:SV.likes||0,lk:SV.lkDay&&SV.lkDay.day===today()?SV.lkDay.ids.filter(x=>x[0]!=='L'):[],lkDay:SV.lkDay?SV.lkDay.day:''}}
 async function netPublish(force){if(!ACC.cloud||!ACC.db||!ACC.uid||!SV.started)return;if(!force&&Date.now()-NET.pubT<120e3)return;NET.pubT=Date.now();
@@ -2579,7 +2619,7 @@ async function netPublish(force){if(!ACC.cloud||!ACC.db||!ACC.uid||!SV.started)r
 const parseTeam=t=>(t||[]).map(s=>String(s).split(',')).map(([k,lv,st,stars,sk,skin,sh,q])=>[k,+lv||1,+st||0,+stars||1,+sk||1,skin||'',+sh||0,q===undefined||q===''?undefined:Math.max(0,Math.min(3,+q||0))]).filter(x=>PETS[x[0]]);
 async function refreshOpp(){const L=lad(),me=L.pts;let real=[];
   if(ACC.db){try{const q=await withTimeout(ACC.db.collection('arena').where('ss','==',L.ss).where('pts','>=',me-250).where('pts','<=',me+250).limit(30).get(),8000);
-    real=q.docs.map(d=>safeD(d)).filter(d=>d.id!==ACC.uid&&parseTeam(d.team).length).map(d=>({n:d.n,pts:d.pts,real:1,team:parseTeam(d.team)}))}catch(e){}}
+    real=q.docs.map(d=>safeD(d)).filter(d=>d.id!==ACC.uid&&parseTeam(d.team).length).map(d=>({n:d.n,pts:d.pts,real:1,pw:d.pw|0,team:parseTeam(d.team)}))}catch(e){}}
   const bots=seasonBots(L.ss).filter(b=>Math.abs(b.pts-me)<=260).map(b=>({n:b.n,pts:b.pts,team:botTeam(b,me)}));
   let pool=[...real,...real,...bots].sort(()=>rnd()-.5),out=[];const pick=f=>{const i=pool.findIndex(o=>f(o)&&!out.some(x=>x.n===o.n));if(i>=0)out.push(pool[i])};
   const myPw=teamPower(SV.team.filter(k=>k&&SV.pets[k])),bMul=o=>{const base=Math.max(1,teamPw(o.team)),rel=clamp((o.pts-me)/120,-1,1);return clamp(myPw*(1+.05*rel)*1.2/base,.5,8)};pool.forEach(o=>{o.mul=o.real?realMul(o.team):bMul(o)});pick(o=>o.pts<me-20);pick(o=>Math.abs(o.pts-me)<=60);pick(o=>o.pts>me+20);while(out.length<3){const b=seasonBots(L.ss)[Math.floor(rnd()*40)];if(!out.some(x=>x.n===b.n))out.push({n:b.n,pts:clamp(me+Math.round((rnd()-.5)*120),0,9999),team:botTeam({...b,pts:me},me),mul:0})}out.forEach(o=>{if(!o.mul)o.mul=bMul(o)});
@@ -2593,10 +2633,12 @@ let AVREADY=true;const avOwn=id=>{const A=AVS.find(x=>x.id===id);return A&&(A.t=
 const avSrc=()=>SV.avatar&&avOwn(SV.avatar)?'assets/av_'+SV.avatar+'.webp':null;
 const lwk=()=>{if(!SV.lsW2||SV.lsW2.wk!==weekId())SV.lsW2={wk:weekId(),enh:0,rr:0,ep:0};return SV.lsW2};
 function applyCos(){const a=$('pAva');if(a)a.className=SV.frame?'fr '+SV.frame:'';const t=$('pTitle');if(t){const T=[...LTITLE,...SPT].find(x=>x.id===SV.title);t.textContent=T?T.n:'';t.hidden=!T}}
+function ladApply(r){if(!r||r.pts==null)return;const L=lad();L.pts=r.pts;L.best=Math.max(r.best,0);L.w=r.w;L.l=r.l;L.ls=r.ls;L.tix=r.tix;L.buy=r.bought;save()}
+function ladSync(){if(!SRV.on())return;SRV.rpc('ladder_me').then(r=>{ladApply(r);if(sheetK==='ladder'||sheetK==='rank')renderSheet()},()=>{})}
 const ladGain=(me,op)=>Math.round(clamp(25+(op-me)/10,12,40)),ladLoss=(me,op)=>Math.round(clamp(15+(me-op)/12,6,25));
 const teamIcons=t=>`<span class="tic">${t.map(([k,lv,st])=>`<img src="assets/${PETS[k].img}${st+1}.webp" alt="" title="${PETS[k].n[st]} Lv${lv}">`).join('')}</span>`;
 const badge=(p,big)=>{const t=tierOf(p);return `<span class="tier ${big?'big':''}" style="--tc:${t.T.c}"><i><img src="assets/t_${t.i}.webp" alt=""></i>${t.name}</span>`};
-function pRank(){const t=sheetTab||'ladder';netFetch();if(Date.now()-NET.pubT>120e3)netPublish();
+function pRank(){const t=sheetTab||'ladder';netFetch();if(SRV.on()&&Date.now()-(SRV.ladT||0)>30e3){SRV.ladT=Date.now();ladSync()}if(Date.now()-NET.pubT>120e3)netPublish();
   let h=tabs([['ladder','天梯'],['lshop','天梯商店'],['week','攻城週榜'],['power','戰力榜'],['pros','繁榮榜']]);
   const note=!ACC.cloud?`<p class="note">👤 目前是遊客模式:只會和電腦玩家比,成績不會上雲端榜。連線到伺服器後就能和其他真人一起排名。</p>`:NET.noWrite?`<p class="note">你目前只有檢視權限,能看排行但成績無法上榜。</p>`:NET.err?`<p class="note">${NET.err}</p>`:'';
   if(t==='ladder'&&!unlocked('ladder'))h+=`<div class="card"><h3>🔒 天梯</h3><p>${lockMsg('ladder')}。先看看排行榜,打冒險升級吧!</p></div>`;
