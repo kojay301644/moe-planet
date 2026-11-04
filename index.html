@@ -453,7 +453,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 #tdBot>*{pointer-events:auto}
 .tdc{position:relative;width:58px;height:58px;border-radius:16px;border:2px solid #ffd860;background:rgba(40,25,80,.85);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
 .tdc i{font-style:normal;font-size:20px}.tdc small{font-size:11px;font-weight:700}.tdc.quit{border-color:#aaa;background:rgba(60,60,70,.8)}
-.tdc.cd{filter:grayscale(.8);opacity:.75}.tdc .cdm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;text-shadow:0 2px 3px #000}
+.tdc.cd{filter:grayscale(.8);opacity:.75}.tdc .cdm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff;text-shadow:0 2px 3px #000}
 .tdc.aim{border-color:#ff5a3a;box-shadow:0 0 12px #ff5a3a}
 #tdPick{position:fixed;left:50%;transform:translateX(-50%);bottom:max(78px,calc(env(safe-area-inset-bottom,0px) + 78px));z-index:22;width:min(560px,calc(100% - 20px));max-height:46vh;overflow:auto;background:#fff8ec;border:3px solid #8a5a2b;border-radius:18px;padding:10px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .tdph{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.tdph b{font-size:15px}.tdph small{flex:1;min-width:0;color:#7a6a5a}.tdph button{border:0;background:#eee;border-radius:10px;width:32px;height:32px}
@@ -3120,7 +3120,7 @@ TDCNT.rainbow=['fire','water','grass','elec','ice','rock'];
 const tdBon=el=>TD.tone==='rainbow'?1.12:el===TD.tone?1.25:1;
 const tdBonHtml=()=>TD.tone==='rainbow'?'🌈 所有萌獸攻擊 +12%':`<span class="el el-${TD.tone}">${EL[TD.tone].n}</span>系萌獸攻擊 +25%`;
 const tdBonTxt=()=>TD.tone==='rainbow'?'所有萌獸攻擊 +12% · 怪物屬性隨機':`${EL[TD.tone].n}系萌獸攻擊 +25% · 怪物多為 ${TDCNT[TD.tone].map(e=>EL[e].n).join('、')}系`;
-const TDDIFF=[{n:'普通',hp:3,c:'#3a9a4a'},{n:'困難',hp:7,c:'#e08a1a'},{n:'地獄',hp:13,c:'#d03a4a'}];
+const TDDIFF=[{n:'普通',hp:2,c:'#3a9a4a'},{n:'困難',hp:7,c:'#e08a1a'},{n:'地獄',hp:13,c:'#d03a4a'}];
 const TDMAX=6,TDWT=3,TDHP=20,TDW=20,TDBUY=[20,30,50],TDLVM=[1,1.45,2];
 const tdCost=k=>40+20*qOf(k),tdUpC=(k,lv)=>lv===1?60+15*qOf(k):100+25*qOf(k);
 const TDBOSS=['worm','golem','yking','serpent','titan','lich'];
@@ -3141,11 +3141,11 @@ function tdWave(w){const T=TD,P=tdPool(T.tone),q=[];const n=Math.min(26,6+Math.f
   if(w%10===0){q.push({k:tdBossFor(T.tone,w/10-1),t:n*(w<6?1:.75)+1.5,boss:1})}
   else if(w>=5&&w%5===0)for(let i=0;i<3;i++)q.push({k:P.main[Math.floor(rnd()*P.main.length)],t:n*.75+1+i*.4,elite:1});
   return q}
-function tdHpMul(w){return (1+.16*w+.011*w*w)}
+function tdHpMul(w){return (1+.16*w+.011*w*w)*(w<=6?.4+.1*w:1)}
 // ---- start / end
 function tdStart(mode,diff){au();for(const k in TDPEEK)delete TDPEEK[k];const t=tdSV();if(mode!=='practice'){if(tdTix()<1)return toast('今天的守塔券用完了');t.used++}
   const S=TDSK[Math.floor(rnd()*TDSK.length)],tone=S.el;SKP=[];
-  TD={mode,diff:mode==='endless'?0:diff,tone,S,SK:skinOf(S.id),deco2:TDDECO.map((p,i)=>S.deco[(i*7+Math.floor(rnd()*3))%S.deco.length]),wave:0,waveOn:false,spawn:[],st:0,en:[],tw:{},proj:[],parts:[],nums:[],hp:TDHP,energy:160,speed:1,paused:false,t:0,over:null,cmd:{},sel:null,aim:null,shield:0,kills:0,prep:30,gap:0,leak:0,banner:3.5,bt:0,used:[],uid:0,shake:0,boss:null};
+  TD={mode,diff:mode==='endless'?0:diff,tone,S,SK:skinOf(S.id),deco2:TDDECO.map((p,i)=>S.deco[(i*7+Math.floor(rnd()*3))%S.deco.length]),wave:0,waveOn:false,spawn:[],st:0,en:[],tw:{},proj:[],parts:[],nums:[],hp:TDHP,energy:250,speed:1,paused:false,t:0,over:null,cmd:{},sel:null,aim:null,shield:0,kills:0,prep:30,gap:0,leak:0,banner:3.5,bt:0,used:[],uid:0,shake:0,boss:null};
   closeSheet();$('town').hidden=true;$('tdHud').hidden=false;$('tdLayer').hidden=false;$('tdRes').hidden=true;tdHudBuild();save();sfx('boss')}
 function tdQuit(){TD=null;SKP=[];$('tdHud').hidden=true;$('tdLayer').hidden=true;$('tdRes').hidden=true;$('tdPick').hidden=true;$('tdInfo').hidden=true;$('town').hidden=false;townHud();openSheet('td')}
 function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?'win':'lose');const t=tdSV(),cl=T.mode==='endless'?T.wave-1:win?TDW:T.wave-1;
@@ -3177,8 +3177,8 @@ function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?
 function tdTower(k,slot){const P=PETS[k],s=SV.pets[k],S=stat(k);return {k,slot,lv:1,spent:tdCost(k),cd:.5,skT:P.sk.cd*.8,atk:S.atk,crit:S.crit||.05,rate:P.rate,el:P.el,far:P.range!=='melee',img:imgName(k),face:1,anim:rnd()*9,hit:0,stun:0,q:qOf(k)}}
 function tdWTower(tk,slot){const T2=TOWERS[tk],lv=towerLv(tk);return {k:'wt:'+tk,wt:tk,slot,lv:1,plv:lv,spent:tdWCost(tk),cd:.5,skT:1e9,atk:T2.dmg*(1+.35*(lv-1))*(3+.5*(SV.castle||1)),crit:.05,rate:T2.rate,el:T2.el,far:true,img:T2.img,face:1,anim:rnd()*9,hit:0,stun:0,q:0}}
 const tdWCost=tk=>50+10*towerLv(tk),tdUpW=w=>w.wt?(w.lv===1?70:110):tdUpC(w.k,w.lv),tdNP=()=>Object.values(TD.tw).filter(w=>!w.wt).length,tdNW=()=>Object.values(TD.tw).filter(w=>w.wt).length;
-const tdRange=w=>(w.far?205:135)*(w.lv===3?1.12:1);
-const tdAtk=w=>w.atk*TDLVM[w.lv-1]*tdBon(w.el);
+const tdRange=w=>(w.far?205:185)*(w.lv===3?1.12:1);
+const tdAtk=w=>w.atk*TDLVM[w.lv-1]*tdBon(w.el)*(w.far?1:1.3);
 function tdSpawn(x){const T=TD,E=ENEMY[x.k],w=T.wave,m=tdHpMul(w)*TDDIFF[T.diff].hp*(x.boss?1:x.elite?2.5:1);let hp=E.hp*m*(x.boss?.55:1);
   const e={id:++T.uid,k:x.k,E,d:x.d||0,hp,max:hp,spd:(36+E.spd*330)*(x.boss?.85:1),slow:0,slowT:0,stun:0,poi:0,poiT:0,fly:!!E.fly,boss:!!x.boss,elite:!!x.elite,anim:rnd()*9,rev:E.revive?1:0,heal:E.shield?2.5:0,sk:4+rnd()*2,hitT:0};
   T.en.push(e);if(e.boss){T.boss=e;sfx('boss');T.shake=.6;tdTxt(TDPATH[0][0]-120,TDPATH[0][1]-80,'⚠ 頭目來襲!','#ff6a5a',1.6)}return e}
@@ -3301,16 +3301,16 @@ function tdHudBuild(){const T=TD;if(!T)return;const cm=CMDS.filter(c=>c.k!=='hol
   document.querySelectorAll('#tdHud [data-td]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();tdAct(b.dataset.td)});tdHudTick()}
 function tdHudTick(){const T=TD;if(!T)return;const inf=$('tdInfo');if(inf&&!inf.hidden&&(!T._it||T.t-T._it>.5||T._iw!==T.wave)){T._it=T.t;T._iw=T.wave;inf.innerHTML=tdInfoHtml();iconize(inf)}const w=$('tdWave');if(!w)return;w.textContent=T.prep>0?`準備 ${Math.ceil(T.prep)}`:T.mode==='endless'?`第 ${T.wave} 波`:`${T.wave} / ${TDW}`;$('tdHp').textContent=`${T.hp}/${TDHP}`;$('tdEn').textContent=Math.floor(T.energy);
   const nx=$('tdNext');nx.hidden=!(T.prep>0||(!T.spawn.length&&T.wave<(T.mode==='endless'?1e9:TDW)));nx.textContent=T.prep>0?'開始':'下一波';
-  for(const c of CMDS){const b=$('tdc_'+c.k);if(!b)continue;const cd=T.cmd[c.k]||0;b.classList.toggle('cd',cd>0);b.querySelector('.cdm').textContent=cd>0?Math.ceil(cd):'';b.classList.toggle('aim',T.aim&&c.k==='rock')}}
-const TDCMD={guard:{cd:30,f:()=>{TD.shield=8;tdTxt(668,60,'🛡 城門護盾 8 秒','#9adfff',1.4)}},heal:{cd:45,f:()=>{const g=Math.min(4,TDHP-TD.hp);TD.hp+=g;tdTxt(668,60,'💚 城門 +'+g,'#7aff9a',1.4)}},rock:{cd:25,aim:1}};
+  for(const c of CMDS){const b=$('tdc_'+c.k);if(!b)continue;const cd=T.cmd[c.k]||0;b.classList.toggle('cd',cd>0);b.querySelector('.cdm').textContent=cd>1e6?'已用':cd>0?Math.ceil(cd):'';b.classList.toggle('aim',T.aim&&c.k==='rock')}}
+const TDCMD={guard:{cd:1e9,f:()=>{TD.shield=15;tdTxt(668,60,'🛡 城門護盾 15 秒','#9adfff',1.4)}},heal:{cd:1e9,f:()=>{const g=Math.min(6,TDHP-TD.hp);TD.hp+=g;tdTxt(668,60,'💚 城門 +'+g,'#7aff9a',1.4)}},rock:{cd:1e9,aim:1}};
 function tdAct(a){const T=TD;if(!T||T.over)return;sfx('click');const [k,arg]=a.split(':');
   if(k==='pause'){T.paused=!T.paused;tdHudBuild()}else if(k==='spd'){T.speed=T.speed===1?2:1;tdHudBuild()}
   else if(k==='next'){if(T.prep>0){T.prep=0;tdNextWave()}else if(!T.spawn.length){const b=8+T.wave;T.energy+=b;tdTxt(1100,560,'提前出怪 ⚡+'+b,'#ffe066',1.2);tdNextWave()}}
   else if(k==='quit'){if(T.quitAsk&&Date.now()-T.quitAsk<2500){tdEnd(false)}else{T.quitAsk=Date.now();toast('再按一次「撤退」結束這場')}}
-  else if(k==='cmd'){const C=CMDS.find(c=>c.k===arg),D=TDCMD[arg];if(!C||!D)return;if((SV.castle||1)<C.lv)return toast(`主城 Lv.${C.lv} 解鎖「${C.n}」`);if((T.cmd[arg]||0)>0)return;
+  else if(k==='cmd'){const C=CMDS.find(c=>c.k===arg),D=TDCMD[arg];if(!C||!D)return;if((SV.castle||1)<C.lv)return toast(`主城 Lv.${C.lv} 解鎖「${C.n}」`);if((T.cmd[arg]||0)>0)return toast('這一場已經用過了');
     if(D.aim){T.aim=T.aim?null:{x:W/2,y:H/2};if(T.aim)toast('點地圖選擇落石位置');tdHudTick();return}T.cmd[arg]=D.cd;D.f();sfx('skill')}}
 function tdTap(px,py){const T=TD;if(!T||T.over)return;const mx=(px-TDV.ox)/TDV.s,my=(py-TDV.oy)/TDV.s;
-  if(T.aim){T.aim=null;T.cmd.rock=TDCMD.rock.cd;const best=Math.max(...Object.values(T.tw).map(w=>tdAtk(w)),SV.castle*120);let n=0;for(const e of T.en){const [x,y]=tdPos(e.d);if(Math.hypot(x-mx,(y-my)*1.3)<95){tdDmg(e,best*3.5,'rock',null);e.stun=Math.max(e.stun,e.boss?.5:1.2);n++}}
+  if(T.aim){T.aim=null;T.cmd.rock=TDCMD.rock.cd;const best=Math.max(...Object.values(T.tw).map(w=>tdAtk(w)),SV.castle*120);let n=0;for(const e of T.en){const [x,y]=tdPos(e.d);if(Math.hypot(x-mx,(y-my)*1.3)<95){tdDmg(e,best*7,'rock',null);e.stun=Math.max(e.stun,e.boss?.8:2);n++}}
     T.parts.push({ring:1,x:mx,y:my,r:95,t:0,life:.6,c:'#c8a070'});tdPart(mx,my,30,['#a07850','#d8b890','#fff'],260,.8,7);T.shake=.6;sfx('rock');tdHudTick();return}
   let hit=-1;TDSLOT.forEach(([x,y],i)=>{if(Math.hypot(x-mx,(y-my)*1.4)<60)hit=i});
   if(hit<0){T.sel=null;$('tdPick').hidden=true;return}T.sel=hit;tdPick(hit)}
@@ -3353,7 +3353,7 @@ function pTD(){const t=tdSV(),n=tdTix();tdFetch();
     <li>每場隨機一種商店的城鎮樣式(春日、秋楓、黃昏、雪國、櫻花祭、星夜、糖果王國),每種樣式對應一個屬性:同屬性萌獸攻擊 +25%,怪物多為剋制它的屬性;糖果王國是彩虹場,所有萌獸 +12%、怪物屬性隨機。</li>
     <li>點路邊的石台放萌獸,最多 ${TDMAX} 隻;萌獸等級、星數、品質、裝備越好,守得越穩。</li><li>主城蓋好的城牆砲塔也能放,最多 ${TDWT} 座(不佔萌獸名額),強度依你的砲塔等級和主城等級。</li>
     <li>擊倒怪物得「✦能量」,用來放萌獸、場內升級(最高 3 級)或收回萌獸(退一半)。</li>
-    <li>屬性招式:🔥範圍爆炸、💧擊退、🌿中毒、⚡連鎖閃電、❄️減速、🪨暈眩;近戰萌獸打不到飛行怪。</li>
+    <li>屬性招式:🔥範圍爆炸、💧擊退、🌿中毒、⚡連鎖閃電、❄️減速、🪨暈眩;近戰萌獸傷害 +30%,但打不到飛行怪。</li><li>守護、治癒雨、落石每場各能用 1 次,留到關鍵時刻再用!</li>
     <li>怪物闖進城門扣耐久,${TDHP} 點扣光就失敗;撐過 ${TDW} 波(第 10、20 波有頭目)就勝利,依剩餘耐久給 1~3 星。</li>
     <li>每天 ${3} 張守塔券。打贏有星星幣、進化石、糖果,上場的萌獸都能拿碎片和品質精華;每個難度每天第一次勝利再送鑽石,困難、地獄還會掉裝備。</li><li>無盡模式每撐過 1 波,上場萌獸各 +300 經驗、💎2;每週排行前 50 名有鑽石獎勵(寄到信箱)。</li>
     <li>練習模式不耗券、沒有獎勵,可以自己練功。</li></ol></details></div>
