@@ -641,16 +641,16 @@ const DEF=()=>({v:3,started:0,tut:0,name:'',uid:null,t:0,coin:3000,gem:160,fruit
   eggs:[],slots:2,pity:0,equips:[],eqId:1,towers:['sling',null,null],twLv:{},gate:1,gateT:Date.now(),reports:[],lastSeen:Date.now(),lords:null,
   quest:{day:'',c:{},got:[]},sign:{n:0,last:''},ach:[],stat:{wins:0,summons:0,ups:0,evos:0,siegeWins:0,defWins:0},gift:{newbie:0,freeT:0},event:{day:'',used:0},buy:{day:'',att:0}});
 function P0(){return {lv:1,st:0,stars:1,shards:0,sk:1,eq:{collar:null,hat:null,charm:null}}}
-const LSKEY='moe.save3';
+const LSKEY='moe.save4';try{['moe.save','moe.save2','moe.save3'].forEach(k=>localStorage.removeItem(k))}catch(e){}
 function loadLocal(){try{const j=localStorage.getItem(LSKEY);return j?Object.assign(DEF(),JSON.parse(j)):null}catch(e){return null}}
 let SV=loadLocal()||DEF();
 function save(){SV.lastSeen=Date.now();SV.t=Date.now();try{localStorage.setItem(LSKEY,JSON.stringify(SV))}catch(e){}if(ACC.cloud)ACC.dirty=1}
 /* ---------- account: claude.ai sign-in gives a private cloud save; signed-out players are guests on this device ---------- */
 const ACC={cloud:false,db:null,uid:null,name:'',dirty:0,busy:0,checked:false,canWrite:true};
 const cloudRef=()=>ACC.db.doc('data/users/'+ACC.uid+'/save');
-async function cloudRead(){try{const d=await cloudRef().get();if(!d.exists)return null;const b=d.data();return Object.assign(DEF(),JSON.parse(b.json))}catch(e){return null}}
+async function cloudRead(){try{const d=await cloudRef().get();if(!d.exists)return null;const b=d.data();if((b.v||0)<4)return null;return Object.assign(DEF(),JSON.parse(b.json))}catch(e){return null}}
 async function cloudWrite(force){if(!ACC.cloud||ACC.busy||(!ACC.dirty&&!force))return;ACC.busy=1;ACC.dirty=0;
-  try{await cloudRef().set({json:JSON.stringify(SV),t:SV.t||Date.now(),v:3});setAcc()}catch(e){ACC.dirty=1;if(e&&e.code==='invalid_argument'){ACC.cloud=false;ACC.canWrite=false;setAcc()}}ACC.busy=0}
+  try{await cloudRef().set({json:JSON.stringify(SV),t:SV.t||Date.now(),v:4});setAcc()}catch(e){ACC.dirty=1;if(e&&e.code==='invalid_argument'){ACC.cloud=false;ACC.canWrite=false;setAcc()}}ACC.busy=0}
 setInterval(()=>cloudWrite(),10000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')cloudWrite()});
 function setAcc(){const el=$('accInfo');if(!el)return;el.textContent=!ACC.checked?'連線中…':ACC.cloud?`☁ 已登入${ACC.name?':'+ACC.name:''} · 進度雲端保存`:ACC.uid&&!ACC.canWrite?'👤 已登入,但沒有寫入權限:以遊客身分保存在這台裝置':'👤 遊客模式 · 進度只存在這台裝置'}
 async function accInit(){const C=window.claude;let user=null,db=null;
@@ -2670,7 +2670,7 @@ setInterval(()=>{if(!B){townHud();if(sheetK&&['summon','farm','train','castle'].
 
 /* =============== title, intro, first egg, tutorial =============== */
 let titleOk=false;
-function titleReady(){if(titleOk)return;titleOk=true;$('tLogin').hidden=!(window.MOE_AUTH&&ACC.auth&&ACC.auth.uid&&!ACC.auth.name);$('tStart').disabled=false;$('tStart').textContent=SV.started?'繼續遊戲':'開始遊戲';$('tCodeBtn').hidden=!ACC.db}
+function titleReady(){if(titleOk)return;titleOk=true;$('tLogin').hidden=!(window.MOE_AUTH&&ACC.auth&&ACC.auth.uid&&!ACC.auth.name);$('tStart').disabled=false;$('tStart').textContent=SV.started?'繼續遊戲':'開始遊戲';$('tCodeBtn').hidden=true}
 $('tStart').onclick=()=>{au();sfx('click');$('title').hidden=true;if(SV.started)enterGame();else startIntro()};
 $('tCodeBtn').onclick=()=>openCode('use');
 function enterGame(){try{potSettle()}catch(e){}if(SV.tut===3)SV.tut=4;eggsFix();try{MKT.settle()}catch(e){}SV.subs=[null,null];regen();const nr=offlineRaids();save();TP=[];townHud();$('town').hidden=false;if(nr)setTimeout(()=>toast(`你離開時被攻打了 ${nr} 次,到主城看戰報`),600)}
@@ -2716,7 +2716,6 @@ function accCard(){if(!window.MOE_AUTH)return window.MOE_CFG?`<div class="card">
 function pSet(){const signed=!!ACC.uid;return accCard()+a2hsCard()+`<div class="card"><h3>帳號</h3><p>${ACC.cloud?`☁ 已連線到雲端${ACC.name?'('+ACC.name+')':''},進度會自動存到雲端;在別的裝置打開同一個遊戲就會自動找回。`:signed?'已登入,但這個遊戲沒有給你寫入權限,進度只存在這台裝置。':'目前是遊客模式,進度只存在這台裝置。連線到伺服器後,進度會自動存到雲端。'}</p>
   <p>守護員名稱:<b>${SV.name||'-'}</b> <button data-act="rename">改名</button></p>
   ${ACC.cloud?`<button class="blue" data-act="sync">立即同步到雲端</button>`:''}</div>
-  <div class="card"><h3>轉移碼 <small>換帳號或備份進度時使用;進度用你設定的密碼加密</small></h3>${ACC.db?`<div class="row"><button class="go" data-act="mkcode">建立轉移碼</button><button class="blue" data-act="usecode">輸入轉移碼找回</button></div>`:'<p class="mut">需要連線到伺服器 才能使用轉移碼。</p>'}</div>
   <div class="card"><h3>其他</h3><div class="row"><button data-act="snd">${SND.on?'🔊 音效開':'🔇 音效關'}</button><button data-act="replay">重看開場</button><button data-act="reset" style="color:#c03030">重新開始(清除進度)</button></div></div>`}
 let resetArm=0;
 const accBusy={v:0};

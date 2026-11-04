@@ -1,5 +1,5 @@
 -- 萌獸星球 雲端資料庫設定(在 Supabase 的 SQL Editor 貼上整段後按 Run)
--- 所有遊戲資料都存在 docs 這張表:arena/(公開的玩家資料)、data/users/<id>/(私人存檔)、xfer/(轉移碼)
+-- 所有遊戲資料都存在 docs 這張表:arena/(公開的玩家資料)、data/users/<id>/(私人存檔)
 
 create table if not exists public.docs(
   path text primary key,
@@ -15,15 +15,15 @@ drop policy if exists docs_read on public.docs;
 drop policy if exists docs_insert on public.docs;
 drop policy if exists docs_update on public.docs;
 drop policy if exists docs_delete on public.docs;
--- 讀取:公開資料(arena、轉移碼)大家都能讀;私人存檔只有自己能讀
+-- 讀取:公開資料(arena)大家都能讀;私人存檔只有自己能讀
 create policy docs_read on public.docs for select to authenticated
-  using (coll in ('arena','xfer') or owner = auth.uid());
--- 寫入:只能寫自己的 arena 資料、自己的私人存檔,或新增轉移碼
+  using (coll = 'arena' or owner = auth.uid());
+-- 寫入:只能寫自己的 arena 資料、自己的私人存檔
 create policy docs_insert on public.docs for insert to authenticated
-  with check (owner = auth.uid() and (path = 'arena/' || auth.uid()::text or path like 'data/users/' || auth.uid()::text || '/%' or coll = 'xfer'));
+  with check (owner = auth.uid() and (path = 'arena/' || auth.uid()::text or path like 'data/users/' || auth.uid()::text || '/%'));
 create policy docs_update on public.docs for update to authenticated
   using (owner = auth.uid())
-  with check (owner = auth.uid() and (path = 'arena/' || auth.uid()::text or path like 'data/users/' || auth.uid()::text || '/%' or coll = 'xfer'));
+  with check (owner = auth.uid() and (path = 'arena/' || auth.uid()::text or path like 'data/users/' || auth.uid()::text || '/%'));
 create policy docs_delete on public.docs for delete to authenticated using (owner = auth.uid());
 
 -- 查詢:遊戲的排行榜、天梯、好友、聊天都用這個函式(會套用上面的權限)
