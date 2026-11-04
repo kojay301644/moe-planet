@@ -2704,7 +2704,7 @@ function guideTick(){const g=GUIDE[SV.tut],box=$('guide');if(!g||!SV.started||B|
   box.hidden=false;const ring=$('gRing'),pad=8;ring.style.left=(r.x-pad)+'px';ring.style.top=(r.y-pad)+'px';ring.style.width=(r.w+pad*2)+'px';ring.style.height=(r.h+pad*2)+'px';
   const tip=$('gTip');tip.textContent=g.t;const tw=Math.min(280,W-32);tip.style.width=tw+'px';let tx=clamp(r.x+r.w/2-tw/2,16,W-tw-16),ty=r.y-74;if(ty<80)ty=r.y+r.h+16;tip.style.left=tx+'px';tip.style.top=ty+'px'}
 /* settings panel: account, bind, transfer code */
-function accCard(){if(!window.MOE_AUTH)return '';const A=ACC.auth||{};if(!A.uid)return `<div class="card"><h3>🔐 遊戲帳號</h3><p class="mut">連線中或無法連線到伺服器,請稍後再開啟這頁。</p></div>`;
+function accCard(){if(!window.MOE_AUTH)return window.MOE_CFG?`<div class="card"><h3>🔐 遊戲帳號</h3><p class="mut">雲端模組沒有載入成功(${window.supabase?'設定錯誤':'網路元件下載失敗'}),請重新整理頁面再試一次。</p></div>`:'';const A=ACC.auth||{};if(!A.uid)return `<div class="card"><h3>🔐 遊戲帳號</h3><p class="mut">連線中或無法連線到伺服器,請稍後再開啟這頁。</p></div>`;
   if(A.name)return `<div class="card"><h3>🔐 遊戲帳號</h3><p>已登入帳號 <b>${esc(A.name)}</b>,進度會自動存到雲端;在其他手機或電腦用同一組帳號密碼登入,就能接著玩。</p>
     <details class="accd"><summary>修改密碼</summary><div class="accf"><input id="accP" type="password" placeholder="新密碼(至少 6 個字)" autocomplete="new-password"><input id="accP2" type="password" placeholder="再輸入一次新密碼" autocomplete="new-password"><button class="go" data-act="accPw">確定修改</button></div></details>
     <button data-act="accOut" style="color:#c03030">登出</button><p class="mut">登出後這台裝置會變回新的遊客,重新登入帳號就能找回進度。</p></div>`;
