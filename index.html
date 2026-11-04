@@ -433,6 +433,14 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 #eggPick img{width:76px;height:76px;object-fit:contain}#eggPick b{font-size:15px;color:#5a3a1a}#eggPick small{font-size:11px;color:#8a6a4a}
 @media (max-height:760px),(max-width:420px){#eggPane .tbox{padding:16px 14px;gap:8px}#eggPet #eggImg{width:96px;height:96px}#eggPick img{width:60px;height:60px}#eggPick{gap:6px;flex-wrap:nowrap}#eggPick button{width:auto;flex:1 1 0;min-width:0;padding:6px 3px}#eggInfo{font-size:13px;margin:4px 0}}
 #eggBtns{justify-content:center}
+#tdBtn{position:absolute;z-index:4;pointer-events:auto;right:max(10px,env(safe-area-inset-right,0px));top:240px;width:86px;padding:4px 2px 5px;border:3px solid #ffd860;border-radius:20px;background:linear-gradient(#7a4ae0,#4a2a9a);color:#fff;display:flex;flex-direction:column;align-items:center;gap:0;box-shadow:0 3px 0 #2a1460,0 0 0 0 rgba(255,216,96,.7);animation:tdglow 2.2s ease-in-out infinite}
+#tdBtn .tdbi{position:relative;width:62px;height:52px;display:block}#tdBtn .tdbi img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}#tdBtn .tdbi em{position:absolute;right:-4px;bottom:-2px;font-style:normal;font-size:22px;filter:drop-shadow(0 2px 1px rgba(0,0,0,.4))}
+#tdBtn b{font-size:13px;letter-spacing:1px;text-shadow:0 2px 0 rgba(0,0,0,.35);white-space:nowrap}#tdBtn small{font-size:10px;color:#ffe9a0;white-space:nowrap;min-height:12px}
+#tdBtn .cnt{position:absolute;right:-6px;top:-6px;min-width:20px;height:20px;border-radius:10px;background:#e04a4a;color:#fff;font-size:12px;font-style:normal;font-weight:800;display:grid;place-items:center;padding:0 4px;box-shadow:0 0 0 2px #fff}
+#tdBtn.lock{filter:grayscale(.85);animation:none;opacity:.92}
+@keyframes tdglow{0%,100%{box-shadow:0 3px 0 #2a1460,0 0 0 0 rgba(255,216,96,.0)}50%{box-shadow:0 3px 0 #2a1460,0 0 18px 4px rgba(255,216,96,.85)}}
+.tdtabs{display:flex;gap:6px;margin-top:8px}.tdtabs button{flex:1;border:2px solid #e8d8c0;background:#fff;border-radius:12px;padding:6px;font-weight:800;color:#8a6a4a}.tdtabs button.on{background:#ffb84a;border-color:#ff9a2a;color:#fff}
+
 #tdLayer{position:fixed;inset:0;z-index:20;touch-action:none}
 #tdHud{position:fixed;inset:0;z-index:21;pointer-events:none;font-family:inherit}
 #tdTop{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:6px;padding:8px max(10px,env(safe-area-inset-right,0px)) 6px max(10px,env(safe-area-inset-left,0px));padding-top:max(8px,env(safe-area-inset-top,0px));background:linear-gradient(rgba(30,15,60,.7),rgba(30,15,60,0))}
@@ -573,7 +581,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
   <div id="editBar" hidden><div><b>🛠 佈置城鎮</b><small id="eMsg"></small></div><button class="blue" id="eInv">🛒 買裝飾</button><button class="go" id="eDone">完成</button></div>
   <button id="hpWarn" hidden></button>
   <div id="raid" hidden><span>⚔</span><div><b><span id="raidName"></span> 來攻打你的城!</b><br><small>對方戰力 <span id="raidPow"></span> · <span id="raidT"></span> 秒後自動迎戰<br><span>交給守城隊勝率約 <b id="raidPct">50</b>%;親自指揮可以集火、放指揮官技能、擋 Boss 大招</span></small></div><button class="go" id="raidGo">親自指揮</button><button id="raidAuto">交給守城隊</button></div>
-  <div id="marq" hidden><span class="mqi">📣</span><div class="mqw"><span id="marqT"></span></div></div><button id="tMenu" class="ib" title="選單">☰<i class="dot" hidden></i></button><div id="tLeft"><button data-p="quest"><b><img src="assets/n_quest.webp" alt=""></b>任務<i class="dot" hidden></i></button><button data-p="sign"><b><img src="assets/n_sign.webp" alt=""></b>簽到<i class="dot" hidden></i></button><button data-p="event"><b><img src="assets/n_event.webp" alt=""></b>活動<i class="dot" hidden></i></button><button data-p="gift"><b><img src="assets/n_gift.webp" alt=""></b>福利<i class="dot" hidden></i></button><button id="tEdit"><b><img src="assets/n_build.webp" alt=""></b>佈置</button><button data-p="boss"><b><img src="assets/n_boss.webp" alt=""></b>副本<i class="dot" hidden></i></button></div>
+  <div id="marq" hidden><span class="mqi">📣</span><div class="mqw"><span id="marqT"></span></div></div><button id="tdBtn" data-p="td"><span class="tdbi"><img src="assets/b_castle.webp" alt=""><em>🛡️</em></span><b>守塔挑戰</b><small id="tdBtnS"></small><i class="cnt" id="tdBtnN" hidden>0</i></button><button id="tMenu" class="ib" title="選單">☰<i class="dot" hidden></i></button><div id="tLeft"><button data-p="quest"><b><img src="assets/n_quest.webp" alt=""></b>任務<i class="dot" hidden></i></button><button data-p="sign"><b><img src="assets/n_sign.webp" alt=""></b>簽到<i class="dot" hidden></i></button><button data-p="event"><b><img src="assets/n_event.webp" alt=""></b>活動<i class="dot" hidden></i></button><button data-p="gift"><b><img src="assets/n_gift.webp" alt=""></b>福利<i class="dot" hidden></i></button><button id="tEdit"><b><img src="assets/n_build.webp" alt=""></b>佈置</button><button data-p="boss"><b><img src="assets/n_boss.webp" alt=""></b>副本<i class="dot" hidden></i></button></div>
   <div id="tBot"><nav id="tNav"><button data-p="pets"><b><img src="assets/n_pets.webp" alt=""></b>萌獸<i class="dot" hidden></i></button><button data-p="bag"><b><img src="assets/n_bag.webp" alt=""></b>背包<i class="dot" hidden></i></button><button data-p="ach"><b><img src="assets/n_ach.webp" alt=""></b>成就<i class="dot" hidden></i></button><button data-p="rank"><b><img src="assets/n_rank.webp" alt=""></b>天梯<i class="dot" hidden></i></button><button data-p="friends"><b><img src="assets/n_friends.webp" alt=""></b>好友<i class="dot" hidden></i></button><button data-p="chat"><b class="todoic">💬</b>聊天<i class="dot" hidden></i></button></nav>
     <button id="goAdv"><b>⚔</b>開始冒險<small>下一關</small></button></div>
 </div>
@@ -1965,6 +1973,7 @@ function qbAsk(k){const Q=QBUY[k],u=qbUsed(k);if(u>=Q.p.length)return toast(`今
   $('a2later').onclick=()=>{$('a2Pane').hidden=true};$('qbYes').onclick=()=>{const u2=qbUsed(k);if(u2>=Q.p.length||SV.gem<Q.p[u2])return;spendGem(Q.p[u2]);Q.add();if(!SV.qb||SV.qb.day!==today())SV.qb={day:today()};SV.qb[k]=u2+1;save();sfx('coin');toast(`${Q.n} +${Q.give}`);$('a2Pane').hidden=true;townHud()}}
 function staBuyAsk(){qbAsk('sta')}
 const UIL={dock:0};function uiMeasure(){const n=$('tNav'),l=$('tLeft');if(!n)return;const nh=n.getBoundingClientRect().height;if(nh)document.documentElement.style.setProperty('--navh',nh+'px');const r=l&&l.getBoundingClientRect();UIL.dock=r&&r.height&&innerHeight>innerWidth?r.top:0;
+  tdBtnPos();
   {const mq=$('marq'),pf=document.querySelector('#tTop .prof'),ch=document.querySelector('#tTop .chip');if(mq){if(innerWidth>innerHeight&&pf&&ch){const p=pf.getBoundingClientRect();let bot=0,left=p.right;for(const e of document.querySelectorAll('#tTop .chip,#tTop .ib,#tTop button')){const r=e.getBoundingClientRect();if(!r.width)continue;if(r.left>=p.right-4)bot=Math.max(bot,r.bottom);else if(r.top>=p.bottom-4)left=Math.max(left,r.right)}const top=Math.max(bot,0)+6;let L=p.right+8;for(const e of document.querySelectorAll('#tTop .ib,#tTop button')){const r=e.getBoundingClientRect();if(r.width&&r.left<p.right&&r.bottom>top&&r.top<top+30)L=Math.max(L,r.right+8)}mq.style.left=Math.round(L)+'px';mq.style.top=Math.round(top)+'px';const tl=$('tLeft');if(tl){let lb=p.bottom;for(const e of document.querySelectorAll('#tTop .ib,#tTop button,#tTop .chip')){const r=e.getBoundingClientRect();if(r.width&&r.left<p.right&&r.top>=p.bottom-4)lb=Math.max(lb,r.bottom)}tl.style.top=Math.round(Math.max(lb,top+26)+8)+'px'}}else{mq.style.left='';mq.style.top='';const tl=$('tLeft');if(tl)tl.style.top=''}}}
   const md=$('tMenu');if(md){const any=[...document.querySelectorAll('#tNav .dot,#tNav .cnt')].some(e=>!e.hidden);md.querySelector('.dot').hidden=!any}}
 addEventListener('resize',()=>setTimeout(uiMeasure,50));setInterval(uiMeasure,1500);
@@ -2028,7 +2037,7 @@ function markDots(){if(!$('tLeft'))return;{const n=todoList().length,b=$('todoN'
   set('[data-p="quest"]',QL().some(Q=>(q.c[Q.k]||0)>=Q.need&&!q.got.includes(Q.k))||(QL().every(Q=>q.got.includes(Q.k))&&!q.got.includes('all')));
   const tu=SV.tut>=9;set('[data-p="sign"]',tu&&SV.sign.last!==today());set('[data-p="event"]',tu&&unlocked('event')&&(SV.event.day!==today()||!SV.event.used));
   set('[data-p="gift"]',tu&&Date.now()-SV.gift.freeT>=8*3600e3);
-  set('[data-p="rank"]',SV.tut>=9&&unlocked('ladder')&&lad().tix>0);set('[data-p="ach"]',unlocked('ach')&&ACH.some(a=>a.f()&&!SV.ach.includes(a.id)));set('[data-p="pets"]',owned().some(k=>canStar(k)));set('[data-p="bag"]',shardRdy())}
+  set('[data-p="rank"]',SV.tut>=9&&unlocked('ladder')&&lad().tix>0);set('[data-p="ach"]',unlocked('ach')&&ACH.some(a=>a.f()&&!SV.ach.includes(a.id)));set('[data-p="pets"]',owned().some(k=>canStar(k)));set('[data-p="bag"]',shardRdy());tdBtnUpd()}
 /* raid banner */
 function showRaid(){$('raid').hidden=false;$('raidName').textContent=raid.L.name;$('raidPow').textContent=fmt(raid.L.power);const pct=Math.round(clamp((defensePower()/raid.L.power-.8)/.4,0,1)*100);$('raidPct').textContent=pct;$('raidPct').parentNode.className=pct<50?'bad':'';sfx('boss')}
 function autoDefend(){if(!raid||!raid.L)return;const L=raid.L;raid=null;$('raid').hidden=true;const A=L.power*(.8+rnd()*.4),D=defensePower(),win=D>=A;let c=0,f=0;
@@ -2046,7 +2055,7 @@ function openSheet(k,tab){sheetK=k;sheetTab=tab||null;$('sheet').hidden=false;re
 function closeSheet(){if(SV.tut===2&&sheetK==='pets')SV.tut=owned().length<3?5:9;sheetK=null;petView=null;petFrom=null;$('sheet').hidden=true;townHud();document.querySelectorAll('#tNav button').forEach(b=>b.classList.remove('on'))}
 $('shClose').onclick=()=>{if(SV.tut===5&&sheetK==='summon')return toast('先用 💎160 單抽一次,完成新手教學');closeSheet()};
 const tutBlock=()=>{if(SV.started&&SV.tut<9){toast('先跟著指引完成新手教學喔');return true}return false};
-const TITLES={grow:'變強',market:'交易所',mail:'信箱',todo:'今日待辦',set:'設定',adv:'冒險之橋',summon:'召喚',castle:'主城',academy:'學院',forge:'鍛造',evo:'進化之泉',shop:'商店',farm:'農場',train:'訓練場 · 潛能特訓',pets:'萌獸',bag:'背包',ach:'成就',rank:'天梯 · 排行榜',friends:'好友',chat:'聊天',pay:'儲值',me:'守護員',boss:'Boss 副本',deco:'擺放裝飾',vip:'VIP 特權',quest:'每日任務',sign:'每日簽到',event:'活動',gift:'福利'};
+const TITLES={td:'守塔挑戰',grow:'變強',market:'交易所',mail:'信箱',todo:'今日待辦',set:'設定',adv:'冒險之橋',summon:'召喚',castle:'主城',academy:'學院',forge:'鍛造',evo:'進化之泉',shop:'商店',farm:'農場',train:'訓練場 · 潛能特訓',pets:'萌獸',bag:'背包',ach:'成就',rank:'天梯 · 排行榜',friends:'好友',chat:'聊天',pay:'儲值',me:'守護員',boss:'Boss 副本',deco:'擺放裝飾',vip:'VIP 特權',quest:'每日任務',sign:'每日簽到',event:'活動',gift:'福利'};
 const petImgTag=(k,cls='')=>`<img class="${cls}" src="assets/${imgName(k)}.webp" alt="">`;
 function costOk(c){return SV.coin>=(c.coin||0)&&SV.fruit>=(c.fruit||0)&&SV.gem>=(c.gem||0)&&SV.stones>=(c.stones||0)}
 function pay(c){SV.coin-=c.coin||0;SV.fruit-=c.fruit||0;if(c.gem)spendGem(c.gem);SV.stones-=c.stones||0}
@@ -2060,7 +2069,7 @@ const EMI={'⭐':'i_coin','💎':'i_gem','🍎':'i_fruit','🍬':'i_candy','💠
 function iconize(root){const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),ns=[];while(w.nextNode())if(EMR.test(w.currentNode.nodeValue))ns.push(w.currentNode);
   for(const n of ns){const parts=n.nodeValue.split(/(⭐|💎|🍎|🍬|💠|🧃|⚡|🎫|🥚)/),fr=document.createDocumentFragment();for(const t of parts){if(EMI[t]){const im=document.createElement('img');im.className='ic';im.src='assets/'+EMI[t]+'.webp';im.alt=t;fr.appendChild(im)}else if(t)fr.appendChild(document.createTextNode(t))}n.parentNode.replaceChild(fr,n)}}
 function renderSheet(soft){if(!sheetK)return;regen();$('shTitle').textContent=TITLES[sheetK]||'';$('shCoin').textContent=fmt(SV.coin);$('shGem').textContent=fmt(SV.gem);$('shFruit').textContent=fmt(SV.candy||0);$('shStone').textContent=SV.stones;
-  const body=$('shBody');let h='';const R={grow:growHtml,market:()=>unlocked('market')?pMarket():`<div class="card"><h3>🔒 交易所</h3><p>${lockMsg('market')}</p></div>`,mail:pMail,todo:pTodo,set:pSet,adv:pAdv,summon:pSummon,castle:pCastle,academy:pAcademy,forge:pForge,evo:pEvo,shop:pShop,farm:pFarm,train:pTrain,pets:pPets,bag:pBag,ach:pAch,rank:pRank,vip:pVip,boss:pBoss,friends:pFriends,chat:pChat,pay:pPay,me:pMe,deco:pDeco,quest:pQuest,sign:pSign,event:pEvent,gift:pGift}[sheetK];
+  const body=$('shBody');let h='';const R={grow:growHtml,market:()=>unlocked('market')?pMarket():`<div class="card"><h3>🔒 交易所</h3><p>${lockMsg('market')}</p></div>`,mail:pMail,todo:pTodo,set:pSet,adv:pAdv,summon:pSummon,castle:pCastle,academy:pAcademy,forge:pForge,evo:pEvo,shop:pShop,farm:pFarm,train:pTrain,pets:pPets,bag:pBag,ach:pAch,rank:pRank,vip:pVip,boss:pBoss,friends:pFriends,chat:pChat,pay:pPay,me:pMe,deco:pDeco,td:pTD,quest:pQuest,sign:pSign,event:pEvent,gift:pGift}[sheetK];
   h=R();if(soft===1&&h===body._h&&sheetK===body._k)return;const ci=$('chatIn'),cv=ci?ci.value:'',cf=document.activeElement===ci;body._h=h;body._k=sheetK;body.innerHTML=h;{const n=$('chatIn');if(n){n.value=cv;if(cf)n.focus();n.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();const [a,...arg]=(body.querySelector('[data-act^="csend"]')||{dataset:{act:''}}).dataset.act.split(':');ACT[a]&&ACT[a](...arg)}}}const lg=$('clog');if(lg)lg.scrollTop=lg.scrollHeight}iconize(body);body.querySelectorAll('canvas[data-sk]').forEach(drawPreview);body.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{sheetTab=b.dataset.tab;sfx('click');renderSheet()});
   body.querySelectorAll('[data-act]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();const [a,...arg]=b.dataset.act.split(':');if(SV.tut===5&&sheetK==='summon'&&a!=='egg1')return toast('先按「單抽 💎160」');ACT[a]&&ACT[a](...arg);sfx('click');save();renderSheet();townHud()})}
 const DEXSRC={armad:'召喚,或攻城勝利累積碎片合成',seal:'召喚,或團隊 Boss 累積碎片合成',marten:'召喚,或任一個人副本第 10 層首次通關贈送',phoenix:'召喚(神獸,每抽約 0.5%;200 抽保底神獸)',dragon:'召喚(神獸,每抽約 0.5%;200 抽保底神獸)'};
@@ -3019,7 +3028,7 @@ const FTL=[
  {k:'boss',f:'boss',n:'Boss 副本',d:'挑戰強大的頭目,拿到套裝裝備!',go:{el:'[data-p="boss"]',sheet:'boss'},steps:[{sel:'[data-tab="solo"]',t:'個人副本:打頭目掉套裝裝備,層數越高掉越好的'},{sel:'[data-tab="raid"]',t:'團隊 Boss:全服一起打,依傷害排名發獎勵,好友也能來支援'}]},
  {k:'forge',f:'forge',n:'鍛造',d:'打造和強化裝備,讓萌獸變得更強!',go:{b:'forge',sheet:'forge'},steps:[{sel:'[data-tab="make"]',t:'打造:用星星幣和礦石打造隨機裝備'},{sel:'[data-tab="up"]',t:'強化:提升裝備數值,每 +3 會強化一條副屬性'},{sel:'[data-tab="re"]',t:'洗練:用洗練石重新隨機副屬性'},{sel:'[data-tab="sal"]',t:'分解:把用不到的裝備拆成材料'}]},
  {k:'market',f:'market',n:'交易所',d:'用鑽石和其他守護員買賣裝備,價格隨市場供需浮動。',go:{b:'play',sheet:'market'},steps:[{sel:'[data-act="mkTab:buy"]',t:'「購買」看大家上架的裝備,買到的裝備會放進背包'},{sel:'[data-act="mkTab:sell"]',t:'「出售」選裝備上架,價格要在參考價的 0.5～2 倍之間'},{t:'賣出時收 10% 手續費;賣出的鑽石和交易通知都會寄到信箱'}]},
- {k:'td',c:()=>tdOpen(),n:'守塔挑戰',d:'其他星球的怪獸來襲!派出你培養的萌獸當作守塔,守住家園。',go:{el:'[data-p="boss"]',sheet:'boss',tab:'td'},steps:[{sel:'.tdhero',t:'每場隨機城鎮色調:同屬性萌獸攻擊 +25%,怪物多為剋制主城的屬性'},{sel:'.tdds',t:'選難度開始挑戰,每天有 3 張守塔券;也可以先「練習」不耗券'},{sel:'[data-act="tdGo:endless:0"]',t:'無盡模式看你能撐幾波,每週排行前 50 名有鑽石'}]},
+ {k:'td',c:()=>tdOpen(),n:'守塔挑戰',d:'其他星球的怪獸來襲!派出你培養的萌獸當作守塔,守住家園。',go:{el:'#tdBtn',sheet:'td'},steps:[{sel:'.tdhero',t:'每場隨機城鎮色調:同屬性萌獸攻擊 +25%,怪物多為剋制主城的屬性'},{sel:'.tdds',t:'選難度開始挑戰,每天有 3 張守塔券;也可以先「練習」不耗券'},{sel:'[data-act="tdGo:endless:0"]',t:'無盡模式看你能撐幾波,每週排行前 50 名有鑽石'}]},
  {k:'mail',c:()=>SRV.on()&&mailUnread()>0,n:'信箱',d:'你收到了第一封信!營運獎勵、交易所的裝備、客服回覆都會寄到這裡。',go:{el:'#mailBtn',sheet:'mail'},steps:[{sel:'[data-act="mailAll"]',t:'按「全部領取」一次拿走所有附件'}]}];
 const FTS={on:null,step:-2};
 function ftReady(x){return x.f?unlocked(x.f):x.c?x.c():false}
@@ -3099,14 +3108,14 @@ const TDTONE={
   ice:{n:'冰城',sk:{id:'tdi',px:'snow',g:[]},cs:{id:'tdci',g:[]},cimg:'bi_castle',sky:['#8fb2e0','#eef6ff'],deco:['snowman','xmas','crystal','gifts','lamp','bench'],fx:'snow'},
   rock:{n:'岩城',sk:{id:'tdr',g:[['saturation','#808080',.35],['soft-light','#d89a40',.8]]},cs:{id:'tdcr',g:[['hue','#b8742a',.8]]},sky:['#d89a5a','#ffe6c0'],deco:['statue','dragon','hay','mush','flag','lamp'],fx:'dust'}};
 const TDDIFF=[{n:'普通',hp:3,c:'#3a9a4a'},{n:'困難',hp:7,c:'#e08a1a'},{n:'地獄',hp:13,c:'#d03a4a'}];
-const TDMAX=6,TDHP=20,TDW=20,TDBUY=[20,30,50],TDLVM=[1,1.45,2];
+const TDMAX=6,TDWT=3,TDHP=20,TDW=20,TDBUY=[20,30,50],TDLVM=[1,1.45,2];
 const tdCost=k=>40+20*qOf(k),tdUpC=(k,lv)=>lv===1?60+15*qOf(k):100+25*qOf(k);
 const TDBOSS=['worm','golem','yking','serpent','titan','lich'];
 ['td_map','td_slot','b_castle','bi_castle'].forEach(img);
 let TD=null,TDV={s:1,ox:0,oy:0},TDNET={top:null,me:null,t:0,err:''};
 function tdSV(){if(!SV.td)SV.td={day:'',used:0,buy:0,clr:[0,0,0],first:[0,0,0],best:0,wk:0,wbest:0};const t=SV.td;if(t.day!==today()){t.day=today();t.used=0;t.buy=0}if(t.wk!==weekId()){t.wk=weekId();t.wbest=0}return t}
 const tdTix=()=>{const t=tdSV();return 3+t.buy-t.used};
-const tdOpen=()=>(SV.castle||1)>=8;
+const TDLV=3,tdOpen=()=>(SV.castle||1)>=TDLV;
 // ---- path helpers
 const TDL=(()=>{const a=[0];for(let i=1;i<TDPATH.length;i++){const [x0,y0]=TDPATH[i-1],[x1,y1]=TDPATH[i];a.push(a[i-1]+Math.hypot(x1-x0,y1-y0))}return a})();
 const TDLEN=TDL[TDL.length-1];
@@ -3126,7 +3135,7 @@ function tdStart(mode,diff){au();for(const k in TDPEEK)delete TDPEEK[k];const t=
   TD={mode,diff:mode==='endless'?0:diff,tone,wave:0,waveOn:false,spawn:[],st:0,en:[],tw:{},proj:[],parts:[],nums:[],hp:TDHP,energy:160,speed:1,paused:false,t:0,over:null,cmd:{},sel:null,aim:null,shield:0,kills:0,prep:12,gap:0,leak:0,banner:3.5,bt:0,used:[],uid:0,shake:0,boss:null};
   TDTONE[tone].deco2=TDDECO.map((p,i)=>TDTONE[tone].deco[(i*7+Math.floor(rnd()*3))%TDTONE[tone].deco.length]);
   closeSheet();$('town').hidden=true;$('tdHud').hidden=false;$('tdLayer').hidden=false;$('tdRes').hidden=true;tdHudBuild();save();sfx('boss')}
-function tdQuit(){TD=null;$('tdHud').hidden=true;$('tdLayer').hidden=true;$('tdRes').hidden=true;$('tdPick').hidden=true;$('town').hidden=false;townHud();openSheet('boss','td')}
+function tdQuit(){TD=null;$('tdHud').hidden=true;$('tdLayer').hidden=true;$('tdRes').hidden=true;$('tdPick').hidden=true;$('tdInfo').hidden=true;$('town').hidden=false;townHud();openSheet('td')}
 function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?'win':'lose');const t=tdSV(),cl=T.mode==='endless'?T.wave-1:win?TDW:T.wave-1;
   let stars=0,lines=[],first=false;
   if(T.mode==='normal'){
@@ -3148,6 +3157,8 @@ function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?
    <ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul><button class="go" id="tdBack">回到城鎮</button></div>`;iconize(R);$('tdBack').onclick=()=>{sfx('click');tdQuit()}}
 // ---- towers / enemies
 function tdTower(k,slot){const P=PETS[k],s=SV.pets[k],S=stat(k);return {k,slot,lv:1,spent:tdCost(k),cd:.5,skT:P.sk.cd*.8,atk:S.atk,crit:S.crit||.05,rate:P.rate,el:P.el,far:P.range!=='melee',img:imgName(k),face:1,anim:rnd()*9,hit:0,stun:0,q:qOf(k)}}
+function tdWTower(tk,slot){const T2=TOWERS[tk],lv=towerLv(tk);return {k:'wt:'+tk,wt:tk,slot,lv:1,plv:lv,spent:tdWCost(tk),cd:.5,skT:1e9,atk:T2.dmg*(1+.35*(lv-1))*(3+.5*(SV.castle||1)),crit:.05,rate:T2.rate,el:T2.el,far:true,img:T2.img,face:1,anim:rnd()*9,hit:0,stun:0,q:0}}
+const tdWCost=tk=>50+10*towerLv(tk),tdUpW=w=>w.wt?(w.lv===1?70:110):tdUpC(w.k,w.lv),tdNP=()=>Object.values(TD.tw).filter(w=>!w.wt).length,tdNW=()=>Object.values(TD.tw).filter(w=>w.wt).length;
 const tdRange=w=>(w.far?205:135)*(w.lv===3?1.12:1);
 const tdAtk=w=>w.atk*TDLVM[w.lv-1]*(w.el===TD.tone?1.25:1);
 function tdSpawn(x){const T=TD,E=ENEMY[x.k],w=T.wave,m=tdHpMul(w)*TDDIFF[T.diff].hp*(x.boss?1:x.elite?2.5:1);let hp=E.hp*m*(x.boss?.55:1);
@@ -3167,6 +3178,8 @@ function tdFire(w,e,skill){const [x,y]=TDSLOT[w.slot],[ex,ey]=tdPos(e.d);w.face=
   if(!w.far){tdHit(w,e,a,skill);tdPart(ex,ey-25,6,EL[w.el].c,90,.3,4);sfx('hit');return}
   TD.proj.push({x,y:y-45,tx:e,el:w.el,w,a,skill,sp:skill?520:620,t:0});sfx(w.el==='fire'?'fire':w.el==='water'?'bubble':w.el==='elec'?'zap':w.el==='ice'?'ice':w.el==='grass'?'leaf':'rock')}
 function tdHit(w,e,a,skill){const T=TD,[ex,ey]=tdPos(e.d),el=w.el,R=skill?85:0;
+  if(w.wt){const W2=TOWERS[w.wt];tdDmg(e,a,el,w);if(W2.slow){e.slow=Math.max(e.slow,.35);e.slowT=1.5}if(W2.freeze&&rnd()<W2.freeze){e.stun=Math.max(e.stun,e.boss?.3:1)}
+    if(W2.chain){let last=e,done=[e];for(let i=0;i<W2.chain-1+(w.lv===3?1:0);i++){const [lx,ly]=tdPos(last.d);let nb=null,nd=95;for(const o of T.en){if(o.hp<=0||done.includes(o))continue;const [ox,oy]=tdPos(o.d),dd=Math.hypot(ox-lx,oy-ly);if(dd<nd){nd=dd;nb=o}}if(!nb)break;done.push(nb);const [nx,ny]=tdPos(nb.d);T.parts.push({zap:1,x:lx,y:ly-25,x2:nx,y2:ny-25,t:0,life:.18});tdDmg(nb,a*.7,el,null,false);last=nb}}return}
   const hits=skill?T.en.filter(o=>o.hp>0&&(!o.fly||w.far)&&Math.hypot(tdPos(o.d)[0]-ex,tdPos(o.d)[1]-ey)<R):[e];
   for(const o of hits){if(o.hp<=0)continue;tdDmg(o,a,el,w);
     if(el==='ice'){o.slow=Math.max(o.slow,w.lv===3||skill?.5:.35);o.slowT=skill?3:1.5}
@@ -3193,7 +3206,7 @@ function tdUpdate(dt){const T=TD;if(!T||T.over||T.paused)return;T.t+=dt;if(T.ban
     if(e.d>=TDLEN){e.hp=0;if(e===T.boss)T.boss=null;const dmg=e.boss?5:e.elite?2:1;if(T.shield>0){tdTxt(668,90,'🛡 擋下了!','#9adfff')}else{T.hp-=dmg;T.leak+=dmg;T.shake=.35;sfx('hit');tdTxt(668,80,'-'+dmg,'#ff5a5a',1,true)}if(T.hp<=0){T.hp=0;return tdEnd(false)}}}
   T.en=T.en.filter(e=>e.hp>0);
   for(const s in T.tw){const w=T.tw[s];w.anim+=dt;if(w.hit>0)w.hit-=dt;if(w.stun>0){w.stun-=dt;continue}w.cd-=dt;w.skT-=dt;const [x,y]=TDSLOT[s];
-    if(w.cd<=0){const e=tdTarget(w,x,y);if(e){w.cd=w.rate*(w.lv===3?.85:1);if(w.skT<=0){w.skT=PETS[w.k].sk.cd*1.1;tdTxt(x,y-95,PETS[w.k].sk.n,EL[w.el].c,1.1);tdFire(w,e,true)}else tdFire(w,e,false)}else w.cd=.15}}
+    if(w.cd<=0){const e=tdTarget(w,x,y);if(e){w.cd=w.rate*(w.lv===3?.85:1);if(!w.wt&&w.skT<=0){w.skT=PETS[w.k].sk.cd*1.1;tdTxt(x,y-95,PETS[w.k].sk.n,EL[w.el].c,1.1);tdFire(w,e,true)}else tdFire(w,e,false)}else w.cd=.15}}
   for(const p of T.proj){p.t+=dt;const e=p.tx;if(e.hp<=0&&!p.lx){const [ex,ey]=tdPos(e.d);p.lx=ex;p.ly=ey}const [tx,ty]=e.hp>0?tdPos(e.d):[p.lx,p.ly];const ty2=ty-25-(e.fly?30:0),dx=tx-p.x,dy=ty2-p.y,dd=Math.hypot(dx,dy),st=p.sp*dt;
     if(dd<=st+4){p.done=1;if(e.hp>0)tdHit(p.w,e,p.a,p.skill)}else{p.x+=dx/dd*st;p.y+=dy/dd*st}}
   T.proj=T.proj.filter(p=>!p.done&&p.t<3);
@@ -3242,13 +3255,13 @@ function tdDraw(){const T=TD;tdLayout();const s=TDV.s,TO=TDTONE[T.tone],sh=T.sha
   else if(T.bt>0&&T.wave){T.bt-=1/60;const a=Math.min(1,T.bt*2);ctx.globalAlpha=a;ctx.font='900 34px sans-serif';ctx.lineWidth=6;ctx.strokeStyle='rgba(40,20,60,.9)';const tx2=T.wave%10===0?`第 ${T.wave} 波 · 頭目!`:`第 ${T.wave} 波`;ctx.strokeText(tx2,W/2,H*.36);ctx.fillStyle='#fff';ctx.fillText(tx2,W/2,H*.36);ctx.globalAlpha=1}
   tdHudTick()}
 function tdRR(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
-function tdDrawTower(w,x,y,slot){const s=TDV.s,im=img(w.img),tt=w.anim;if(!im||!im.naturalWidth)return;const h=(78+w.lv*8)*s,ww=h*im.naturalWidth/im.naturalHeight,X=tdX(x),Y=tdY(y)+6*s;
+function tdDrawTower(w,x,y,slot){const s=TDV.s,im=img(w.img),tt=w.anim;if(!im||!im.naturalWidth)return;const h=(w.wt?96+w.lv*6:78+w.lv*8)*s,ww=h*im.naturalWidth/im.naturalHeight,X=tdX(x),Y=tdY(y)+6*s;
   ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(X,Y,ww*.38,ww*.12,0,0,7);ctx.fill();
   ctx.save();ctx.translate(X,Y-Math.abs(Math.sin(tt*3))*3*s-(w.hit>0?6*s:0));ctx.scale(w.face,1);if(w.stun>0)ctx.globalAlpha=.6;ctx.drawImage(im,-ww/2,-h,ww,h);ctx.restore();
   if(w.stun>0){ctx.font=`${Math.round(18*s+6)}px sans-serif`;ctx.fillText('💫',X,Y-h-6*s)}
   // level badge
   ctx.fillStyle=EL[w.el].c;ctx.beginPath();ctx.arc(X+ww*.32,Y-6*s,11*s+3,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font=`900 ${Math.round(12*s+5)}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(w.lv,X+ww*.32,Y-5*s);
-  if(w.lv<3&&TD.energy>=tdUpC(w.k,w.lv)){ctx.fillStyle='#3ad06a';ctx.font=`900 ${Math.round(14*s+6)}px sans-serif`;ctx.fillText('▲',X-ww*.32,Y-10*s-Math.abs(Math.sin(performance.now()/250))*4)}}
+  if(w.lv<3&&TD.energy>=tdUpW(w)){ctx.fillStyle='#3ad06a';ctx.font=`900 ${Math.round(14*s+6)}px sans-serif`;ctx.fillText('▲',X-ww*.32,Y-10*s-Math.abs(Math.sin(performance.now()/250))*4)}}
 function tdDrawEnemy(e,x,y){const s=TDV.s,im=img(e.E.img);if(!im||!im.naturalWidth)return;const sz=(e.boss?150:e.elite?78:62)*(e.E.sz/.66*.9+.1)*s,h=sz,w=h*im.naturalWidth/im.naturalHeight,fly=e.fly?32*s:0;const dir=tdPos(e.d+4)[0]-x,X=tdX(x),Y=tdY(y)+4*s;
   ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(X,Y,w*.32,w*.1,0,0,7);ctx.fill();
   ctx.save();ctx.translate(X,Y-fly-Math.abs(Math.sin(e.anim*6))*3*s);if(dir>0)ctx.scale(-1,1);
@@ -3280,19 +3293,26 @@ function tdTap(px,py){const T=TD;if(!T||T.over)return;const mx=(px-TDV.ox)/TDV.s
   let hit=-1;TDSLOT.forEach(([x,y],i)=>{if(Math.hypot(x-mx,(y-my)*1.4)<60)hit=i});
   if(hit<0){T.sel=null;$('tdPick').hidden=true;return}T.sel=hit;tdPick(hit)}
 function tdPick(i){const T=TD,P=$('tdPick'),w=T.tw[i];P.hidden=false;
-  if(w){const up=w.lv<3?tdUpC(w.k,w.lv):0,ref=Math.floor(w.spent*.5);
-    P.innerHTML=`<div class="tdpk"><img src="assets/${w.img}.webp" alt=""><div><b>${PETS[w.k].n[SV.pets[w.k].st]} <span class="el el-${w.el}">${EL[w.el].n}</span> Lv${w.lv}</b><small>攻擊 ${fmt(tdAtk(w))} · ${w.far?'遠程':'近戰(打不到飛行)'} · ${TDSP[w.el]}</small><small>技能「${PETS[w.k].sk.n}」每 ${Math.round(PETS[w.k].sk.cd*1.1)} 秒自動施放</small></div></div>
+  if(w){const up=w.lv<3?tdUpW(w):0,ref=Math.floor(w.spent*.5),nm=w.wt?TOWERS[w.wt].n:PETS[w.k].n[SV.pets[w.k].st];
+    P.innerHTML=`<div class="tdpk"><img src="assets/${w.img}.webp" alt=""><div><b>${nm} <span class="el el-${w.el}">${EL[w.el].n}</span> Lv${w.lv}</b><small>攻擊 ${fmt(tdAtk(w))} · ${w.wt?'城牆砲塔 Lv'+w.plv+' · '+TOWERS[w.wt].d:(w.far?'遠程':'近戰(打不到飛行)')+' · '+TDSP[w.el]}</small>${w.wt?'':`<small>技能「${PETS[w.k].sk.n}」每 ${Math.round(PETS[w.k].sk.cd*1.1)} 秒自動施放</small>`}</div></div>
     <div class="tdpb">${w.lv<3?`<button class="go" data-tp="up" ${T.energy<up?'disabled':''}>升級 ✦${up}</button>`:'<button disabled>已滿級</button>'}<button class="blue" data-tp="sell">收回 ✦+${ref}</button><button data-tp="x">關閉</button></div>`}
-  else{const used=Object.values(T.tw).map(x=>x.k),L=owned().filter(k=>!used.includes(k)).sort((a,b)=>stat(b).atk-stat(a).atk),n=Object.keys(T.tw).length;
-    P.innerHTML=`<div class="tdph"><b>選一隻萌獸守這裡</b><small>已上場 ${n} / ${TDMAX} · 能量 ✦${Math.floor(T.energy)} · <span class="el el-${T.tone}">${EL[T.tone].n}</span>系攻擊 +25%</small><button data-tp="x">✕</button></div>
-    <div class="tdpl">${n>=TDMAX?'<p class="dim">最多上場 6 隻,可以先收回其他萌獸</p>':L.map(k=>{const c=tdCost(k),P2=PETS[k];return `<button class="tdpp ${P2.el===T.tone?'bn':''}" data-tp="put:${k}" ${T.energy<c?'disabled':''}><img src="assets/${imgName(k)}.webp" alt=""><b>${P2.n[SV.pets[k].st]}</b><small><span class="el el-${P2.el}">${EL[P2.el].n}</span> ${P2.range==='melee'?'近戰':'遠程'}</small><small>攻 ${fmt(stat(k).atk*(P2.el===T.tone?1.25:1))}</small><i>✦${c}</i></button>`}).join('')}</div>`}
+  else{const tab=T.pkTab||'pet',used=Object.values(T.tw).map(x=>x.k),np=tdNP(),nw=tdNW();
+    let body='';
+    if(tab==='pet'){const L=owned().filter(k=>!used.includes(k)).sort((a,b)=>stat(b).atk-stat(a).atk);
+      body=np>=TDMAX?'<p class="dim">萌獸最多上場 6 隻,可以先收回其他萌獸</p>':L.map(k=>{const c=tdCost(k),P2=PETS[k];return `<button class="tdpp ${P2.el===T.tone?'bn':''}" data-tp="put:${k}" ${T.energy<c?'disabled':''}><img src="assets/${imgName(k)}.webp" alt=""><b>${P2.n[SV.pets[k].st]}</b><small><span class="el el-${P2.el}">${EL[P2.el].n}</span> ${P2.range==='melee'?'近戰':'遠程'}</small><small>攻 ${fmt(stat(k).atk*(P2.el===T.tone?1.25:1))}</small><i>✦${c}</i></button>`}).join('')}
+    else{body=nw>=TDWT?'<p class="dim">城牆砲塔最多 3 座,可以先收回其他砲塔</p>':TK.map(tk=>{const T2=TOWERS[tk],own=!!(SV.twLv&&SV.twLv[tk]),on=used.includes('wt:'+tk);if(!own)return `<button class="tdpp" disabled><img src="assets/${T2.img}.webp" alt="" class="sil"><b>${T2.n}</b><small>到主城建造</small></button>`;
+      const c=tdWCost(tk),A=tdWTower(tk,0);return `<button class="tdpp ${T2.el===T.tone?'bn':''}" data-tp="putw:${tk}" ${T.energy<c||on?'disabled':''}><img src="assets/${T2.img}.webp" alt=""><b>${T2.n} Lv${towerLv(tk)}</b><small><span class="el el-${T2.el}">${EL[T2.el].n}</span> ${T2.d}</small><small>攻 ${fmt(A.atk*(T2.el===T.tone?1.25:1))}</small><i>${on?'已上場':'✦'+c}</i></button>`}).join('')}
+    P.innerHTML=`<div class="tdph"><b>守這個石台</b><small>能量 ✦${Math.floor(T.energy)} · <span class="el el-${T.tone}">${EL[T.tone].n}</span>系攻擊 +25%</small><button data-tp="x">✕</button></div>
+    <div class="tdtabs"><button class="${tab==='pet'?'on':''}" data-tp="tab:pet">萌獸 ${np}/${TDMAX}</button><button class="${tab==='wt'?'on':''}" data-tp="tab:wt">城牆砲塔 ${nw}/${TDWT}</button></div><div class="tdpl">${body}</div>`}
   iconize(P);P.querySelectorAll('[data-tp]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();sfx('click');const [a,k]=b.dataset.tp.split(':');
     if(a==='x'){T.sel=null;P.hidden=true;return}
-    if(a==='put'){const c=tdCost(k);if(T.energy<c)return;T.energy-=c;T.tw[i]=tdTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[PETS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
-    if(a==='up'){const c=tdUpC(w.k,w.lv);if(T.energy<c||w.lv>=3)return;T.energy-=c;w.spent+=c;w.lv++;const [x,y]=TDSLOT[i];tdPart(x,y-40,20,['#ffe066','#fff'],180,.6,5);tdTxt(x,y-100,'升級!','#ffe066');sfx('up');tdPick(i);return}
+    if(a==='tab'){T.pkTab=k;tdPick(i);return}
+    if(a==='put'){const c=tdCost(k);if(T.energy<c||tdNP()>=TDMAX)return;T.energy-=c;T.tw[i]=tdTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[PETS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
+    if(a==='putw'){const c=tdWCost(k);if(T.energy<c||tdNW()>=TDWT)return;T.energy-=c;T.tw[i]=tdWTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[TOWERS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
+    if(a==='up'){const c=tdUpW(w);if(T.energy<c||w.lv>=3)return;T.energy-=c;w.spent+=c;w.lv++;const [x,y]=TDSLOT[i];tdPart(x,y-40,20,['#ffe066','#fff'],180,.6,5);tdTxt(x,y-100,'升級!','#ffe066');sfx('up');tdPick(i);return}
     if(a==='sell'){T.energy+=Math.floor(w.spent*.5);delete T.tw[i];T.sel=null;P.hidden=true}})}
-function tdInfoHtml(){const T=TD,n=Object.keys(T.tw).length,nw=T.prep>0?1:T.wave+1,fin=T.mode!=='endless'&&nw>TDW;const ks=fin?[]:[...new Set((T.spawn.length&&T.wave?T.spawn:tdPeek(nw)).map(x=>x.k))].slice(0,6);
-  return `<div class="tdih"><b>${TDTONE[T.tone].n}</b> <span class="el el-${T.tone}">${EL[T.tone].n}</span>系萌獸攻擊 +25%<small>已上場 ${n} / ${TDMAX} · 點地圖上的「+」石台放萌獸,點萌獸可以升級或收回</small></div>
+function tdInfoHtml(){const T=TD,n=tdNP(),nw=T.prep>0?1:T.wave+1,fin=T.mode!=='endless'&&nw>TDW;const ks=fin?[]:[...new Set((T.spawn.length&&T.wave?T.spawn:tdPeek(nw)).map(x=>x.k))].slice(0,6);
+  return `<div class="tdih"><b>${TDTONE[T.tone].n}</b> <span class="el el-${T.tone}">${EL[T.tone].n}</span>系萌獸攻擊 +25%<small>萌獸 ${n}/${TDMAX} · 砲塔 ${tdNW()}/${TDWT} · 點「+」石台放萌獸或砲塔,點已放的可以升級或收回</small></div>
   ${fin?'':`<div class="tdiw"><b>${T.spawn.length&&T.wave?'這一波':'下一波'}(第 ${T.spawn.length&&T.wave?T.wave:nw} 波)</b><div>${ks.map(k=>`<span class="tdie"><img src="assets/${ENEMY[k].img}.webp" alt=""><small><span class="el el-${ENEMY[k].el}">${EL[ENEMY[k].el].n}</span>${ENEMY[k].fly?' 飛':''}${ENEMY[k].boss?' 頭目':''}</small></span>`).join('')}</div></div>`}
   <div class="tdit">💡 ${['飛行怪只有遠程萌獸打得到','岩系萌獸專剋高防禦的裝甲怪','冰系減速 + 火系範圍爆炸是好搭檔','能量夠就先升級主力萌獸,3 級射程更遠','提前出怪可以多拿能量','頭目會震暈附近的萌獸,別全部擠在一起'][Math.floor(T.t/8)%6]}</div>`}
 const TDPEEK={};function tdPeek(w){if(!TDPEEK[w+TD.tone]){const s=TD.spawn,st=TD.st;TDPEEK[w+TD.tone]=tdWave(w);TD.spawn=s;TD.st=st}return TDPEEK[w+TD.tone]}
@@ -3301,13 +3321,15 @@ const TDSP={fire:'範圍爆炸',water:'機率擊退',grass:'中毒持續傷害',
 function tdFetch(){if(!SRV.on()||Date.now()-TDNET.t<60e3)return;TDNET.t=Date.now();
   SRV.rpc('td_top',{p_limit:50}).then(r=>{TDNET.top=r||[];if(sheetK==='boss'&&sheetTab==='td')renderSheet(1)}).catch(e=>{TDNET.err=e.message});
   SRV.rpc('td_claim',{}).then(r=>{if(r&&r.gem>0){toast(`上週守塔排行第 ${r.rank} 名,獎勵 💎${r.gem} 已寄到信箱`)}}).catch(()=>{})}
+function tdBtnPos(){const b=$('tdBtn'),mq=$('marq');if(!b||!mq)return;const r=mq.getBoundingClientRect(),top=(r.height?r.bottom:parseFloat(getComputedStyle(mq).top)+30)+8;if(Math.abs((b._t||0)-top)>1){b._t=top;b.style.top=Math.round(top)+'px'}}
+function tdBtnUpd(){const b=$('tdBtn');if(!b)return;const op=tdOpen();b.classList.toggle('lock',!op);const n=op?tdTix():0;$('tdBtnN').hidden=!(n>0);$('tdBtnN').textContent=n;let s='';if(!op)s=`主城 Lv${TDLV} 開放`;else{tdFetch();const r=(TDNET.top||[]).findIndex(x=>x.me);if(r>=0)s=`本週第 ${r+1} 名`;else if(n>0)s='今日券 '+n}$('tdBtnS').textContent=s}
 function pTD(){const t=tdSV(),n=tdTix();tdFetch();
-  if(!tdOpen())return `<div class="card"><h3>🔒 守塔挑戰</h3><p>主城升到 Lv.8 開放</p></div>`;
+  if(!tdOpen())return `<div class="card tdhero"><h3>🔒 守塔挑戰 <small>主城升到 Lv.${TDLV} 開放</small></h3><p class="dim">其他星球的怪獸大軍來襲!派出你培養的萌獸和城牆砲塔,沿著蜿蜒小路守住家園。每場隨機城鎮色調、20 波怪物和頭目,還有每週無盡模式排行榜。</p><p>到「主城」升級,就能開始挑戰!</p></div>`;
   let h=`<div class="card tdhero"><h3>🛡️ 守塔挑戰 <small>其他星球來襲,守護家園!</small></h3>
     <p class="dim">怪獸大軍沿著蜿蜒小路衝向主城,派出你培養的萌獸守住家園!</p>
     <details class="dropd"><summary>玩法規則</summary><ol class="tdrule">
     <li>每場隨機一種城鎮色調:主城屬性的萌獸攻擊 +25%,怪物多為剋制主城的屬性。</li>
-    <li>點路邊的石台放萌獸,最多 ${TDMAX} 隻;萌獸等級、星數、品質、裝備越好,守得越穩。</li>
+    <li>點路邊的石台放萌獸,最多 ${TDMAX} 隻;萌獸等級、星數、品質、裝備越好,守得越穩。</li><li>主城蓋好的城牆砲塔也能放,最多 ${TDWT} 座(不佔萌獸名額),強度依你的砲塔等級和主城等級。</li>
     <li>擊倒怪物得「✦能量」,用來放萌獸、場內升級(最高 3 級)或收回萌獸(退一半)。</li>
     <li>屬性招式:🔥範圍爆炸、💧擊退、🌿中毒、⚡連鎖閃電、❄️減速、🪨暈眩;近戰萌獸打不到飛行怪。</li>
     <li>怪物闖進城門扣耐久,${TDHP} 點扣光就失敗;撐過 ${TDW} 波(第 10、20 波有頭目)就勝利,依剩餘耐久給 1~3 星。</li>
