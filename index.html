@@ -3129,7 +3129,7 @@ const TDBOSS=['worm','golem','yking','serpent','titan','lich'];
 let TD=null,TDV={s:1,ox:0,oy:0},TDNET={top:null,me:null,t:0,err:''};
 function tdSV(){if(SV.tdTiW&&SV.tdTiW!==weekId()){SV.cos=(SV.cos||[]).filter(x=>x!=='sp_td');if(SV.title==='sp_td')SV.title=null;delete SV.tdTiW}if(!SV.td)SV.td={day:'',used:0,buy:0,clr:[0,0,0],first:[0,0,0],best:0,wk:0,wbest:0};const t=SV.td;if(t.day!==today()){t.day=today();t.used=0;t.buy=0}if(t.wk!==weekId()){t.wk=weekId();t.wbest=0}return t}
 const tdTix=()=>{const t=tdSV();return 3+t.buy-t.used};
-const TDLV=3,tdOpen=()=>(SV.castle||1)>=TDLV;
+const TDLV=1,tdOpen=()=>owned().length>0;
 // ---- path helpers
 const TDL=(()=>{const a=[0];for(let i=1;i<TDPATH.length;i++){const [x0,y0]=TDPATH[i-1],[x1,y1]=TDPATH[i];a.push(a[i-1]+Math.hypot(x1-x0,y1-y0))}return a})();
 const TDLEN=TDL[TDL.length-1];
@@ -3213,7 +3213,6 @@ function tdImpact(kd,x,y,big){const T=TD,m=big?2.2:1,P=o=>T.parts.push(Object.as
   else if(kd==='rock'){for(let i=0;i<9*m;i++){const a=-Math.PI*R(.05,.95),v=R(60,170)*m;P({x,y:y+8,vx:Math.cos(a)*v,vy:Math.sin(a)*v,g:400,life:R(.4,.7),c:['#a07850','#c8a878','#7a5a3a'][i%3],sz:R(3,6)*m})}for(let i=0;i<5*m;i++)P({puff:1,x:x+R(-20,20)*m,y:y+10,vx:R(-30,30),vy:R(-30,-10),g:0,life:R(.5,.8),c:'210,190,160',sz:R(10,18)*m})}
   else if(kd==='bee'){for(let i=0;i<5;i++){const a=rnd()*7,v=R(40,90);P({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,g:0,life:.35,c:['#ffd020','#3a2a10'][i%2],sz:2.5})}}}
 function tdUlt(w,e,a){const T=TD,[x,y]=TDSLOT[w.slot],[ex,ey]=tdPos(e.d),el=w.el,P=o=>T.parts.push(Object.assign({t:0},o)),R=(a2,b)=>a2+rnd()*(b-a2);
-  if(!T.cut||T.t-T.cutT>3.5){T.cut={k:w.k,img:w.img,n:PETS[w.k].sk.n,el,t:0};T.cutT=T.t}
   sfx('skill');const hit=()=>{if(e.hp>0||1)tdHit(w,e,a,true);tdImpact(el,ex,ey-20,1);T.shake=Math.max(T.shake,.35)};
   if(el==='fire'){P({meteor:1,x:ex+120,y:ey-420,x2:ex,y2:ey-10,life:.38,c:'fire'});tdLater(.36,()=>{hit();P({ring:1,x:ex,y:ey,r:110,life:.5,c:'#ff8a30',lw:6});for(let i=0;i<16;i++){const an=i/16*7;P({flame:1,x:ex+Math.cos(an)*30,y:ey+Math.sin(an)*20,vx:Math.cos(an)*120,vy:Math.sin(an)*60-80,g:-60,life:R(.5,.8),sz:R(10,16)})}tdFlash('255,160,60',.28,.25)})}
   else if(el==='water'){P({wave:1,x:ex,y:ey,life:.7,r:120});hit();for(let i=0;i<5;i++)P({pillar:1,x:ex+R(-70,70),y:ey+R(-20,20),life:R(.45,.7),h:R(60,110),c:'#7fd0ff'});tdFlash('120,200,255',.18,.3)}
@@ -3410,9 +3409,9 @@ function tdFetch(){if(!SRV.on()||Date.now()-TDNET.t<60e3)return;TDNET.t=Date.now
   SRV.rpc('td_top',{p_limit:50}).then(r=>{TDNET.top=r||[];if(sheetK==='boss'&&sheetTab==='td')renderSheet(1)}).catch(e=>{TDNET.err=e.message});
   SRV.rpc('td_claim',{}).then(r=>{if(r&&r.gem>0){toast(`上週守塔排行第 ${r.rank} 名,獎勵 💎${r.gem} 已寄到信箱`);if(r.rank<=3){SV.cos=[...new Set([...(SV.cos||[]),'sp_td'])];SV.tdTiW=weekId();save();toast('獲得一週限定稱號「🛡️守塔英雄」,到守護員頁面換上!')}}}).catch(()=>{})}
 function tdBtnPos(){const b=$('tdBtn'),mq=$('marq');if(!b||!mq)return;const r=mq.getBoundingClientRect(),top=(r.height?r.bottom:parseFloat(getComputedStyle(mq).top)+30)+8;if(Math.abs((b._t||0)-top)>1){b._t=top;b.style.top=Math.round(top)+'px'}}
-function tdBtnUpd(){const b=$('tdBtn');if(!b)return;const op=tdOpen();b.classList.toggle('lock',!op);const n=op?tdTix():0;$('tdBtnN').hidden=!(n>0);$('tdBtnN').textContent=n;let s='';if(!op)s=`主城 Lv${TDLV} 開放`;else{tdFetch();const r=(TDNET.top||[]).findIndex(x=>x.me);if(r>=0)s=`本週第 ${r+1} 名`;else if(n>0)s='今日券 '+n}$('tdBtnS').textContent=s}
+function tdBtnUpd(){const b=$('tdBtn');if(!b)return;const op=tdOpen();b.classList.toggle('lock',!op);const n=op?tdTix():0;$('tdBtnN').hidden=!(n>0);$('tdBtnN').textContent=n;let s='';if(!op)s='擁有萌獸就能玩';else{tdFetch();const r=(TDNET.top||[]).findIndex(x=>x.me);if(r>=0)s=`本週第 ${r+1} 名`;else if(n>0)s='今日券 '+n}$('tdBtnS').textContent=s}
 function pTD(){const t=tdSV(),n=tdTix();tdFetch();
-  if(!tdOpen())return `<div class="card tdhero"><h3>🔒 守塔挑戰 <small>主城升到 Lv.${TDLV} 開放</small></h3><p class="dim">其他星球的怪獸大軍來襲!派出你培養的萌獸和城牆砲塔,沿著蜿蜒小路守住家園。每場隨機城鎮色調、20 波怪物和頭目,還有每週無盡模式排行榜。</p><p>到「主城」升級,就能開始挑戰!</p></div>`;
+  if(!tdOpen())return `<div class="card tdhero"><h3>🔒 守塔挑戰 <small>擁有萌獸就能玩</small></h3><p class="dim">其他星球的怪獸大軍來襲!派出你培養的萌獸和城牆砲塔,沿著蜿蜒小路守住家園。每場隨機城鎮色調、20 波怪物和頭目,還有每週無盡模式排行榜。</p><p>先孵出你的第一隻萌獸,就能開始挑戰!</p></div>`;
   let h=`<div class="card tdhero"><h3>🛡️ 守塔挑戰 <small>其他星球來襲,守護家園!</small></h3>
     <p class="dim">怪獸大軍沿著蜿蜒小路衝向主城,派出你培養的萌獸守住家園!</p>
     <details class="dropd"><summary>玩法規則</summary><ol class="tdrule">
