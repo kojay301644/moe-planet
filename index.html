@@ -474,7 +474,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 .tdds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .tdd{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:14px;border:2px solid var(--c);background:#fff}
 .tdd>b{color:var(--c);font-size:17px}.tdd small{font-size:11px;color:#7a6a5a;text-align:center}.tdd button{width:100%}.tdd.lock{opacity:.6}
-.tdtip{margin:0 0 10px;padding:10px 12px;border-radius:14px;background:#fff6c8;border:2px solid #ffd860;color:#6a4a10;font-weight:700;font-size:13px;line-height:1.5}.tdrule{margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6}
+.tdtip{margin:0 0 10px;padding:10px 12px;border-radius:14px;background:#fff6c8;border:2px solid #ffd860;color:#6a4a10;font-weight:700;font-size:13px;line-height:1.5}.tdtip.sm{margin:8px 0 0;padding:6px 10px;font-size:12px}.tdrule{margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6}
 .tdlb{list-style:none;padding:0;margin:6px 0 0;max-height:300px;overflow:auto}.tdlb li{display:flex;gap:8px;align-items:center;padding:5px 8px;border-bottom:1px dashed #e8d8c0}
 .tdlb li b{width:26px;text-align:center;color:#8a5a2b}.tdlb li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tdlb li i{font-style:normal;font-weight:900;color:#d07a10}.tdlb li.me{background:#fff4d8}
 
@@ -3385,21 +3385,21 @@ function tdPick(i){const T=TD,P=$('tdPick'),w=T.tw[i];P.hidden=false;
     <div class="tdpb">${w.lv<3?`<button class="go" data-tp="up" ${T.energy<up?'disabled':''}>升級 ✦${up}</button>`:'<button disabled>已滿級</button>'}<button class="blue" data-tp="sell">收回 ✦+${ref}</button><button data-tp="x">關閉</button></div>`}
   else{const tab=T.pkTab||'pet',used=Object.values(T.tw).map(x=>x.k),np=tdNP(),nw=tdNW();
     let body='';
-    if(tab==='pet'){const L=owned().filter(k=>!used.includes(k)).sort((a,b)=>stat(b).atk-stat(a).atk);
-      body=np>=TDMAX?'<p class="dim">萌獸最多上場 6 隻,可以先收回其他萌獸</p>':L.map(k=>{const c=tdCost(k),P2=PETS[k];return `<button class="tdpp ${P2.el===T.tone?'bn':''}" data-tp="put:${k}" ${T.energy<c?'disabled':''}><img src="assets/${imgName(k)}.webp" alt=""><b>${P2.n[SV.pets[k].st]}</b><small><span class="el el-${P2.el}">${EL[P2.el].n}</span> ${P2.range==='melee'?'近戰':'遠程'}</small><small>攻 ${fmt(stat(k).atk*tdBon(P2.el))}</small><i>✦${c}</i></button>`}).join('')}
-    else{body=nw>=TDWT?'<p class="dim">城牆砲塔最多 3 座,可以先收回其他砲塔</p>':TK.map(tk=>{const T2=TOWERS[tk],own=!!(SV.twLv&&SV.twLv[tk]),on=used.includes('wt:'+tk);if(!own)return `<button class="tdpp" disabled><img src="assets/${T2.img}.webp" alt="" class="sil"><b>${T2.n}</b><small>到主城建造</small></button>`;
+    if(tab==='pet'){const L=owned().sort((a,b)=>stat(b).atk-stat(a).atk);
+      body=L.map(k=>{const c=tdCost(k),P2=PETS[k];return `<button class="tdpp ${P2.el===T.tone?'bn':''}" data-tp="put:${k}" ${T.energy<c?'disabled':''}><img src="assets/${imgName(k)}.webp" alt=""><b>${P2.n[SV.pets[k].st]}</b><small><span class="el el-${P2.el}">${EL[P2.el].n}</span> ${P2.range==='melee'?'近戰':'遠程'}</small><small>攻 ${fmt(stat(k).atk*tdBon(P2.el))}</small><i>✦${c}</i></button>`}).join('')}
+    else{body=TK.map(tk=>{const T2=TOWERS[tk],own=!!(SV.twLv&&SV.twLv[tk]),on=false;if(!own)return `<button class="tdpp" disabled><img src="assets/${T2.img}.webp" alt="" class="sil"><b>${T2.n}</b><small>到主城建造</small></button>`;
       const c=tdWCost(tk),A=tdWTower(tk,0);return `<button class="tdpp ${T2.el===T.tone?'bn':''}" data-tp="putw:${tk}" ${T.energy<c||on?'disabled':''}><img src="assets/${T2.img}.webp" alt=""><b>${T2.n} Lv${towerLv(tk)}</b><small><span class="el el-${T2.el}">${EL[T2.el].n}</span> ${T2.d}</small><small>攻 ${fmt(A.atk*tdBon(T2.el))}</small><i>${on?'已上場':'✦'+c}</i></button>`}).join('')}
     P.innerHTML=`<div class="tdph"><b>守這個石台</b><small>能量 ✦${Math.floor(T.energy)} · ${tdBonHtml()}</small><button data-tp="x">✕</button></div>
-    <div class="tdtabs"><button class="${tab==='pet'?'on':''}" data-tp="tab:pet">萌獸 ${np}/${TDMAX}</button><button class="${tab==='wt'?'on':''}" data-tp="tab:wt">城牆砲塔 ${nw}/${TDWT}</button></div><div class="tdpl">${body}</div>`}
+    <div class="tdtip sm">💡 同一隻萌獸或砲塔可以重複放在不同石台,只要能量夠就能放滿!</div><div class="tdtabs"><button class="${tab==='pet'?'on':''}" data-tp="tab:pet">萌獸(已放 ${np})</button><button class="${tab==='wt'?'on':''}" data-tp="tab:wt">城牆砲塔(已放 ${nw})</button></div><div class="tdpl">${body}</div>`}
   iconize(P);P.querySelectorAll('[data-tp]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();sfx('click');const [a,k]=b.dataset.tp.split(':');
     if(a==='x'){T.sel=null;P.hidden=true;return}
     if(a==='tab'){T.pkTab=k;tdPick(i);return}
-    if(a==='put'){const c=tdCost(k);if(T.energy<c||tdNP()>=TDMAX)return;T.energy-=c;if(!T.used.includes(k))T.used.push(k);T.tw[i]=tdTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[PETS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
-    if(a==='putw'){const c=tdWCost(k);if(T.energy<c||tdNW()>=TDWT)return;T.energy-=c;T.tw[i]=tdWTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[TOWERS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
+    if(a==='put'){const c=tdCost(k);if(T.energy<c)return;T.energy-=c;if(!T.used.includes(k))T.used.push(k);T.tw[i]=tdTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[PETS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
+    if(a==='putw'){const c=tdWCost(k);if(T.energy<c)return;T.energy-=c;T.tw[i]=tdWTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[TOWERS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
     if(a==='up'){const c=tdUpW(w);if(T.energy<c||w.lv>=3)return;T.energy-=c;w.spent+=c;w.lv++;const [x,y]=TDSLOT[i];tdPart(x,y-40,20,['#ffe066','#fff'],180,.6,5);tdTxt(x,y-100,'升級!','#ffe066');sfx('up');tdPick(i);return}
     if(a==='sell'){T.energy+=Math.floor(w.spent*.5);delete T.tw[i];T.sel=null;P.hidden=true}})}
 function tdInfoHtml(){const T=TD,n=tdNP(),nw=T.prep>0?1:T.wave+1,fin=T.mode!=='endless'&&nw>TDW;const ks=fin?[]:[...new Set((T.spawn.length&&T.wave?T.spawn:tdPeek(nw)).map(x=>x.k))].slice(0,6);
-  return `<div class="tdih"><b>${T.S.ic} ${T.SK.n}</b> ${tdBonHtml()}<small>萌獸 ${n}/${TDMAX} · 砲塔 ${tdNW()}/${TDWT} · 點「+」石台放萌獸或砲塔,點已放的可以升級或收回</small></div>
+  return `<div class="tdih"><b>${T.S.ic} ${T.SK.n}</b> ${tdBonHtml()}<small>萌獸 ${n} 座 · 砲塔 ${tdNW()} 座 · 點「+」石台放萌獸或砲塔(同一隻可以重複放),點已放的可以升級或收回</small></div>
   ${fin?'':`<div class="tdiw"><b>${T.spawn.length&&T.wave?'這一波':'下一波'}(第 ${T.spawn.length&&T.wave?T.wave:nw} 波)</b><div>${ks.map(k=>`<span class="tdie"><img src="assets/${ENEMY[k].img}.webp" alt=""><small><span class="el el-${ENEMY[k].el}">${EL[ENEMY[k].el].n}</span>${ENEMY[k].fly?' 飛':''}${ENEMY[k].boss?' 頭目':''}</small></span>`).join('')}</div></div>`}
   <div class="tdit">💡 ${['飛行怪只有遠程萌獸打得到','岩系萌獸專剋高防禦的裝甲怪','冰系減速 + 火系範圍爆炸是好搭檔','能量夠就先升級主力萌獸,3 級射程更遠','提前出怪可以多拿能量','頭目會震暈附近的萌獸,別全部擠在一起'][Math.floor(T.t/8)%6]}</div>`}
 const TDPEEK={};function tdPeek(w){if(!TDPEEK[w+TD.tone]){const s=TD.spawn,st=TD.st;TDPEEK[w+TD.tone]=tdWave(w);TD.spawn=s;TD.st=st}return TDPEEK[w+TD.tone]}
@@ -3416,20 +3416,21 @@ function pTD(){const t=tdSV(),n=tdTix();tdFetch();
     <p class="dim">怪獸大軍沿著蜿蜒小路衝向主城,派出你培養的萌獸守住家園!</p>
     <details class="dropd"><summary>玩法規則</summary><ol class="tdrule">
     <li>每場隨機一種商店的城鎮樣式(春日、秋楓、黃昏、雪國、櫻花祭、星夜、糖果王國),每種樣式對應一個屬性:同屬性萌獸攻擊 +25%,怪物多為剋制它的屬性;糖果王國是彩虹場,所有萌獸 +12%、怪物屬性隨機。</li>
-    <li>點路邊的石台放萌獸,最多 ${TDMAX} 隻;萌獸等級、星數、品質、裝備越好,守得越穩。</li><li>主城蓋好的城牆砲塔也能放,最多 ${TDWT} 座(不佔萌獸名額),強度依你的砲塔等級和主城等級。</li>
+    <li>點路邊的石台放萌獸,同一隻萌獸可以重複放在不同石台,只要能量夠就能放滿;萌獸等級、星數、品質、裝備越好,守得越穩。</li><li>主城蓋好的城牆砲塔也能放(一樣可以重複),強度依你的砲塔等級和主城等級。</li><li>困難要擁有一隻 Lv20 以上的萌獸、地獄要 Lv30 以上,並且通關前一個難度。</li>
     <li>擊倒怪物得「✦能量」,用來放萌獸、場內升級(最高 3 級)或收回萌獸(退一半)。</li>
     <li>屬性招式:🔥範圍爆炸、💧擊退、🌿中毒、⚡連鎖閃電、❄️減速、🪨暈眩;近戰萌獸傷害 +30%,但打不到飛行怪。</li><li>守護、治癒雨、落石每場各能用 1 次,留到關鍵時刻再用!</li>
     <li>怪物闖進城門扣耐久,${TDHP} 點扣光就失敗;撐過 ${TDW} 波(第 10、20 波有頭目)就勝利,依剩餘耐久給 1~3 星。</li>
     <li>每天 ${3} 張守塔券。打贏有星星幣、進化石、糖果,上場的萌獸都能拿碎片和品質精華;每個難度每天第一次勝利再送鑽石,困難、地獄還會掉裝備。</li><li>無盡模式每撐過 1 波,上場萌獸各 +300 經驗、💎2;每週排行前 50 名有鑽石獎勵(寄到信箱)。</li>
     <li>練習模式不耗券、沒有獎勵,可以自己練功。</li></ol></details></div>
     <div class="card ladme"><div class="lm"><b>今日守塔券</b><small>普通/困難/地獄、無盡模式都會用 1 張</small></div><div class="tix"><b>🎫 ${n}</b><small>剩餘</small><button class="blue" data-act="tdBuy" ${t.buy>=TDBUY.length?'disabled':''}>${t.buy<TDBUY.length?'💎'+TDBUY[t.buy]+' +1':'今日已買滿'}</button></div></div>`;
-  h+=`<div class="tdtip">💡 第一次玩建議先按「練習」熟悉玩法(不耗守塔券、沒有獎勵),熟悉後再正式挑戰,避免浪費券。</div><div class="card"><h3>挑戰關卡</h3><div class="tdds">${TDDIFF.map((D,i)=>{const lock=i>0&&!(t.clr[i-1]>0),st=t.clr[i]||0;return `<div class="tdd ${lock?'lock':''}" style="--c:${D.c}"><b>${D.n}</b><span class="tdstars sm">${[0,1,2].map(j=>`<span class="${j<st?'':'off'}">★</span>`).join('')}</span><small>${lock?'先通關'+TDDIFF[i-1].n:t.first[i]?'每日首勝 💎'+[20,40,80][i]:'首通 💎'+[100,200,400][i]}</small><button class="go" data-act="tdGo:normal:${i}" ${lock||n<1?'disabled':''}>挑戰</button><button class="mini" data-act="tdGo:practice:${i}" ${lock?'disabled':''}>練習</button></div>`}).join('')}</div></div>`;
+  const mxl=Math.max(0,...owned().map(k=>SV.pets[k].lv||1)),TDNEED=[0,20,30];
+  h+=`<div class="tdtip">💡 第一次玩建議先按「練習」熟悉玩法(不耗守塔券、沒有獎勵),熟悉後再正式挑戰,避免浪費券。</div><div class="card"><h3>挑戰關卡</h3><div class="tdds">${TDDIFF.map((D,i)=>{const lv0=mxl<TDNEED[i],cl0=i>0&&!(t.clr[i-1]>0),lock=lv0||cl0,st=t.clr[i]||0;return `<div class="tdd ${lock?'lock':''}" style="--c:${D.c}"><b>${D.n}</b><span class="tdstars sm">${[0,1,2].map(j=>`<span class="${j<st?'':'off'}">★</span>`).join('')}</span><small>${lock?[lv0?'需要一隻 Lv'+TDNEED[i]+' 萌獸':'',cl0?'先通關'+TDDIFF[i-1].n:''].filter(Boolean).join('、'):t.first[i]?'每日首勝 💎'+[20,40,80][i]:'首通 💎'+[100,200,400][i]}</small><button class="go" data-act="tdGo:normal:${i}" ${lock||n<1?'disabled':''}>挑戰</button><button class="mini" data-act="tdGo:practice:${i}" ${lock?'disabled':''}>練習</button></div>`}).join('')}</div></div>`;
   const top=TDNET.top||[],me=t.wbest||0;
-  h+=`<div class="card"><h3>♾️ 無盡模式 <small>本週最佳 ${me} 波 · 歷史最佳 ${t.best||0} 波</small></h3><p class="dim">怪物無限湧出,看你能撐幾波!每週一重新計算,每撐過 1 波:上場萌獸各 +300 經驗、💎2。每週一重新計算,前 50 名有鑽石獎勵:第 1 名 💎600、2~3 名 💎400、4~10 名 💎200、11~50 名 💎60;前 3 名再送一週限定稱號「🛡️守塔英雄」。</p>
+  h+=`<div class="card"><h3>♾️ 無盡模式 <small>本週最佳 ${me} 波 · 歷史最佳 ${t.best||0} 波</small></h3><p class="dim">怪物無限湧出,看你能撐幾波!每撐過 1 波:上場萌獸各 +300 經驗、💎2。每週一重新計算,前 50 名有鑽石獎勵:第 1 名 💎600、2~3 名 💎400、4~10 名 💎200、11~50 名 💎60;前 3 名再送一週限定稱號「🛡️守塔英雄」。</p>
     <div class="bt"><button class="go" data-act="tdGo:endless:0" ${n<1?'disabled':''}>開始無盡模式</button></div>
     <h3 style="margin-top:10px">本週排行</h3>${SRV.on()?(TDNET.top?`<ol class="tdlb">${top.slice(0,50).map((r,i)=>`<li class="${r.me?'me':''}"><b>${i+1}</b><span>${esc(r.n||'守護員')}</span><i>${r.w} 波</i></li>`).join('')||'<p class="dim">本週還沒有人上榜,快來搶第一!</p>'}</ol>`:'<p class="dim">讀取中…</p>'):'<p class="dim">登入後才會顯示排行</p>'}</div>`;
   return h}
-Object.assign(ACT,{tdGo:(m,d)=>{if(!tdOpen())return;if(!SV.team.some(k=>k&&SV.pets[k])&&!owned().length)return;tdStart(m,+d||0)},
+Object.assign(ACT,{tdGo:(m,d)=>{if(!tdOpen())return;d=+d||0;if(m!=='endless'&&d>0){const mxl=Math.max(0,...owned().map(k=>SV.pets[k].lv||1));if(mxl<[0,20,30][d])return toast(`需要一隻 Lv${[0,20,30][d]} 以上的萌獸`);if(!(tdSV().clr[d-1]>0))return toast('先通關'+TDDIFF[d-1].n)}if(!SV.team.some(k=>k&&SV.pets[k])&&!owned().length)return;tdStart(m,+d||0)},
   tdBuy:()=>{const t=tdSV();if(t.buy>=TDBUY.length)return;const c=TDBUY[t.buy];if(SV.gem<c)return toast('鑽石不足');spendGem(c);t.buy++;toast('守塔券 +1');SRV.sync()}});
 // pointer
 (function(){const L=$('tdLayer');if(!L)return;L.addEventListener('pointerdown',e=>{if(!TD)return;e.preventDefault();tdTap(e.clientX,e.clientY)})})();
