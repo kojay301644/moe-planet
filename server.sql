@@ -151,8 +151,12 @@ begin select moe_vip(topup) into v from wallet where uid = auth.uid(); v := coal
   return ladder_json(L, (v>=1)::int + (v>=7)::int); end $$;
 
 -- 回報一場天梯:伺服器檢查挑戰次數、戰力差距、戰鬥時間,再計算分數
-create or replace function public.ladder_report(p_win boolean, p_opp_pts int, p_opp_pw int, p_my_pw int, p_secs real) returns jsonb language plpgsql security definer set search_path = public as $$
-declare u uuid := moe_uid(); L ladder := ladder_row(); v int; extra int; g int; ok boolean := true;
+create table if not exists public.ladder_def(id bigserial primary key, attacker uuid not null, defender uuid not null, att_win boolean not null, at timestamptz not null default now(), revenged boolean not null default false);
+create index if not exists ladder_def_idx on public.ladder_def(defender, id);
+alter table public.ladder_def enable row level security;
+drop function if exists public.ladder_report(boolean,int,int,int,real,uuid,bigint);
+create or replace function public.ladder_report(p_win boolean, p_opp_pts int, p_opp_pw int, p_my_pw int, p_secs real, p_opp_uid uuid default null, p_rev bigint default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); L ladder := ladder_row(); v int; extra int; g int; ok boolean := true; rv boolean := false;
 begin
   select moe_vip(topup) into v from wallet where uid = u; v := coalesce(v,0); extra := (v>=1)::int + (v>=7)::int;
   if L.used >= 5 + extra + L.bought then raise exception 'no tickets'; end if;
@@ -162,6 +166,7 @@ begin
   if p_win and ok then
     g := round(least(greatest(25 + (p_opp_pts - L.pts) / 10.0, 12), 40));
     if L.ls >= 3 then g := round(g * 1.5); end if;
+    if p_rev is not null then update ladder_def set revenged = true where id = p_rev and defender = u and attacker = p_opp_uid and att_win and not revenged and at > now() - interval '1 day'; rv := found; if rv then g := g + 5; end if; end if;
     L.pts := L.pts + g; L.w := L.w + 1; L.ls := 0;
   else
     g := round(least(greatest(15 + (L.pts - p_opp_pts) / 12.0, 6), 25));
@@ -169,7 +174,8 @@ begin
   end if;
   L.best := greatest(L.best, L.pts); L.used := L.used + 1;
   update ladder set pts=L.pts, best=L.best, w=L.w, l=L.l, ls=L.ls, used=L.used, flags=L.flags, last_at=now(), updated_at=now() where uid = u;
-  return ladder_json(L, extra) || jsonb_build_object('delta', g, 'ok', ok);
+  if p_opp_uid is not null and p_opp_uid <> u and p_rev is null then insert into ladder_def(attacker, defender, att_win) values (u, p_opp_uid, p_win and ok); delete from ladder_def where at < now() - interval '7 days'; end if;
+  return ladder_json(L, extra) || jsonb_build_object('delta', g, 'ok', ok, 'rev', rv);
 end $$;
 
 create or replace function public.ladder_buy() returns jsonb language plpgsql security definer set search_path = public as $$
@@ -890,3 +896,10 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 grant execute on function public.report_error(text,text,text) to authenticated;
+
+-- 天梯防守紀錄:誰挑戰過我(最近 20 筆)
+create or replace function public.ladder_defs() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare u uuid := moe_uid();
+begin return (select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'uid', x.attacker, 'win', x.att_win, 'at', x.at, 'rev', x.revenged, 'n', d.data->>'n', 'team', d.data->'team', 'pw', (d.data->>'pw')::int, 'pts', coalesce(l.pts,0)) order by x.id desc), '[]'::jsonb)
+  from (select * from ladder_def where defender = u order by id desc limit 20) x left join docs d on d.path = 'arena/' || x.attacker::text left join ladder l on l.uid = x.attacker); end $$;
+grant execute on function public.ladder_defs() to authenticated;
