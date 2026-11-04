@@ -876,6 +876,7 @@ begin
     end loop;
   end loop;
   delete from events where at < now() - interval '1 day';
+  perform bot_td();
   return n;
 end $$;
 -- 跑馬燈讀取:順便讓電腦玩家活動,回傳最近 1 小時最新 5 則
@@ -905,3 +906,48 @@ declare u uuid := moe_uid();
 begin return (select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'uid', x.attacker, 'win', x.att_win, 'at', x.at, 'rev', x.revenged, 'n', d.data->>'n', 'team', d.data->'team', 'pw', (d.data->>'pw')::int, 'pts', coalesce(l.pts,0)) order by x.id desc), '[]'::jsonb)
   from (select * from ladder_def where defender = u order by id desc limit 20) x left join docs d on d.path = 'arena/' || x.attacker::text left join ladder l on l.uid = x.attacker); end $$;
 grant execute on function public.ladder_defs() to authenticated;
+
+-- ============ 守塔挑戰:無盡模式週排行 ============
+create table if not exists public.td_week(uid uuid not null, wk int not null, best int not null default 0, secs int not null default 0, at timestamptz not null default now(), claimed boolean not null default false, primary key(uid, wk));
+alter table public.td_week enable row level security;
+alter table public.bots add column if not exists td_wk int not null default 0;
+alter table public.bots add column if not exists td_best int not null default 0;
+create or replace function public.td_report(p_wave int, p_secs int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); w int := moe_week(); b int;
+begin
+  if p_wave is null or p_wave < 1 or p_wave > 500 then return jsonb_build_object('ok',false); end if;
+  if p_secs < p_wave * 6 then return jsonb_build_object('ok',false,'err','too fast'); end if;
+  insert into td_week(uid, wk, best, secs) values (u, w, p_wave, p_secs)
+    on conflict (uid, wk) do update set best = greatest(td_week.best, excluded.best), secs = case when excluded.best > td_week.best then excluded.secs else td_week.secs end, at = case when excluded.best > td_week.best then now() else td_week.at end;
+  select best into b from td_week where uid = u and wk = w;
+  return jsonb_build_object('ok',true,'best',b);
+end $$;
+create or replace function public.td_board(p_wk int) returns table(uid uuid, bot bigint, n text, w int, at timestamptz) language sql stable security definer set search_path = public as $$
+  select * from (
+    select t.uid, null::bigint, coalesce(d.data->>'n','守護員'), t.best, t.at from td_week t left join docs d on d.path = 'arena/' || t.uid::text
+      where t.wk = p_wk and not exists (select 1 from bans x where x.uid = t.uid and (x.until is null or x.until > now()))
+    union all
+    select null::uuid, b.id, b.name, b.td_best, b.created from bots b where b.active and b.td_wk = p_wk and b.td_best > 0) q
+  order by 4 desc, 5 asc $$;
+create or replace function public.td_top(p_limit int default 50) returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('n',n,'w',w,'me',coalesce(uid = auth.uid(),false))), '[]'::jsonb) from (select * from td_board(moe_week()) limit least(greatest(p_limit,1),100)) q $$;
+create or replace function public.td_claim() returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); pw int := moe_week() - 1; r int; g int; T td_week;
+begin
+  select * into T from td_week where uid = u and wk = pw for update;
+  if T.uid is null or T.claimed then return jsonb_build_object('gem',0); end if;
+  select rn into r from (select uid, row_number() over () rn from td_board(pw)) q where q.uid = u;
+  update td_week set claimed = true where uid = u and wk = pw;
+  g := case when r is null then 0 when r = 1 then 300 when r <= 3 then 200 when r <= 10 then 100 when r <= 50 then 30 else 0 end;
+  if g > 0 then
+    insert into inbox(uid, gem, note, title, kind) values (u, g, '上週守塔挑戰無盡模式第 ' || r || ' 名(' || T.best || ' 波),獎勵請收下!', '🛡️ 守塔排行獎勵', 'system');
+  end if;
+  return jsonb_build_object('gem',g,'rank',r);
+end $$;
+-- 電腦玩家每週也會挑戰無盡模式(依戰力決定撐幾波)
+create or replace function public.bot_td() returns void language sql security definer set search_path = public as $$
+  update bots set td_wk = moe_week(), td_best = case when td_wk <> moe_week() then 0 else td_best end where active and td_wk <> moe_week();
+  update bots set td_best = greatest(td_best, floor(8 + power / 900.0 + random() * 10)::int) where active and random() < .08;
+$$;
+revoke execute on function public.bot_td(), public.td_board(int) from public, anon, authenticated;
+grant execute on function public.td_report(int,int), public.td_top(int), public.td_claim() to authenticated;
