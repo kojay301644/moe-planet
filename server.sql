@@ -11,6 +11,7 @@ create table if not exists public.wallet(
   flags int not null default 0, bank int not null default 0,
   updated_at timestamptz not null default now());
 alter table public.wallet add column if not exists bank int not null default 0;
+alter table public.wallet add column if not exists free_at timestamptz;
 create table if not exists public.gem_log(id bigserial primary key, uid uuid not null, delta int not null, reason text, at timestamptz not null default now());
 create table if not exists public.pay_first(uid uuid, pkg text, primary key(uid,pkg));
 alter table public.wallet enable row level security;
@@ -42,10 +43,10 @@ begin
   insert into wallet(uid) values (u) on conflict (uid) do nothing;
   insert into player_day values (u, moe_today()) on conflict do nothing;
   select * into w from wallet where uid = u;
-  return jsonb_build_object('gem',w.gem,'topup',w.topup,'pity',w.pity,'dpity',w.dpity,'bank',w.bank);
+  return jsonb_build_object('gem',w.gem,'topup',w.topup,'pity',w.pity,'dpity',w.dpity,'bank',w.bank,'free_at',w.free_at);
 end $$;
 
--- 同步:遊戲中賺到的鑽石(每天最多入帳 1000,超過的先存著,之後每天陸續入帳)與花掉的鑽石
+-- 同步:遊戲中賺到的鑽石(每天最多入帳 5000,超過的先存著,之後每天陸續入帳)與花掉的鑽石
 create or replace function public.gem_sync(p_earn int, p_spend int) returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); w wallet; e int; s int;
 begin
@@ -54,7 +55,7 @@ begin
   if w.earn_day is distinct from moe_today() then w.earn_day := moe_today(); w.earn_today := 0; end if;
   insert into player_day values (u, moe_today()) on conflict do nothing;
   w.bank := least(w.bank + greatest(coalesce(p_earn,0),0), 20000);
-  e := least(w.bank, greatest(1000 - w.earn_today, 0));
+  e := least(w.bank, greatest(5000 - w.earn_today, 0));
   w.bank := w.bank - e;
   s := greatest(coalesce(p_spend,0),0);
   w.gem := w.gem + e; w.earn_today := w.earn_today + e;
@@ -67,7 +68,8 @@ begin
 end $$;
 
 -- 伺服器抽卡(單抽 160、十連 1440)
-create or replace function public.summon(p_n int, p_wish text default null) returns jsonb language plpgsql security definer set search_path = public as $$
+drop function if exists public.summon(int,text);
+create or replace function public.summon(p_n int, p_wish text default null, p_free boolean default false) returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); w wallet; cost int; res jsonb := '[]'::jsonb; i int; r float; q int; k text; tot float; acc float;
   ks text[] := array['fox','otter','penguin','pango','ferret','whale','bear','dragon','bunny','mouse','mole','puffer','owl','lizard','deer','moth','armad','seal','marten','phoenix'];
   ws float[] := array[1,1,1,1,1,1,.5,.08,1,1,1,1,1,1,1,1,.5,.5,.5,.08];
@@ -75,9 +77,14 @@ declare u uuid := moe_uid(); w wallet; cost int; res jsonb := '[]'::jsonb; i int
 begin
   up := to_regclass('public.game_event') is not null and exists (select 1 from game_event where kind = 'sumup' and starts <= now() and ends > now());
   if p_n not in (1,10) then raise exception 'bad n'; end if;
-  cost := case when p_n = 10 then 1440 else 160 end;
+  cost := case when p_free then 0 when p_n = 10 then 1440 else 160 end;
   select * into w from wallet where uid = u for update;
-  if not found or w.gem < cost then raise exception 'not enough gem'; end if;
+  if not found then raise exception 'not enough gem'; end if;
+  if p_free then
+    if p_n <> 1 then raise exception 'bad n'; end if;
+    if w.free_at is not null and w.free_at > now() - interval '24 hours' then raise exception '免費召喚還在冷卻中'; end if;
+    update wallet set free_at = now() where uid = u;
+  elsif w.gem < cost then raise exception 'not enough gem'; end if;
   w.gem := w.gem - cost;
   select sum(x) into tot from unnest(ws) x;
   for i in 1..p_n loop
@@ -96,8 +103,8 @@ begin
     res := res || jsonb_build_object('k',k,'q',q);
   end loop;
   update wallet set gem = w.gem, pity = w.pity, dpity = w.dpity, updated_at = now() where uid = u;
-  insert into gem_log(uid,delta,reason) values (u, -cost, 'summon'||p_n);
-  return jsonb_build_object('gem',w.gem,'pity',w.pity,'dpity',w.dpity,'res',res);
+  insert into gem_log(uid,delta,reason) values (u, -cost, case when p_free then 'summon_free' else 'summon'||p_n end);
+  return jsonb_build_object('gem',w.gem,'pity',w.pity,'dpity',w.dpity,'res',res,'free_at',(select free_at from wallet where uid = u));
 end $$;
 
 -- 測試用儲值(之後串金流時改成由金流通知呼叫)
@@ -356,7 +363,7 @@ begin
 end $$;
 grant execute on function public.delete_account() to authenticated;
 
-grant execute on function public.wallet_init(int), public.gem_sync(int,int), public.summon(int,text), public.topup_test(text),
+grant execute on function public.wallet_init(int), public.gem_sync(int,int), public.summon(int,text,boolean), public.topup_test(text),
   public.ladder_me(), public.ladder_report(boolean,int,int,int,real), public.ladder_buy(), public.ladder_top(int),
   public.market_list(jsonb,int), public.market_browse(), public.market_mine(), public.market_buy(bigint), public.market_cancel(bigint), public.inbox_claim() to authenticated;
 revoke execute on function public.ladder_row(), public.ladder_json(ladder,int) from public, anon, authenticated;
