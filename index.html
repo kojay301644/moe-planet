@@ -3174,7 +3174,7 @@ function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?
    ${T.mode==='normal'&&win?`<div class="tdstars">${[0,1,2].map(i=>`<span class="${i<stars?'':'off'}">★</span>`).join('')}</div>`:''}
    <p>${T.mode==='endless'?`撐過 <b>${Math.max(0,cl)}</b> 波`:`第 ${Math.min(T.wave,TDW)} / ${TDW} 波 · 城門剩 ${T.hp} / ${TDHP}`} · 擊倒 ${T.kills} 隻</p>
    <ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul>${!win?tdTips():T.mode==='normal'&&stars<3?tdTips(`💪 想拿 3 星?城門剩 15 以上就是 3 星`):''}<button class="go" id="tdBack">回到城鎮</button></div>`;iconize(R);$('tdBack').onclick=()=>{sfx('click');tdQuit()};R.querySelectorAll('[data-tgo]').forEach(b=>b.onclick=()=>{sfx('click');const [s2,tb]=b.dataset.tgo.split(':');tdQuit();setTimeout(()=>{closeSheet();openSheet(s2,tb||null)},60)})}
-const TDAURA=false,TDAU={golem:'au_golem'},TDAUN=16;Object.values(TDAU).forEach(img);
+const TDAURA=false,TDAU={golem:'au_golem',worm:'au_worm',yking:'au_yking',serpent:'au_serpent',titan:'au_titan',lich:'au_lich'},TDAUN=16;Object.values(TDAU).forEach(img);
 function tdAuraFx(e,X,Y,w,ta,front){const im=IMG[TDAU[e.k]];if(!im||!im.naturalWidth)return;const fw=im.naturalWidth/TDAUN,fh=im.naturalHeight,fi=Math.floor(ta*14)%TDAUN,dw=w*1.35,dh=dw*fh/fw,y0=Y-dh*.74;ctx.save();ctx.beginPath();if(front)ctx.rect(X-dw,Y-dh*.08,dw*2,dh*2);else ctx.rect(X-dw,y0-dh,dw*2,dh+(Y-dh*.08-y0));ctx.clip();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=front?.7:.8;ctx.drawImage(im,fi*fw,0,fw,fh,X-dw/2,y0,dw,dh);ctx.restore()}
 const TDWALK={golem:'bw_golem',worm:'bw_worm',yking:'bw_yking',serpent:'bw_serpent',titan:'bw_titan',lich:'bw_lich'},TDWN=12;Object.values(TDWALK).forEach(img);
 function tdBossAura(e,X,Y,w,ta){const s=TDV.s,el=e.E.el,k=e.k,R=w*.55;ctx.save();
