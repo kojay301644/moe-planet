@@ -24,8 +24,16 @@ create policy gem_log_read on public.gem_log for select to authenticated using (
 
 create table if not exists public.bans(uid uuid primary key, reason text, until timestamptz, at timestamptz not null default now());
 alter table public.bans enable row level security;
+-- 單一裝置登入:每次開遊戲產生新的登入憑證,舊裝置的憑證就失效
+create table if not exists public.sessions(uid uuid primary key, sid uuid not null, dev text, at timestamptz not null default now(), seen timestamptz not null default now());
+alter table public.sessions enable row level security;
+create or replace function public.moe_sid() returns uuid language sql stable as $$
+  select nullif(coalesce((nullif(current_setting('request.headers', true),'')::json)->>'x-moe-sid',''),'')::uuid $$;
+create or replace function public.moe_sess_ok() returns boolean language sql stable security definer set search_path = public as $$
+  select moe_sid() is null or auth.uid() is null or not exists (select 1 from sessions s where s.uid = auth.uid() and s.sid <> moe_sid()) $$;
 create or replace function public.moe_uid() returns uuid language plpgsql stable security definer set search_path = public as $$
 begin if auth.uid() is null then raise exception 'not signed in'; end if;
+  if not moe_sess_ok() then raise exception 'kicked'; end if;
   if exists (select 1 from bans where uid = auth.uid() and (until is null or until > now())) then raise exception 'banned'; end if;
   if to_regclass('public.settings') is not null and exists (select 1 from settings where k = 'maint' and (v->>'on')::boolean)
      and not exists (select 1 from admins where uid = auth.uid()) then raise exception 'maintenance'; end if;
@@ -462,6 +470,7 @@ begin
     'ladder', (select to_jsonb(l) from ladder l where uid = p_uid),
     'arena', (select data - 'chat' - 'cm' from docs where path = 'arena/' || p_uid::text),
     'ban', (select to_jsonb(b) from bans b where uid = p_uid and (until is null or until > now())),
+    'sess', (select jsonb_build_object('dev', dev, 'at', at, 'seen', seen) from sessions where uid = p_uid),
     'log', (select coalesce(jsonb_agg(to_jsonb(g) order by g.id desc), '[]'::jsonb) from (select * from gem_log where uid = p_uid order by id desc limit 60) g),
     'market', (select coalesce(jsonb_agg(to_jsonb(m) order by m.id desc), '[]'::jsonb) from (select * from market where seller = p_uid or buyer = p_uid order by id desc limit 30) m));
 end $$;
@@ -951,3 +960,22 @@ create or replace function public.bot_td() returns void language sql security de
 $$;
 revoke execute on function public.bot_td(), public.td_board(int) from public, anon, authenticated;
 grant execute on function public.td_report(int,int), public.td_top(int), public.td_claim() to authenticated;
+
+-- ============ 單一裝置登入 ============
+create or replace function public.session_start(p_dev text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := auth.uid(); s uuid := gen_random_uuid();
+begin if u is null then raise exception 'not signed in'; end if;
+  insert into sessions(uid, sid, dev, at, seen) values (u, s, left(coalesce(p_dev,''),60), now(), now())
+    on conflict (uid) do update set sid = excluded.sid, dev = excluded.dev, at = now(), seen = now();
+  return jsonb_build_object('sid', s); end $$;
+create or replace function public.session_ping(p_sid uuid) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := auth.uid(); S sessions;
+begin if u is null then return jsonb_build_object('ok', true); end if;
+  select * into S from sessions where uid = u;
+  if S.uid is null then return jsonb_build_object('ok', true); end if;
+  if S.sid <> p_sid then return jsonb_build_object('ok', false, 'dev', S.dev); end if;
+  update sessions set seen = now() where uid = u; return jsonb_build_object('ok', true); end $$;
+grant execute on function public.session_start(text), public.session_ping(uuid) to authenticated;
+-- 被擠掉的裝置不能再寫入存檔
+drop policy if exists docs_sess on public.docs;
+create policy docs_sess on public.docs as restrictive for all to authenticated using (moe_sess_ok()) with check (moe_sess_ok());

@@ -783,15 +783,23 @@ function save(){if(ACC.deleted)return;SV.lastSeen=Date.now();SV.t=Date.now();try
 const ACC={cloud:false,db:null,uid:null,name:'',dirty:0,busy:0,checked:false,canWrite:true};
 const cloudRef=()=>ACC.db.doc('data/users/'+ACC.uid+'/save');
 async function cloudRead(){try{const d=await cloudRef().get();if(!d.exists)return null;const b=d.data();if((b.v||0)<4)return null;return Object.assign(DEF(),JSON.parse(b.json))}catch(e){return null}}
-async function cloudWrite(force){if(!ACC.cloud||ACC.busy||(!ACC.dirty&&!force))return;ACC.busy=1;ACC.dirty=0;
+async function cloudWrite(force){if(!ACC.cloud||SES.kicked||ACC.busy||(!ACC.dirty&&!force))return;ACC.busy=1;ACC.dirty=0;
   try{await cloudRef().set({json:JSON.stringify(SV),t:SV.t||Date.now(),v:4});setAcc()}catch(e){ACC.dirty=1;if(e&&e.code==='invalid_argument'){ACC.cloud=false;ACC.canWrite=false;setAcc()}}ACC.busy=0}
+const SES={sid:null,kicked:false,t:0};
+function devName(){const u=navigator.userAgent||'';const os=/iPhone/.test(u)?'iPhone':/iPad/.test(u)?'iPad':/Android/.test(u)?'Android':/Windows/.test(u)?'Windows':/Mac/.test(u)?'Mac':'其他裝置';const br=/CriOS|Chrome/.test(u)&&!/Edg/.test(u)?'Chrome':/Edg/.test(u)?'Edge':/Firefox|FxiOS/.test(u)?'Firefox':/Safari/.test(u)?'Safari':'瀏覽器';return os+' · '+br+(matchMedia('(display-mode: standalone)').matches?'(桌面捷徑)':'')}
+async function sessStart(){if(!window.MOE_SB)return;try{const {data,error}=await MOE_SB.rpc('session_start',{p_dev:devName()});if(error||!data||!data.sid)return;SES.sid=data.sid;SES.t=Date.now();if(MOE_SB.rest&&MOE_SB.rest.headers)MOE_SB.rest.headers['x-moe-sid']=SES.sid}catch(e){}}
+async function sessPing(){if(!SES.sid||SES.kicked||!window.MOE_SB)return;try{const {data,error}=await MOE_SB.rpc('session_ping',{p_sid:SES.sid});if(!error&&data&&data.ok===false)sessKicked(data.dev)}catch(e){}}
+function sessKicked(dev){if(SES.kicked)return;SES.kicked=true;try{if(TD)TD.paused=true}catch(e){}const d=document.createElement('div');d.className='ov';d.id='kickOv';d.style.zIndex=120;
+  d.innerHTML=`<div class="tbox"><h2>⚠️ 帳號已在其他裝置登入</h2><p>你的帳號剛剛在${dev?'「'+esc(dev)+'」':'另一台裝置'}開啟,這台已經暫停,避免兩邊同時遊玩造成進度錯亂。</p><p class="mut">如果不是你本人登入,請盡快到「設定」修改密碼。</p><button class="go big" id="kickGo">在這台繼續玩</button></div>`;
+  document.body.appendChild(d);$('kickGo').onclick=()=>location.reload()}
+setInterval(sessPing,30000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sessPing()});
 setInterval(()=>cloudWrite(),10000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')cloudWrite()});
 function setAcc(){const el=$('accInfo');if(!el)return;el.textContent=!ACC.checked?'連線中…':ACC.cloud?`☁ 已登入${ACC.name?':'+ACC.name:''} · 進度雲端保存`:ACC.uid&&!ACC.canWrite?'👤 已登入,但沒有寫入權限:以遊客身分保存在這台裝置':'👤 遊客模式 · 進度只存在這台裝置'}
 async function accInit(){const C=window.claude;let user=null,db=null;
   try{if(C&&C.use){[user,db]=await Promise.all([C.use('user'),C.use('db')])}}catch(e){}
   const id=user?await user.id():null;if(user){const me=await user.me();ACC.name=me.name||''}if(window.MOE_AUTH){try{ACC.auth=await MOE_AUTH.info();if(ACC.auth.name)ACC.name=ACC.auth.name}catch(e){}}
   ACC.uid=id;ACC.db=db;ACC.checked=true;
-  if(id&&db){const cloud=await cloudRead();ACC.cloud=true;
+  if(id&&db){await sessStart();const cloud=await cloudRead();ACC.cloud=true;
     let wantCloud=false;try{wantCloud=!!localStorage.getItem('moe.login');localStorage.removeItem('moe.login')}catch(e){}
     if(cloud&&(wantCloud||!SV.started||SV.uid===id&&(cloud.t||0)>=(SV.t||0))){SV=cloud;SV.uid=id;saveLocalOnly()}
     else if(cloud&&SV.started&&SV.uid!==id){await chooseSave(cloud)}
@@ -800,8 +808,8 @@ async function accInit(){const C=window.claude;let user=null,db=null;
 /* ---------- 伺服器驗證:鑽石錢包、抽卡、天梯、玩家交易所(只有網頁版、而且伺服器 SQL 已安裝時才啟用) ---------- */
 const SRV={ok:0,last:null,earn:0,spend:0,q:Promise.resolve(),bankT:0,
   on(){return !!(SRV.ok&&window.MOE_SB&&ACC.cloud)},
-  msg(m){m=String(m||'');return /not enough gem/.test(m)?'鑽石不足':/no tickets/.test(m)?'今天的挑戰券用完了':/too fast/.test(m)?'太快了,請稍等幾秒再試':/^limit/.test(m)?'今天已買滿 10 次':/banned/.test(m)?'帳號已被停權':/maintenance/.test(m)?(setTimeout(maintCheck,0),'遊戲維護中'):/not signed/.test(m)?'還沒連上伺服器,請重新整理':/[一-鿿]/.test(m)?m:'伺服器忙碌中,請稍後再試'},
-  async rpc(fn,a){const {data,error}=await withTimeout(MOE_SB.rpc(fn,a||{}),12000);if(error){const e=new Error(SRV.msg(error.message));e.raw=error.message;throw e}return data},
+  msg(m){m=String(m||'');return /kicked/.test(m)?'帳號已在其他裝置登入':/not enough gem/.test(m)?'鑽石不足':/no tickets/.test(m)?'今天的挑戰券用完了':/too fast/.test(m)?'太快了,請稍等幾秒再試':/^limit/.test(m)?'今天已買滿 10 次':/banned/.test(m)?'帳號已被停權':/maintenance/.test(m)?(setTimeout(maintCheck,0),'遊戲維護中'):/not signed/.test(m)?'還沒連上伺服器,請重新整理':/[一-鿿]/.test(m)?m:'伺服器忙碌中,請稍後再試'},
+  async rpc(fn,a){if(SES.kicked)throw new Error('帳號已在其他裝置登入');const {data,error}=await withTimeout(MOE_SB.rpc(fn,a||{}),12000);if(error){if(/kicked/.test(error.message||''))sessPing();const e=new Error(SRV.msg(error.message));e.raw=error.message;throw e}return data},
   watch(){if(SRV.last==null)return;const d=Math.round(SV.gem-SRV.last);if(d>0)SRV.earn+=d;else if(d<0)SRV.spend-=d;SRV.last=SV.gem},
   adopt(g){if(g==null)return;const x=SV.gem-SRV.last;SV.gem=g+x;SRV.last=g;townHud()},
   run(f){const p=SRV.q.then(f,f);SRV.q=p.catch(()=>{});return p},
