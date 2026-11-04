@@ -700,7 +700,7 @@ end $$;
 create or replace function public.admin_tickets(p_status text default 'open') returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
 declare a uuid := moe_admin();
 begin return (select coalesce(jsonb_agg(to_jsonb(t) || jsonb_build_object('name', d.data->>'n', 'acct', split_part(coalesce(u.email,''),'@',1)) order by t.id desc), '[]'::jsonb)
-  from (select * from tickets where p_status = 'all' or status = p_status order by id desc limit 100) t left join docs d on d.path = 'arena/' || t.uid::text left join auth.users u on u.id = t.uid); end $$;
+  from (select * from tickets where case when p_status = 'err' then cat = '系統錯誤' else cat is distinct from '系統錯誤' and (p_status = 'all' or status = p_status) end order by id desc limit 100) t left join docs d on d.path = 'arena/' || t.uid::text left join auth.users u on u.id = t.uid); end $$;
 create or replace function public.admin_ticket_reply(p_id bigint, p_reply text, p_close boolean) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); t tickets;
 begin
@@ -878,3 +878,15 @@ begin
 end $$;
 revoke execute on function public.bot_tick() from public, anon, authenticated;
 grant execute on function public.events_feed() to authenticated;
+
+-- ============ 遊戲錯誤自動回報(顯示在後台「客服回報 → 系統錯誤」) ============
+create or replace function public.report_error(p_msg text, p_stack text, p_ctx text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := auth.uid(); b text := left(coalesce(p_msg,''),300) || chr(10) || left(coalesce(p_ctx,''),300) || chr(10) || left(coalesce(p_stack,''),900);
+begin
+  if u is null then return jsonb_build_object('ok', false); end if;
+  if (select count(*) from tickets where uid = u and cat = '系統錯誤' and at > now() - interval '1 hour') >= 10 then return jsonb_build_object('ok', false); end if;
+  if exists (select 1 from tickets where uid = u and cat = '系統錯誤' and left(body, 300) = left(b, 300) and at > now() - interval '1 day') then return jsonb_build_object('ok', false); end if;
+  insert into tickets(uid, cat, body) values (u, '系統錯誤', b);
+  return jsonb_build_object('ok', true);
+end $$;
+grant execute on function public.report_error(text,text,text) to authenticated;

@@ -275,9 +275,9 @@ A.mutego=async uid=>{try{await rpc('admin_mute',{p_uid:uid,p_hours:+$('mh').valu
 A.unmute=async uid=>{try{await rpc('admin_mute',{p_uid:uid,p_hours:-1,p_reason:null});toast('已解除禁言');render()}catch(e){toast(e.message)}};
 // ---------- 客服回報 ----------
 let TKS='open';
-V.tickets=async()=>{const L=await rpc('admin_tickets',{p_status:TKS});return `<div class="card"><div class="row">${[['open','待處理'],['replied','已回覆'],['closed','已結案'],['all','全部']].map(([k,n])=>`<button class="s ${TKS===k?'p':''}" data-a="tks:${k}">${n}</button>`).join('')}</div></div>
+V.tickets=async()=>{const L=await rpc('admin_tickets',{p_status:TKS});return `<div class="card"><div class="row">${[['open','待處理'],['replied','已回覆'],['closed','已結案'],['all','全部'],['err','⚠ 系統錯誤']].map(([k,n])=>`<button class="s ${TKS===k?'p':''}" data-a="tks:${k}">${n}</button>`).join('')}</div></div>
   ${L.map(t=>`<div class="card act"><div class="row"><b style="flex:1">${esc(t.cat||'其他')} · <a href="#" data-a="pdet:${t.uid}">${esc(t.name||'玩家')}</a> <span class="mut">${esc(t.acct||'')}</span></b><span class="tag ${t.status==='open'?'warn':t.status==='replied'?'ok':''}">${{open:'待處理',replied:'已回覆',closed:'已結案'}[t.status]}</span><span class="mut">${tm(t.at)}</span></div>
-    <p style="margin:0;white-space:pre-wrap">${esc(t.body)}</p>${t.reply?`<p class="mut" style="margin:0">💬 已回覆:${esc(t.reply)}</p>`:''}
+    <p style="margin:0;white-space:pre-wrap;${t.cat==='系統錯誤'?'font-family:monospace;font-size:12px;overflow-wrap:anywhere':''}">${esc(t.body)}</p>${t.reply?`<p class="mut" style="margin:0">💬 已回覆:${esc(t.reply)}</p>`:''}
     ${t.status!=='closed'?`<div class="row"><input id="tr${t.id}" placeholder="回覆內容(會寄到玩家信箱)"><button class="p" data-a="treply:${t.id}:0">回覆</button><button data-a="treply:${t.id}:1">回覆並結案</button></div>`:''}</div>`).join('')||'<div class="card empty">沒有回報單</div>'}`};
 A.tks=k=>{TKS=k;render()};
 A.treply=async(id,close)=>{const r=($('tr'+id)||{}).value||'';if(!r.trim()&&close!=='1')return toast('請輸入回覆內容');try{await rpc('admin_ticket_reply',{p_id:+id,p_reply:r,p_close:close==='1'});toast(r.trim()?'已回覆,玩家會在信箱看到':'已結案');render()}catch(e){toast(e.message)}};
