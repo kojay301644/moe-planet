@@ -3178,7 +3178,7 @@ function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?
 function tdTower(k,slot){const P=PETS[k],s=SV.pets[k],S=stat(k);return {k,slot,lv:1,spent:tdCost(k),cd:.5,skT:P.sk.cd*.8,atk:S.atk,crit:S.crit||.05,rate:P.rate,el:P.el,far:P.range!=='melee',img:imgName(k),face:1,anim:rnd()*9,hit:0,stun:0,q:qOf(k)}}
 function tdWTower(tk,slot){const T2=TOWERS[tk],lv=towerLv(tk);return {k:'wt:'+tk,wt:tk,slot,lv:1,plv:lv,spent:tdWCost(tk),cd:.5,skT:1e9,atk:T2.dmg*(1+.35*(lv-1))*(3+.5*(SV.castle||1)),crit:.05,rate:T2.rate,el:T2.el,far:true,img:T2.img,face:1,anim:rnd()*9,hit:0,stun:0,q:0}}
 const tdWCost=tk=>50+10*towerLv(tk),tdUpW=w=>w.wt?(w.lv===1?70:110):tdUpC(w.k,w.lv),tdNP=()=>Object.values(TD.tw).filter(w=>!w.wt).length,tdNW=()=>Object.values(TD.tw).filter(w=>w.wt).length;
-const tdRange=w=>(w.far?205:185)*(w.lv===3?1.12:1);
+const TDRG=[1,1.15,1.3],tdRange=w=>(w.far?205:185)*TDRG[w.lv-1];
 const tdAtk=w=>w.atk*TDLVM[w.lv-1]*tdBon(w.el)*(w.far?1:1.3);
 function tdSpawn(x){const T=TD,E=ENEMY[x.k],w=T.wave,m=tdHpMul(w)*TDDIFF[T.diff].hp*(x.boss?1:x.elite?2.5:1);let hp=E.hp*m*(x.boss?.55:1);
   const e={id:++T.uid,k:x.k,E,d:x.d||0,hp,max:hp,spd:(36+E.spd*330)*(x.boss?.85:1),slow:0,slowT:0,stun:0,poi:0,poiT:0,fly:!!E.fly,boss:!!x.boss,elite:!!x.elite,anim:rnd()*9,rev:E.revive?1:0,heal:E.shield?2.5:0,sk:4+rnd()*2,hitT:0};
@@ -3291,6 +3291,7 @@ function tdDraw(){const T=TD;tdLayout();const s=TDV.s,TO=T.S,SK=T.SK,sh=T.shake>
     gl(tdX(668),tdY(60),150*s,'255,200,110');TDDECO.forEach(([x,y],i)=>{const D=DECOS[T.deco2[i]];if(D&&D.glow)gl(tdX(x),tdY(y)-40*s,90*s,D.glow[2])});for(const s2 in T.tw){const [x,y]=TDSLOT[s2];gl(tdX(x),tdY(y)-30*s,70*s,'255,220,150')}ctx.restore()}
   ctx.setTransform(dpr,0,0,dpr,0,0);drawSkinFx(SK);ctx.setTransform(dpr,0,0,dpr,dpr*(rnd()-.5)*sh,dpr*(rnd()-.5)*sh);
   // range of selected tower
+  for(const s2 in T.tw){const w=T.tw[s2];if(w.rgT>0&&+s2!==T.sel){w.rgT-=1/60;const [x,y]=TDSLOT[s2],R=tdRange(w);ctx.save();ctx.globalAlpha=Math.min(1,w.rgT);ctx.strokeStyle='#ffe066';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(tdX(x),tdY(y),R*s,R*s/1.3,0,0,7);ctx.stroke();ctx.restore()}}
   if(T.sel!=null&&T.tw[T.sel]){const w=T.tw[T.sel],[x,y]=TDSLOT[T.sel],R=tdRange(w);ctx.save();ctx.fillStyle='rgba(255,255,255,.12)';ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(tdX(x),tdY(y),R*s,R*s/1.3,0,0,7);ctx.fill();ctx.stroke();ctx.restore()}
   // projectiles
   for(const p of T.proj){const X=tdX(p.x),Y0=tdY(p.y),k2=p.kd,c=EL[p.el].c;let Y=Y0;
@@ -3381,8 +3382,8 @@ function tdTap(px,py){const T=TD;if(!T||T.over)return;if(T.banner>.4){T.banner=.
   if(hit<0){T.sel=null;$('tdPick').hidden=true;return}T.sel=hit;tdPick(hit)}
 function tdPick(i){const T=TD,P=$('tdPick'),w=T.tw[i];P.hidden=false;
   if(w){const up=w.lv<3?tdUpW(w):0,ref=Math.floor(w.spent*.5),nm=w.wt?TOWERS[w.wt].n:PETS[w.k].n[SV.pets[w.k].st];
-    P.innerHTML=`<div class="tdpk"><img src="assets/${w.img}.webp" alt=""><div><b>${nm} <span class="el el-${w.el}">${EL[w.el].n}</span> Lv${w.lv}</b><small>攻擊 ${fmt(tdAtk(w))} · ${w.wt?'城牆砲塔 Lv'+w.plv+' · '+TOWERS[w.wt].d:(w.far?'遠程':'近戰(打不到飛行)')+' · '+TDSP[w.el]}</small>${w.wt?'':`<small>技能「${PETS[w.k].sk.n}」每 ${Math.round(PETS[w.k].sk.cd*1.1)} 秒自動施放</small>`}</div></div>
-    <div class="tdpb">${w.lv<3?`<button class="go" data-tp="up" ${T.energy<up?'disabled':''}>升級 ✦${up}</button>`:'<button disabled>已滿級</button>'}<button class="blue" data-tp="sell">收回 ✦+${ref}</button><button data-tp="x">關閉</button></div>`}
+    P.innerHTML=`<div class="tdpk"><img src="assets/${w.img}.webp" alt=""><div><b>${nm} <span class="el el-${w.el}">${EL[w.el].n}</span> Lv${w.lv}</b><small>攻擊 ${fmt(tdAtk(w))} · ${w.wt?'城牆砲塔 Lv'+w.plv+' · '+TOWERS[w.wt].d:(w.far?'遠程':'近戰(打不到飛行)')+' · '+TDSP[w.el]}</small>${w.wt?'':`<small>技能「${PETS[w.k].sk.n}」每 ${Math.round(PETS[w.k].sk.cd*1.1)} 秒自動施放</small>`}<small>射程 ${Math.round(TDRG[w.lv-1]*100)}%${w.lv<3?' → 升級後 '+Math.round(TDRG[w.lv]*100)+'%(攻擊 ×'+(TDLVM[w.lv]/TDLVM[w.lv-1]).toFixed(2)+')':'(已滿)'}</small></div></div>
+    <div class="tdpb">${w.lv<3?`<button class="go" data-tp="up" ${T.energy<up?'disabled':''}>升級 ✦${up}・射程+15%</button>`:'<button disabled>已滿級</button>'}<button class="blue" data-tp="sell">收回(退 ✦${ref})</button><button data-tp="x">關閉</button></div>`}
   else{const tab=T.pkTab||'pet',used=Object.values(T.tw).map(x=>x.k),np=tdNP(),nw=tdNW();
     let body='';
     if(tab==='pet'){const L=owned().sort((a,b)=>stat(b).atk-stat(a).atk);
@@ -3396,7 +3397,7 @@ function tdPick(i){const T=TD,P=$('tdPick'),w=T.tw[i];P.hidden=false;
     if(a==='tab'){T.pkTab=k;tdPick(i);return}
     if(a==='put'){const c=tdCost(k);if(T.energy<c)return;T.energy-=c;if(!T.used.includes(k))T.used.push(k);T.tw[i]=tdTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[PETS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
     if(a==='putw'){const c=tdWCost(k);if(T.energy<c)return;T.energy-=c;T.tw[i]=tdWTower(k,i);T.sel=null;P.hidden=true;const [x,y]=TDSLOT[i];tdPart(x,y-30,18,[EL[TOWERS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
-    if(a==='up'){const c=tdUpW(w);if(T.energy<c||w.lv>=3)return;T.energy-=c;w.spent+=c;w.lv++;const [x,y]=TDSLOT[i];tdPart(x,y-40,20,['#ffe066','#fff'],180,.6,5);tdTxt(x,y-100,'升級!','#ffe066');sfx('up');tdPick(i);return}
+    if(a==='up'){const c=tdUpW(w);if(T.energy<c||w.lv>=3)return;T.energy-=c;w.spent+=c;w.lv++;w.rgT=1.2;const [x,y]=TDSLOT[i];tdPart(x,y-40,20,['#ffe066','#fff'],180,.6,5);tdTxt(x,y-100,'升級!','#ffe066');sfx('up');tdPick(i);return}
     if(a==='sell'){T.energy+=Math.floor(w.spent*.5);delete T.tw[i];T.sel=null;P.hidden=true}})}
 function tdInfoHtml(){const T=TD,n=tdNP(),nw=T.prep>0?1:T.wave+1,fin=T.mode!=='endless'&&nw>TDW;const ks=fin?[]:[...new Set((T.spawn.length&&T.wave?T.spawn:tdPeek(nw)).map(x=>x.k))].slice(0,6);
   return `<div class="tdih"><b>${T.S.ic} ${T.SK.n}</b> ${tdBonHtml()}<small>萌獸 ${n} 座 · 砲塔 ${tdNW()} 座 · 點「+」石台放萌獸或砲塔(同一隻可以重複放),點已放的可以升級或收回</small></div>
