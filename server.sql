@@ -481,18 +481,20 @@ end $$;
 
 -- 寄信(可附鑽石):指定一位玩家,或 p_uid 留空 = 全服(有玩過的玩家)
 drop function if exists public.admin_mail(uuid,int,text);
-create or replace function public.admin_mail(p_uid uuid, p_gem int, p_note text, p_title text default null) returns jsonb language plpgsql security definer set search_path = public as $$
+drop function if exists public.admin_mail(uuid,int,text,text);
+create or replace function public.admin_mail(p_uid uuid, p_gem int, p_note text, p_title text default null, p_bonus jsonb default null) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); n int;
 begin
   if coalesce(p_gem,0) < 0 or p_gem > 100000 then raise exception '鑽石數量要在 0 ~ 100000 之間'; end if;
   if coalesce(trim(p_note),'') = '' then raise exception '請填寫信件內容'; end if;
+  p_bonus := (select jsonb_object_agg(key, least(greatest((value)::text::numeric, 0), 100000000)::bigint) from jsonb_each(coalesce(p_bonus,'{}'::jsonb)) where key in ('coin','candy','stones','ore','enh','reroll','rtix') and (value)::text ~ '^[0-9]+$' and (value)::text::numeric > 0);
   if p_uid is null then
-    insert into inbox(uid, gem, note, credit, kind, title) select uid, coalesce(p_gem,0), p_note, true, 'ops', coalesce(nullif(trim(p_title),''),'營運信件') from wallet;
+    insert into inbox(uid, gem, note, credit, kind, title, bonus) select uid, coalesce(p_gem,0), p_note, true, 'ops', coalesce(nullif(trim(p_title),''),'營運信件'), p_bonus from wallet;
   else
-    insert into inbox(uid, gem, note, credit, kind, title) values (p_uid, coalesce(p_gem,0), p_note, true, 'ops', coalesce(nullif(trim(p_title),''),'營運信件'));
+    insert into inbox(uid, gem, note, credit, kind, title, bonus) values (p_uid, coalesce(p_gem,0), p_note, true, 'ops', coalesce(nullif(trim(p_title),''),'營運信件'), p_bonus);
   end if;
   get diagnostics n = row_count;
-  perform alog('mail', p_uid, jsonb_build_object('gem', p_gem, 'note', p_note, 'title', p_title, 'n', n));
+  perform alog('mail', p_uid, jsonb_build_object('gem', p_gem, 'note', p_note, 'title', p_title, 'bonus', p_bonus, 'n', n));
   return jsonb_build_object('sent', n);
 end $$;
 
@@ -577,7 +579,7 @@ begin return (select coalesce(jsonb_agg(jsonb_build_object('at', l.at, 'action',
 
 revoke execute on function public.alog(text,uuid,jsonb) from public, anon, authenticated;
 grant execute on function public.admin_whoami(), public.admin_claim(), public.admin_stats(), public.admin_players(text,text,int), public.admin_player(uuid),
-  public.admin_gem(uuid,int,text), public.admin_mail(uuid,int,text,text), public.admin_ban(uuid,text,int), public.admin_unban(uuid), public.admin_player_set(uuid,text,int),
+  public.admin_gem(uuid,int,text), public.admin_mail(uuid,int,text,text,jsonb), public.admin_ban(uuid,text,int), public.admin_unban(uuid), public.admin_player_set(uuid,text,int),
   public.admin_market(text), public.admin_market_remove(bigint,text), public.admin_notice_save(bigint,text,text,boolean,boolean), public.admin_notice_delete(bigint), public.admin_notices(),
   public.admin_admins(), public.admin_admin_set(text,boolean), public.admin_logs(int) to authenticated;
 
