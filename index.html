@@ -3174,7 +3174,9 @@ function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?
    ${T.mode==='normal'&&win?`<div class="tdstars">${[0,1,2].map(i=>`<span class="${i<stars?'':'off'}">★</span>`).join('')}</div>`:''}
    <p>${T.mode==='endless'?`撐過 <b>${Math.max(0,cl)}</b> 波`:`第 ${Math.min(T.wave,TDW)} / ${TDW} 波 · 城門剩 ${T.hp} / ${TDHP}`} · 擊倒 ${T.kills} 隻</p>
    <ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul>${!win?tdTips():T.mode==='normal'&&stars<3?tdTips(`💪 想拿 3 星?城門剩 15 以上就是 3 星`):''}<button class="go" id="tdBack">回到城鎮</button></div>`;iconize(R);$('tdBack').onclick=()=>{sfx('click');tdQuit()};R.querySelectorAll('[data-tgo]').forEach(b=>b.onclick=()=>{sfx('click');const [s2,tb]=b.dataset.tgo.split(':');tdQuit();setTimeout(()=>{closeSheet();openSheet(s2,tb||null)},60)})}
-const TDAURA=false;const TDWALK={golem:'bw_golem',worm:'bw_worm',yking:'bw_yking',serpent:'bw_serpent',titan:'bw_titan',lich:'bw_lich'},TDWN=12;Object.values(TDWALK).forEach(img);
+const TDAURA=false,TDAU={golem:'au_golem'},TDAUN=16;Object.values(TDAU).forEach(img);
+function tdAuraFx(e,X,Y,w,ta,front){const im=IMG[TDAU[e.k]];if(!im||!im.naturalWidth)return;const fw=im.naturalWidth/TDAUN,fh=im.naturalHeight,fi=Math.floor(ta*14)%TDAUN,dw=w*1.35,dh=dw*fh/fw,y0=Y-dh*.74;ctx.save();ctx.beginPath();if(front)ctx.rect(X-dw,Y-dh*.08,dw*2,dh*2);else ctx.rect(X-dw,y0-dh,dw*2,dh+(Y-dh*.08-y0));ctx.clip();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=front?.7:.8;ctx.drawImage(im,fi*fw,0,fw,fh,X-dw/2,y0,dw,dh);ctx.restore()}
+const TDWALK={golem:'bw_golem',worm:'bw_worm',yking:'bw_yking',serpent:'bw_serpent',titan:'bw_titan',lich:'bw_lich'},TDWN=12;Object.values(TDWALK).forEach(img);
 function tdBossAura(e,X,Y,w,ta){const s=TDV.s,el=e.E.el,k=e.k,R=w*.55;ctx.save();
   if(k==='lich'){ctx.globalCompositeOperation='lighter';for(let i=0;i<7;i++){const a=ta*1.6+i/7*Math.PI*2,fx=X+Math.cos(a)*R,fy=Y-w*.25+Math.sin(a)*R*.35,r=10*s+4+Math.sin(ta*8+i)*3,g=ctx.createRadialGradient(fx,fy,0,fx,fy,r);g.addColorStop(0,'rgba(230,180,255,.95)');g.addColorStop(.5,'rgba(150,70,255,.6)');g.addColorStop(1,'rgba(90,20,200,0)');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(fx,fy-r*.4,r*.7,r*1.3,0,0,7);ctx.fill()}}
   else if(el==='fire'){ctx.globalCompositeOperation='lighter';for(let i=0;i<14;i++){const a=i/14*Math.PI*2+ta*.6,fx=X+Math.cos(a)*R,fy=Y+Math.sin(a)*R*.28,hh=(16+10*Math.abs(Math.sin(ta*9+i*1.7)))*s+4,g=ctx.createLinearGradient(fx,fy,fx,fy-hh);g.addColorStop(0,'rgba(255,120,30,.85)');g.addColorStop(.6,'rgba(255,200,80,.6)');g.addColorStop(1,'rgba(255,240,180,0)');ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(fx-6*s-2,fy);ctx.quadraticCurveTo(fx+Math.sin(ta*7+i)*6*s,fy-hh*.6,fx,fy-hh);ctx.quadraticCurveTo(fx+Math.sin(ta*6+i)*6*s,fy-hh*.4,fx+6*s+2,fy);ctx.fill()}}
@@ -3252,17 +3254,22 @@ function tdUlt(w,e,a){const T=TD,[x,y]=TDSLOT[w.slot],[ex,ey]=tdPos(e.d),el=w.el
     tg.forEach((o,i)=>tdLater(i*.08,()=>{const [ox,oy]=tdPos(o.d);P({bolt:1,x:ox+R(-30,30),y:oy-460,x2:ox,y2:oy-20,life:.22,w:6,seed:rnd()*99});tdImpact('elec',ox,oy-20,1)}));hit();tdFlash('255,255,230',.45,.18)}
   else if(el==='ice'){P({nova:1,x:ex,y:ey,life:.6,r:110});for(let i=0;i<10;i++){const an=i/10*7;P({spike:1,x:ex+Math.cos(an)*R(30,90),y:ey+Math.sin(an)*R(20,55),life:1.1,h:R(26,44)})}hit();tdFlash('200,240,255',.25,.25)}
   else{P({meteor:1,x:ex-60,y:ey-440,x2:ex,y2:ey-10,life:.4,c:'rock'});tdLater(.38,()=>{hit();for(let i=0;i<6;i++){const an=rnd()*7;P({crack:1,x:ex,y:ey,a:an,l:R(40,90),life:1})}for(let i=0;i<10;i++)P({puff:1,x:ex+R(-60,60),y:ey+R(-10,20),vx:R(-60,60),vy:R(-50,-10),g:0,life:R(.6,1),c:'200,180,150',sz:R(18,30)});T.shake=.6})}}
-function tdHit(w,e,a,skill){const T=TD,[ex,ey]=tdPos(e.d),el=w.el,R=skill?85:0;
-  if(w.wt){const W2=TOWERS[w.wt];tdDmg(e,a,el,w);if(W2.slow){e.slow=Math.max(e.slow,.35);e.slowT=1.5}if(W2.freeze&&rnd()<W2.freeze){e.stun=Math.max(e.stun,e.boss?.3:1)}
-    if(W2.chain){let last=e,done=[e];for(let i=0;i<W2.chain-1+(w.lv===3?1:0);i++){const [lx,ly]=tdPos(last.d);let nb=null,nd=95;for(const o of T.en){if(o.hp<=0||done.includes(o))continue;const [ox,oy]=tdPos(o.d),dd=Math.hypot(ox-lx,oy-ly);if(dd<nd){nd=dd;nb=o}}if(!nb)break;done.push(nb);const [nx,ny]=tdPos(nb.d);T.parts.push({zap:1,x:lx,y:ly-25,x2:nx,y2:ny-25,t:0,life:.18});tdDmg(nb,a*.7,el,null,false);last=nb}}return}
+const TDFX={fire:{r:[60,75,90],p:[.5,.6,.7]},water:{c:[.25,.3,.35],d:[30,40,50]},grass:{p:[.22,.28,.35],t:[3,3.5,4]},elec:{n:[2,3,4]},ice:{s:[.35,.42,.5],t:[1.5,1.8,2.2]},rock:{c:[.2,.25,.3],t:[.7,.85,1]},ult:[85,95,110],
+  bubble:{s:[.35,.42,.5]},thunder:{n:[3,4,5]},ice_t:{c:[.25,.3,.35],t:[1,1.2,1.4]},bee:{r:[1,.91,.83]}};
+function tdFxTxt(w,lv){const i=lv-1,F=TDFX;if(w.wt){const k=w.wt;return k==='bubble'?`減速 ${Math.round(F.bubble.s[i]*100)}%`:k==='thunder'?`連鎖 ${F.thunder.n[i]} 個目標`:k==='ice'?`冰凍機率 ${Math.round(F.ice_t.c[i]*100)}%、${F.ice_t.t[i]} 秒`:k==='bee'?`攻速 +${Math.round((1/F.bee.r[i]-1)*100)}%`:''}
+  const el=w.el;return el==='fire'?`爆炸範圍 ${F.fire.r[i]}、濺射 ${Math.round(F.fire.p[i]*100)}%`:el==='water'?`擊退機率 ${Math.round(F.water.c[i]*100)}%、距離 ${F.water.d[i]}`:el==='grass'?`中毒 ${Math.round(F.grass.p[i]*100)}%/秒、${F.grass.t[i]} 秒`:el==='elec'?`連鎖 ${F.elec.n[i]} 個目標`:el==='ice'?`減速 ${Math.round(F.ice.s[i]*100)}%、${F.ice.t[i]} 秒`:`暈眩機率 ${Math.round(F.rock.c[i]*100)}%、${F.rock.t[i]} 秒`}
+function tdChain(T,e,a,el,n,mul){let last=e,done=[e];for(let i=0;i<n;i++){const [lx,ly]=tdPos(last.d);let nb=null,nd=95;for(const o of T.en){if(o.hp<=0||done.includes(o))continue;const [ox,oy]=tdPos(o.d),dd=Math.hypot(ox-lx,oy-ly);if(dd<nd){nd=dd;nb=o}}if(!nb)break;done.push(nb);const [nx,ny]=tdPos(nb.d);T.parts.push({zap:1,x:lx,y:ly-25,x2:nx,y2:ny-25,t:0,life:.18});tdDmg(nb,a*mul,el,null,false);last=nb}}
+function tdHit(w,e,a,skill){const T=TD,[ex,ey]=tdPos(e.d),el=w.el,L=w.lv-1,F=TDFX,R=skill?F.ult[L]:0;
+  if(w.wt){const k=w.wt;tdDmg(e,a,el,w);if(k==='bubble'){e.slow=Math.max(e.slow,F.bubble.s[L]);e.slowT=1.5}if(k==='ice'&&rnd()<F.ice_t.c[L]){e.stun=Math.max(e.stun,e.boss?.3:F.ice_t.t[L])}
+    if(k==='thunder')tdChain(T,e,a,el,F.thunder.n[L]-1,.7);return}
   const hits=skill?T.en.filter(o=>o.hp>0&&(!o.fly||w.far)&&Math.hypot(tdPos(o.d)[0]-ex,tdPos(o.d)[1]-ey)<R):[e];
   for(const o of hits){if(o.hp<=0)continue;tdDmg(o,a,el,w);
-    if(el==='ice'){o.slow=Math.max(o.slow,w.lv===3||skill?.5:.35);o.slowT=skill?3:1.5}
-    else if(el==='grass'){o.poi=Math.max(o.poi,a*.22);o.poiT=skill?5:3}
-    else if(el==='rock'&&(skill||rnd()<.2)){o.stun=Math.max(o.stun,o.boss?.35:skill?1.4:.7)}
-    else if(el==='water'&&!o.boss&&(skill||rnd()<.25)){o.d=Math.max(0,o.d-(skill?60:30));o.slow=Math.max(o.slow,.2);o.slowT=1}}
-  if(el==='fire'&&!skill){for(const o of T.en){if(o===e||o.hp<=0||(o.fly&&!w.far))continue;const [ox,oy]=tdPos(o.d);if(Math.hypot(ox-ex,oy-ey)<60)tdDmg(o,a*.5,el,null,false)}}
-  if(el==='elec'){let last=e,done=[e];for(let i=0;i<(w.lv===3||skill?3:2);i++){const [lx,ly]=tdPos(last.d);let nb=null,nd=95;for(const o of T.en){if(o.hp<=0||done.includes(o))continue;const [ox,oy]=tdPos(o.d),dd=Math.hypot(ox-lx,oy-ly);if(dd<nd){nd=dd;nb=o}}if(!nb)break;done.push(nb);const [nx,ny]=tdPos(nb.d);T.parts.push({zap:1,x:lx,y:ly-25,x2:nx,y2:ny-25,t:0,life:.18});tdDmg(nb,a*.6,el,null,false);last=nb}}
+    if(el==='ice'){o.slow=Math.max(o.slow,skill?F.ice.s[L]+.1:F.ice.s[L]);o.slowT=skill?3+L*.5:F.ice.t[L]}
+    else if(el==='grass'){o.poi=Math.max(o.poi,a*(skill?F.grass.p[L]/2.5:F.grass.p[L]));o.poiT=skill?5+L:F.grass.t[L]}
+    else if(el==='rock'&&(skill||rnd()<F.rock.c[L])){o.stun=Math.max(o.stun,o.boss?.35:skill?1.4+.2*L:F.rock.t[L])}
+    else if(el==='water'&&!o.boss&&(skill||rnd()<F.water.c[L])){o.d=Math.max(0,o.d-(skill?60+10*L:F.water.d[L]));o.slow=Math.max(o.slow,.2);o.slowT=1}}
+  if(el==='fire'&&!skill){for(const o of T.en){if(o===e||o.hp<=0||(o.fly&&!w.far))continue;const [ox,oy]=tdPos(o.d);if(Math.hypot(ox-ex,oy-ey)<F.fire.r[L])tdDmg(o,a*F.fire.p[L],el,null,false)}}
+  if(el==='elec')tdChain(T,e,a,el,skill?F.elec.n[L]+1:F.elec.n[L],.6);
 }
 // ---- update
 function tdUpdate(dt){const T=TD;if(!T)return;TT+=dt;try{skinFx(T.SK,dt)}catch(e){}if(T.over||T.paused)return;T.t+=dt;if(T.banner>0)T.banner-=dt;if(T.shake>0)T.shake-=dt;
@@ -3282,7 +3289,7 @@ function tdUpdate(dt){const T=TD;if(!T)return;TT+=dt;try{skinFx(T.SK,dt)}catch(e
     if(e.d>=TDLEN){e.hp=0;if(e===T.boss)T.boss=null;const dmg=e.boss?5:e.elite?2:1;T.lk=T.lk||{boss:0,fly:0,n:0};T.lk.n+=dmg;if(e.boss)T.lk.boss+=dmg;if(e.fly)T.lk.fly+=dmg;{T.hp-=dmg;T.leak+=dmg;T.shake=.35;sfx('hit');tdTxt(668,80,'-'+dmg,'#ff5a5a',1,true)}if(T.hp<=0){T.hp=0;return tdEnd(false)}}}
   T.en=T.en.filter(e=>e.hp>0);
   for(const s in T.tw){const w=T.tw[s];w.anim+=dt;if(w.hit>0)w.hit-=dt;if(w.stun>0){w.stun-=dt;continue}w.cd-=dt;w.skT-=dt;const [x,y]=TDSLOT[s];
-    if(w.cd<=0){const e=tdTarget(w,x,y);if(e){w.cd=w.rate*(w.lv===3?.85:1);if(!w.wt&&w.skT<=0){w.skT=PETS[w.k].sk.cd*1.1;tdTxt(x,y-95,PETS[w.k].sk.n,EL[w.el].c,1.1);tdFire(w,e,true)}else tdFire(w,e,false)}else w.cd=.15}}
+    if(w.cd<=0){const e=tdTarget(w,x,y);if(e){w.cd=w.rate*(w.lv===3?.85:1)*(w.wt==='bee'?TDFX.bee.r[w.lv-1]:1);if(!w.wt&&w.skT<=0){w.skT=PETS[w.k].sk.cd*1.1;tdTxt(x,y-95,PETS[w.k].sk.n,EL[w.el].c,1.1);tdFire(w,e,true)}else tdFire(w,e,false)}else w.cd=.15}}
   for(const p of T.proj){p.t+=dt;const e=p.tx;if(e.hp<=0&&!p.lx){const [ex,ey]=tdPos(e.d);p.lx=ex;p.ly=ey}const [tx,ty]=e.hp>0?tdPos(e.d):[p.lx,p.ly];const ty2=ty-25-(e.fly?30:0),dx=tx-p.x,dy=ty2-p.y,dd=Math.hypot(dx,dy),st=p.sp*dt;
     p.rot+=dt*9;p.hist.push([p.x,p.y]);if(p.hist.length>7)p.hist.shift();
     if(dd<=st+4){p.done=1;if(e.hp>0)tdHit(p.w,e,p.a,false);tdImpact(p.kd,tx,ty2,0)}else{p.x+=dx/dd*st;p.y+=dy/dd*st}}
@@ -3392,7 +3399,7 @@ function tdDrawEnemy(e,x,y){const s=TDV.s,im=img(e.E.img);if(!im||!im.naturalWid
     const c=EL[e.E.el].c,pr=w*(e.boss?.62:.45)*(1+.06*Math.sin(ta*4));ctx.save();ctx.globalCompositeOperation='lighter';const ag=ctx.createRadialGradient(X0+ox,Y-h*.4-fly,0,X0+ox,Y-h*.4-fly,pr);ag.addColorStop(0,c+'55');ag.addColorStop(1,c+'00');ctx.fillStyle=ag;ctx.fillRect(X0+ox-pr,Y-h*.4-fly-pr,2*pr,2*pr);ctx.restore()}
   const ws=e.boss&&TDWALK[e.k]?IMG[TDWALK[e.k]]:null,wsOk=ws&&ws.naturalWidth;
   if(wsOk&&e.k!=='lich'&&e.k!=='serpent'&&e.k!=='worm'){bob*=.25;sx=1;sy=1;rot*=.3}
-  const X=X0+ox;if(e.boss&&TDAURA)tdBossAura(e,X,Y,w,ta);
+  const X=X0+ox;if(e.boss&&TDAURA)tdBossAura(e,X,Y,w,ta);if(e.boss)tdAuraFx(e,X,Y-fly,w,ta,false);
   if(e.boss&&e.k==='lich'){e.tr=e.tr||[];e.tr.push([X,Y-fly]);if(e.tr.length>14)e.tr.shift();ctx.save();e.tr.forEach(([tx2,ty2],i)=>{if(i%4)return;ctx.globalAlpha=.12+.04*i/4;ctx.save();ctx.translate(tx2,ty2);if(dir>0)ctx.scale(-1,1);ctx.drawImage(im,-w/2,-h,w,h);ctx.restore()});ctx.restore()}
   ctx.fillStyle='rgba(0,0,0,.24)';ctx.beginPath();ctx.ellipse(X,Y,w*.32*sh,w*.1*sh,0,0,7);ctx.fill();
   ctx.save();ctx.translate(X,Y-fly-bob);ctx.rotate(rot);if(dir>0)ctx.scale(-1,1);ctx.scale(sx,sy);
@@ -3400,6 +3407,7 @@ function tdDrawEnemy(e,x,y){const s=TDV.s,im=img(e.E.img);if(!im||!im.naturalWid
   if(wsOk){const fw=ws.naturalWidth/TDWN,fh=ws.naturalHeight,fi=Math.floor(((e.ph||0)/2*TDWN+(e.stun>0?0:0)))%TDWN,dw=h*fw/fh*1.05,dh=h*1.05;ctx.drawImage(ws,fi*fw,0,fw,fh,-dw/2,-dh,dw,dh)}else ctx.drawImage(im,-w/2,-h,w,h);ctx.filter='none';
   if(e.boss&&e.k==='golem'){ctx.globalCompositeOperation='lighter';const gr=w*.28,gg=ctx.createRadialGradient(0,-h*.42,0,0,-h*.42,gr);gg.addColorStop(0,`rgba(255,170,60,${.45+.3*Math.sin(ta*5)})`);gg.addColorStop(1,'rgba(255,90,20,0)');ctx.fillStyle=gg;ctx.fillRect(-gr,-h*.42-gr,2*gr,2*gr)}
   ctx.restore();
+  if(e.boss)tdAuraFx(e,X,Y-fly,w,ta,true);
   if(e.elite){ctx.fillStyle='#ffd84a';ctx.font=`900 ${Math.round(12*s+5)}px sans-serif`;ctx.textAlign='center';ctx.fillText('精英',X,Y-h-fly-14*s)}
   if(e.stun>0){ctx.font=`${Math.round(14*s+6)}px sans-serif`;ctx.fillText('💫',X,Y-h-fly-2)}
   if(!e.boss&&e.hp<e.max){const bw=w*.7;ctx.fillStyle='rgba(30,10,30,.7)';ctx.fillRect(X-bw/2,Y-h-fly-6*s,bw,5*s+1);ctx.fillStyle=e.elite?'#ffb03a':'#ff5a5a';ctx.fillRect(X-bw/2,Y-h-fly-6*s,bw*e.hp/e.max,5*s+1)}}
@@ -3427,7 +3435,7 @@ function tdTap(px,py){const T=TD;if(!T||T.over)return;if(T.banner>.4){T.banner=.
   if(hit<0){T.sel=null;$('tdPick').hidden=true;return}T.sel=hit;tdPick(hit)}
 function tdPick(i){const T=TD,P=$('tdPick'),w=T.tw[i];P.hidden=false;
   if(w){const up=w.lv<3?tdUpW(w):0,ref=Math.floor(w.spent*.5),nm=w.wt?TOWERS[w.wt].n:PETS[w.k].n[SV.pets[w.k].st];
-    P.innerHTML=`<div class="tdpk"><img src="assets/${w.img}.webp" alt=""><div><b>${nm} <span class="el el-${w.el}">${EL[w.el].n}</span> Lv${w.lv}</b><small>攻擊 ${fmt(tdAtk(w))} · ${w.wt?'城牆砲塔 Lv'+w.plv+' · '+TOWERS[w.wt].d:(w.far?'遠程':'近戰(打不到飛行)')+' · '+TDSP[w.el]}</small>${w.wt?'':`<small>技能「${PETS[w.k].sk.n}」每 ${Math.round(PETS[w.k].sk.cd*1.1)} 秒自動施放</small>`}<small>射程 ${Math.round(TDRG[w.lv-1]*100)}%${w.lv<3?' → 升級後 '+Math.round(TDRG[w.lv]*100)+'%(攻擊 ×'+(TDLVM[w.lv]/TDLVM[w.lv-1]).toFixed(2)+')':'(已滿)'}</small></div></div>
+    P.innerHTML=`<div class="tdpk"><img src="assets/${w.img}.webp" alt=""><div><b>${nm} <span class="el el-${w.el}">${EL[w.el].n}</span> Lv${w.lv}</b><small>攻擊 ${fmt(tdAtk(w))} · ${w.wt?'城牆砲塔 Lv'+w.plv+' · '+TOWERS[w.wt].d:(w.far?'遠程':'近戰(打不到飛行)')+' · '+TDSP[w.el]}</small>${w.wt?'':`<small>技能「${PETS[w.k].sk.n}」每 ${Math.round(PETS[w.k].sk.cd*1.1)} 秒自動施放</small>`}${tdFxTxt(w,w.lv)?`<small>效果:${tdFxTxt(w,w.lv)}${w.lv<3?' → 升級後 '+tdFxTxt(w,w.lv+1):''}</small>`:''}<small>射程 ${Math.round(TDRG[w.lv-1]*100)}%${w.lv<3?' → 升級後 '+Math.round(TDRG[w.lv]*100)+'%(攻擊 ×'+(TDLVM[w.lv]/TDLVM[w.lv-1]).toFixed(2)+')':'(已滿)'}</small></div></div>
     <div class="tdpb">${w.lv<3?`<button class="go" data-tp="up" ${T.energy<up?'disabled':''}>升級 ✦${up}・射程+15%</button>`:'<button disabled>已滿級</button>'}<button class="blue" data-tp="sell">收回(退 ✦${ref})</button><button data-tp="x">關閉</button></div>`}
   else{const tab=T.pkTab||'pet',used=Object.values(T.tw).map(x=>x.k),np=tdNP(),nw=tdNW();
     let body='';
