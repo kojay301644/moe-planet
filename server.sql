@@ -206,11 +206,15 @@ create policy inbox_read on public.inbox for select to authenticated using (uid 
 
 -- 伺服器參考價(和遊戲裡的算法一致,不含市場熱度)
 create or replace function public.moe_fair(it jsonb) returns int language sql immutable as $$
-  select greatest(5, round(
+  select case when it ? 'mat' then greatest(1, round(coalesce((it->>'n')::numeric,1) * case it->>'mat'
+      when 'stones' then 15 when 'enh' then 5 when 'ore' then 2 when 'reroll' then 20 when 'candy' then 1.5
+      when 'shard' then case when it->>'pet' in ('dragon','phoenix') then 60 when it->>'pet' in ('bear','armad','seal','marten') then 25
+        when it->>'pet' in ('ferret','whale','owl','lizard','deer','moth') then 12 else 6 end else 5 end))::int
+  else greatest(5, round(
     (case when it ? 'uq' and coalesce(it->>'uq','') <> '' then 7000 else (array[12,40,220,2500,10000])[(it->>'rar')::int + 1] end)
     * (1 + .06 * coalesce((it->>'lv')::int,0))
     * (1 + coalesce((select sum((s->>1)::numeric) from jsonb_array_elements(coalesce(it->'subs','[]'::jsonb)) s),0) / 60)
-    * (case when it->>'type' = 'bell' then 1.1 else 1 end)))::int $$;
+    * (case when it->>'type' = 'bell' then 1.1 else 1 end)))::int end $$;
 
 -- 上架:伺服器鑑定裝備數值是否合理,並限制每週可上架的高品質數量
 create or replace function public.market_list(p_item jsonb, p_price int) returns jsonb language plpgsql security definer set search_path = public as $$
@@ -230,7 +234,7 @@ begin
   if coalesce(p_item->>'uq','') <> '' and p_item->>'uq' not in ('vamp','wind','thorn','revenge') then raise exception '獨特裝備不合理'; end if;
   f := moe_fair(p_item);
   if p_price < ceil(f * .5) or p_price > floor(f * 2) then raise exception '價格要在 % ~ % 鑽石之間', ceil(f*.5), floor(f*2); end if;
-  if (select count(*) from market where seller = u and status = 'open' and created > now() - interval '48 hours') >= 5 then raise exception '最多同時上架 5 件'; end if;
+  if (select count(*) from market where seller = u and status = 'open' and created > now() - interval '48 hours') >= 10 then raise exception '最多同時上架 10 件'; end if;
   v_kind := case when coalesce(p_item->>'uq','') <> '' then 'uq' else 'r' || rar end;
   lim := case v_kind when 'uq' then 1 when 'r4' then 1 when 'r3' then 2 when 'r2' then 10 else 30 end;
   insert into mint_quota(uid,wk,kind) values (u,v_wk,v_kind) on conflict do nothing;
@@ -259,8 +263,8 @@ begin
   insert into wallet(uid) values (m.seller) on conflict do nothing;
   update wallet set gem = gem + g, updated_at = now() where uid = m.seller;
   update market set status = 'sold', buyer = u, sold_at = now() where id = p_id;
-  insert into inbox(uid, item, note, kind, title) values (u, m.item, '你在交易所買到的裝備,領取後放進背包。', 'market', '交易所:購買成功');
-  insert into inbox(uid, gem, note, kind, title) values (m.seller, g, '你上架的 ' || coalesce(m.item->>'type','裝備') || ' 賣出了,鑽石已直接入帳(已扣 10% 手續費)。', 'market', '交易所:裝備賣出');
+  insert into inbox(uid, item, note, kind, title) values (u, m.item, '你在交易所買到的物品,領取後放進背包。', 'market', '交易所:購買成功');
+  insert into inbox(uid, gem, note, kind, title) values (m.seller, g, '你上架的物品賣出了,鑽石已直接入帳(已扣 10% 手續費)。', 'market', '交易所:裝備賣出');
   insert into gem_log(uid,delta,reason) values (u, -m.price, 'market_buy:'||p_id), (m.seller, g, 'market_sell:'||p_id);
   return jsonb_build_object('gem', (select gem from wallet where uid = u), 'item', m.item);
 end $$;
@@ -763,3 +767,20 @@ begin
   return jsonb_build_object('n', n);
 end $$;
 grant execute on function public.admin_bot_save(bigint,text,text,real,boolean), public.admin_bot_delete(bigint), public.admin_bot_reset(bigint) to authenticated;
+
+-- ============ 交易所:材料與碎片(封測期間不限上架數量) ============
+create or replace function public.market_list_mat(p_mat text, p_pet text, p_n int, p_price int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); it jsonb; f int; nm text;
+begin
+  if p_mat not in ('stones','enh','ore','reroll','candy','shard') then raise exception '這個物品不能交易'; end if;
+  if coalesce(p_n,0) < 1 or p_n > 9999 then raise exception '數量要在 1 ~ 9999 之間'; end if;
+  if p_mat = 'shard' and coalesce(p_pet,'') not in ('fox','otter','penguin','pango','ferret','whale','bear','dragon','bunny','mouse','mole','puffer','owl','lizard','deer','moth','armad','seal','marten','phoenix') then raise exception '萌獸種類不對'; end if;
+  it := jsonb_build_object('mat', p_mat, 'n', p_n) || case when p_mat = 'shard' then jsonb_build_object('pet', p_pet) else '{}'::jsonb end;
+  f := moe_fair(it);
+  if p_price < ceil(f * .5) or p_price > floor(f * 2) then raise exception '價格要在 % ~ % 鑽石之間', ceil(f*.5), floor(f*2); end if;
+  if (select count(*) from market where seller = u and status = 'open' and created > now() - interval '48 hours') >= 10 then raise exception '最多同時上架 10 件'; end if;
+  select data->>'n' into nm from docs where path = 'arena/' || u::text;
+  insert into market(seller, seller_name, item, price) values (u, coalesce(nm,'守護員'), it, p_price);
+  return jsonb_build_object('ok', true, 'fair', f);
+end $$;
+grant execute on function public.market_list_mat(text,text,int,int) to authenticated;

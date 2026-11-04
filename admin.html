@@ -105,8 +105,9 @@ async function rpc(fn,a){const {data,error}=await sb.rpc(fn,a||{});if(error){con
 const PET={fox:'小焰狐',otter:'泡泡獺',penguin:'雪糰企鵝',pango:'小石甲',ferret:'靜電毛球',whale:'小鯨鈴',bear:'苔苔熊',dragon:'星晶龍寶',bunny:'蘑菇兔',mouse:'火花鼠',mole:'礦石鼴',puffer:'泡泡豚',owl:'雪絨鴞',lizard:'火蜥寶',deer:'雷光鹿',moth:'花芽蝶',armad:'小鋼甲',seal:'雪球海豹',marten:'影絨貂',phoenix:'火鳥雛'};
 const EQT={collar:'項圈',hat:'帽子',charm:'護符',bell:'鈴鐺'},SET={basic:'一般',fire:'烈焰',ice:'冰霜',elec:'雷鳴',guard:'守護',wind:'疾風',siege:'攻城',hunt:'獵王'},UQ={vamp:'吸血項圈',wind:'疾風帽',thorn:'荊棘護符',revenge:'復仇鈴鐺'},RAR=['普通','稀有','史詩','傳說','神話'];
 const SUB={atk:'攻擊',hp:'血量',def:'防禦',crit:'爆擊率',critd:'爆擊傷害',cdr:'技能冷卻',boss:'對Boss',siege:'對城門塔',heal:'治療'};
-const itemName=e=>e?`<span class="item r${e.rar}c"><b>${e.uq?UQ[e.uq]:SET[e.set||'basic']+EQT[e.type]}${e.lv?' +'+e.lv:''}</b></span> <span class="tag">${RAR[e.rar]||''}</span>`:'-';
-const itemSubs=e=>(e&&e.subs||[]).map(s=>`${SUB[s[0]]||s[0]} +${s[1]}`).join('、');
+const MATN={stones:'進化石',enh:'強化石',ore:'礦石',reroll:'洗練石',candy:'經驗糖果'};
+const itemName=e=>e&&e.mat?`<b>${e.mat==='shard'?(PET[e.pet]||e.pet)+'碎片':MATN[e.mat]||e.mat} ×${fmt(e.n)}</b> <span class="tag">${e.mat==='shard'?'碎片':'材料'}</span>`:e?`<span class="item r${e.rar}c"><b>${e.uq?UQ[e.uq]:SET[e.set||'basic']+EQT[e.type]}${e.lv?' +'+e.lv:''}</b></span> <span class="tag">${RAR[e.rar]||''}</span>`:'-';
+const itemSubs=e=>(e&&!e.mat&&e.subs||[]).map(s=>`${SUB[s[0]]||s[0]} +${s[1]}`).join('、');
 const REASON=r=>{r=r||'';return r==='earn'?'遊戲獲得':r==='spend'?'遊戲花費':r==='mail'?'信件領取':r.startsWith('summon')?'召喚 ×'+r.slice(6):r.startsWith('topup:')?'儲值 '+r.slice(6):r.startsWith('admin:')?'營運調整 '+r.slice(6):r.startsWith('market_buy')?'交易所購買':r.startsWith('market_sell_bot')?'交易所賣出(系統)':r.startsWith('market_sell')?'交易所賣出':r==='ladder_ticket'?'天梯挑戰券':r};
 const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',admin_remove:'移除管理員'};
 let ME=null,TAB='home',PQ={q:'',sort:'recent'},MKS='open';
