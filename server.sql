@@ -26,16 +26,21 @@ alter table public.bans enable row level security;
 create or replace function public.moe_uid() returns uuid language plpgsql stable security definer set search_path = public as $$
 begin if auth.uid() is null then raise exception 'not signed in'; end if;
   if exists (select 1 from bans where uid = auth.uid() and (until is null or until > now())) then raise exception 'banned'; end if;
+  if to_regclass('public.settings') is not null and exists (select 1 from settings where k = 'maint' and (v->>'on')::boolean)
+     and not exists (select 1 from admins where uid = auth.uid()) then raise exception 'maintenance'; end if;
   return auth.uid(); end $$;
 create or replace function public.moe_today() returns date language sql stable as $$ select (now() at time zone 'Asia/Taipei')::date $$;
 create or replace function public.moe_vip(p_topup int) returns int language sql immutable as $$
   select coalesce((select max(i) from unnest(array[0,60,330,980,1980,3280,6480,9800,19800,32800,64800]) with ordinality t(v,i) where p_topup >= v),1)::int - 1 $$;
 
 -- 第一次連線:建立錢包(新玩家 160 鑽石)
+create table if not exists public.player_day(uid uuid, d date, primary key(uid, d));
+alter table public.player_day enable row level security;
 create or replace function public.wallet_init(p_local int) returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); w wallet;
 begin
   insert into wallet(uid) values (u) on conflict (uid) do nothing;
+  insert into player_day values (u, moe_today()) on conflict do nothing;
   select * into w from wallet where uid = u;
   return jsonb_build_object('gem',w.gem,'topup',w.topup,'pity',w.pity,'dpity',w.dpity,'bank',w.bank);
 end $$;
@@ -47,6 +52,7 @@ begin
   select * into w from wallet where uid = u for update;
   if not found then insert into wallet(uid) values (u) returning * into w; end if;
   if w.earn_day is distinct from moe_today() then w.earn_day := moe_today(); w.earn_today := 0; end if;
+  insert into player_day values (u, moe_today()) on conflict do nothing;
   w.bank := least(w.bank + greatest(coalesce(p_earn,0),0), 20000);
   e := least(w.bank, greatest(1000 - w.earn_today, 0));
   w.bank := w.bank - e;
@@ -65,8 +71,9 @@ create or replace function public.summon(p_n int, p_wish text default null) retu
 declare u uuid := moe_uid(); w wallet; cost int; res jsonb := '[]'::jsonb; i int; r float; q int; k text; tot float; acc float;
   ks text[] := array['fox','otter','penguin','pango','ferret','whale','bear','dragon','bunny','mouse','mole','puffer','owl','lizard','deer','moth','armad','seal','marten','phoenix'];
   ws float[] := array[1,1,1,1,1,1,.5,.08,1,1,1,1,1,1,1,1,.5,.5,.5,.08];
-  epic text[] := array['bear','armad','seal','marten']; anyhi boolean := false;
+  epic text[] := array['bear','armad','seal','marten']; anyhi boolean := false; up boolean;
 begin
+  up := to_regclass('public.game_event') is not null and exists (select 1 from game_event where kind = 'sumup' and starts <= now() and ends > now());
   if p_n not in (1,10) then raise exception 'bad n'; end if;
   cost := case when p_n = 10 then 1440 else 160 end;
   select * into w from wallet where uid = u for update;
@@ -75,7 +82,7 @@ begin
   select sum(x) into tot from unnest(ws) x;
   for i in 1..p_n loop
     w.pity := w.pity + 1; w.dpity := w.dpity + 1; r := random();
-    q := case when r < .015 then 3 when r < .1 then 2 when r < .4 then 1 else 0 end;
+    q := case when r < (case when up then .03 else .015 end) then 3 when r < (case when up then .15 else .1 end) then 2 when r < .4 then 1 else 0 end;
     if w.pity >= 80 then q := 3; end if;
     if p_n = 10 and i = 10 and not anyhi and q < 1 then q := 1; end if;
     if q >= 1 then anyhi := true; end if;
@@ -184,6 +191,10 @@ alter table if exists public.inbox add column if not exists credit boolean not n
 create index if not exists market_open_idx on public.market(status, created);
 create table if not exists public.inbox(id bigserial primary key, uid uuid not null, item jsonb, gem int not null default 0, note text, created timestamptz not null default now(), claimed boolean not null default false, credit boolean not null default false);
 alter table public.inbox add column if not exists credit boolean not null default false;
+alter table public.inbox add column if not exists title text;
+alter table public.inbox add column if not exists kind text not null default 'system';
+alter table public.inbox add column if not exists bonus jsonb;
+create index if not exists inbox_uid_idx on public.inbox(uid, id);
 create table if not exists public.mint_quota(uid uuid, wk int, kind text, n int not null default 0, primary key(uid, wk, kind));
 alter table public.market enable row level security;
 alter table public.inbox enable row level security;
@@ -248,8 +259,8 @@ begin
   insert into wallet(uid) values (m.seller) on conflict do nothing;
   update wallet set gem = gem + g, updated_at = now() where uid = m.seller;
   update market set status = 'sold', buyer = u, sold_at = now() where id = p_id;
-  insert into inbox(uid, item, note) values (u, m.item, '交易所購買');
-  insert into inbox(uid, gem, note) values (m.seller, g, '交易所賣出(已扣 10% 手續費)');
+  insert into inbox(uid, item, note, kind, title) values (u, m.item, '你在交易所買到的裝備,領取後放進背包。', 'market', '交易所:購買成功');
+  insert into inbox(uid, gem, note, kind, title) values (m.seller, g, '你上架的 ' || coalesce(m.item->>'type','裝備') || ' 賣出了,鑽石已直接入帳(已扣 10% 手續費)。', 'market', '交易所:裝備賣出');
   insert into gem_log(uid,delta,reason) values (u, -m.price, 'market_buy:'||p_id), (m.seller, g, 'market_sell:'||p_id);
   return jsonb_build_object('gem', (select gem from wallet where uid = u), 'item', m.item);
 end $$;
@@ -260,7 +271,7 @@ begin
   select * into m from market where id = p_id and seller = u for update;
   if not found or m.status <> 'open' then raise exception '這件已經賣掉或下架了'; end if;
   update market set status = 'cancelled' where id = p_id;
-  insert into inbox(uid, item, note) values (u, m.item, '交易所下架退回');
+  insert into inbox(uid, item, note, kind, title) values (u, m.item, '你下架的裝備,領取後回到背包。', 'market', '交易所:下架退回');
   return jsonb_build_object('ok', true);
 end $$;
 
@@ -276,25 +287,56 @@ begin
       g := floor(m.price * .9);
       update market set status = 'sold', sold_at = now() where id = m.id;
       update wallet set gem = gem + g, updated_at = now() where uid = u;
-      insert into inbox(uid, gem, note) values (u, g, '交易所賣出(已扣 10% 手續費)');
+      insert into inbox(uid, gem, note, kind, title) values (u, g, '你上架的裝備賣出了,鑽石已直接入帳(已扣 10% 手續費)。', 'market', '交易所:裝備賣出');
       insert into gem_log(uid,delta,reason) values (u, g, 'market_sell_bot:'||m.id);
     end if;
   end loop;
 end $$;
 revoke execute on function public.market_tick(uuid) from public, anon, authenticated;
 
--- 領取信箱(買到的裝備、退回的裝備、營運寄送的鑽石;交易所賣出的鑽石已直接入帳)
-create or replace function public.inbox_claim() returns jsonb language plpgsql security definer set search_path = public as $$
-declare u uuid := moe_uid(); out jsonb; cr int;
+-- 信箱:列出信件(順便處理交易所過期退回、系統買家);已領取超過 30 天的信會自動刪除
+create or replace function public.inbox_list() returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid();
 begin
   perform market_tick(u);
-  insert into inbox(uid, item, note) select seller, item, '交易所上架 48 小時未售出,退回' from market where seller = u and status = 'open' and created < now() - interval '48 hours';
+  insert into inbox(uid, item, note, kind, title) select seller, item, '上架 48 小時沒有賣出,領取後回到背包。', 'market', '交易所:過期退回' from market where seller = u and status = 'open' and created < now() - interval '48 hours';
   update market set status = 'expired' where seller = u and status = 'open' and created < now() - interval '48 hours';
-  with c as (update inbox set claimed = true where uid = u and not claimed returning id, item, gem, note, credit)
-  select coalesce(jsonb_agg(jsonb_build_object('item', item, 'gem', gem, 'note', note) order by id), '[]'::jsonb), coalesce(sum(gem) filter (where credit), 0) into out, cr from c;
+  delete from inbox where uid = u and claimed and created < now() - interval '30 days';
+  return jsonb_build_object('gem', (select gem from wallet where uid = u), 'mail', (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'title', title, 'note', note, 'kind', kind, 'gem', gem, 'item', item, 'bonus', bonus, 'credit', credit, 'claimed', claimed, 'created', created) order by id desc), '[]'::jsonb)
+    from (select * from inbox where uid = u order by id desc limit 100) x));
+end $$;
+-- 領取信件(p_id 留空 = 全部領取):裝備交給遊戲放進背包,營運寄的鑽石在這裡入帳
+create or replace function public.inbox_take(p_id bigint default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); out jsonb; cr int;
+begin
+  with c as (update inbox set claimed = true where uid = u and not claimed and (p_id is null or id = p_id) returning id, item, gem, note, title, credit, bonus)
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'item', item, 'gem', gem, 'note', note, 'title', title, 'credit', credit, 'bonus', bonus) order by id), '[]'::jsonb), coalesce(sum(gem) filter (where credit), 0) into out, cr from c;
   if cr > 0 then insert into wallet(uid) values (u) on conflict do nothing; update wallet set gem = gem + cr, updated_at = now() where uid = u; insert into gem_log(uid,delta,reason) values (u, cr, 'mail'); end if;
   return jsonb_build_object('items', out, 'gem', (select gem from wallet where uid = u));
 end $$;
+-- 舊版相容
+create or replace function public.inbox_claim() returns jsonb language sql security definer set search_path = public as $$ select inbox_take(null) $$;
+
+-- ============ 跑馬燈:攻城消息 ============
+create table if not exists public.events(id bigserial primary key, uid uuid, kind text, txt text not null, at timestamptz not null default now());
+create index if not exists events_at_idx on public.events(at);
+alter table public.events enable row level security;
+drop policy if exists events_read on public.events;
+create policy events_read on public.events for select to authenticated using (at > now() - interval '2 hours');
+grant select on public.events to authenticated;
+-- 遊戲回報攻城結果,文字由伺服器組成(同一個人 20 秒內只記一次)
+create or replace function public.event_siege(p_kind text, p_target text, p_loot int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); me text; t text := left(regexp_replace(coalesce(p_target,''), '[<>]', '', 'g'), 16); l int := least(greatest(coalesce(p_loot,0),0), 5000000);
+begin
+  if exists (select 1 from events where uid = u and at > now() - interval '20 seconds') then return jsonb_build_object('ok', false); end if;
+  select left(coalesce(data->>'n','守護員'),16) into me from docs where path = 'arena/' || u::text; me := coalesce(me,'守護員');
+  if t = '' then return jsonb_build_object('ok', false); end if;
+  insert into events(uid, kind, txt) values (u, p_kind, case when p_kind = 'breach' then '🔥 ' || t || ' 攻破了 ' || me || ' 的城門' || case when l > 0 then ',搶走 ⭐' || to_char(l,'FM999,999,999') else '' end
+    else '⚔️ ' || me || ' 攻破了 ' || t || ' 的城門' || case when l > 0 then ',搶走 ⭐' || to_char(l,'FM999,999,999') else '' end end);
+  delete from events where at < now() - interval '1 day';
+  return jsonb_build_object('ok', true);
+end $$;
+grant execute on function public.inbox_list(), public.inbox_take(bigint), public.event_siege(text,text,int) to authenticated;
 
 -- ============ 刪除帳號 ============
 -- 玩家在設定頁按「刪除帳號」:清掉這個帳號的所有資料(存檔、鑽石、天梯、交易所上架),最後刪掉登入帳號本身
@@ -415,24 +457,25 @@ begin
   insert into wallet(uid) values (p_uid) on conflict do nothing;
   update wallet set gem = greatest(0, gem + p_delta), updated_at = now() where uid = p_uid returning gem into g;
   insert into gem_log(uid,delta,reason) values (p_uid, p_delta, 'admin:' || coalesce(p_reason,''));
-  insert into inbox(uid, gem, note) values (p_uid, p_delta, '營運調整:' || coalesce(nullif(p_reason,''),'鑽石調整'));
+  insert into inbox(uid, gem, note, kind, title) values (p_uid, p_delta, coalesce(nullif(p_reason,''),'鑽石調整') || '(鑽石已直接調整)', 'ops', '營運通知:鑽石調整');
   perform alog('gem', p_uid, jsonb_build_object('delta', p_delta, 'reason', p_reason));
   return jsonb_build_object('gem', g);
 end $$;
 
 -- 寄信(可附鑽石):指定一位玩家,或 p_uid 留空 = 全服(有玩過的玩家)
-create or replace function public.admin_mail(p_uid uuid, p_gem int, p_note text) returns jsonb language plpgsql security definer set search_path = public as $$
+drop function if exists public.admin_mail(uuid,int,text);
+create or replace function public.admin_mail(p_uid uuid, p_gem int, p_note text, p_title text default null) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); n int;
 begin
   if coalesce(p_gem,0) < 0 or p_gem > 100000 then raise exception '鑽石數量要在 0 ~ 100000 之間'; end if;
   if coalesce(trim(p_note),'') = '' then raise exception '請填寫信件內容'; end if;
   if p_uid is null then
-    insert into inbox(uid, gem, note, credit) select uid, coalesce(p_gem,0), p_note, true from wallet;
+    insert into inbox(uid, gem, note, credit, kind, title) select uid, coalesce(p_gem,0), p_note, true, 'ops', coalesce(nullif(trim(p_title),''),'營運信件') from wallet;
   else
-    insert into inbox(uid, gem, note, credit) values (p_uid, coalesce(p_gem,0), p_note, true);
+    insert into inbox(uid, gem, note, credit, kind, title) values (p_uid, coalesce(p_gem,0), p_note, true, 'ops', coalesce(nullif(trim(p_title),''),'營運信件'));
   end if;
   get diagnostics n = row_count;
-  perform alog('mail', p_uid, jsonb_build_object('gem', p_gem, 'note', p_note, 'n', n));
+  perform alog('mail', p_uid, jsonb_build_object('gem', p_gem, 'note', p_note, 'title', p_title, 'n', n));
   return jsonb_build_object('sent', n);
 end $$;
 
@@ -473,19 +516,21 @@ begin
   select * into m from market where id = p_id for update;
   if not found or m.status <> 'open' then raise exception '這件已經不在上架中'; end if;
   update market set status = 'cancelled' where id = p_id;
-  insert into inbox(uid, item, note) values (m.seller, m.item, '營運下架退回:' || coalesce(nullif(p_reason,''),'違反交易規範'));
+  insert into inbox(uid, item, note, kind, title) values (m.seller, m.item, '原因:' || coalesce(nullif(p_reason,''),'違反交易規範') || '。領取後回到背包。', 'ops', '營運通知:交易所裝備下架');
   perform alog('market_remove', m.seller, jsonb_build_object('id', p_id, 'reason', p_reason));
   return jsonb_build_object('ok', true);
 end $$;
 
-create or replace function public.admin_notice_save(p_id bigint, p_title text, p_body text, p_active boolean) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); i bigint;
+drop function if exists public.admin_notice_save(bigint,text,text,boolean);
+create or replace function public.admin_notice_save(p_id bigint, p_title text, p_body text, p_active boolean, p_mail boolean default false) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); i bigint; n int := 0;
 begin
   if coalesce(trim(p_title),'') = '' then raise exception '請填寫標題'; end if;
   if p_id is null then insert into notice(title, body, active) values (p_title, coalesce(p_body,''), coalesce(p_active,true)) returning id into i;
   else update notice set title = p_title, body = coalesce(p_body,''), active = coalesce(p_active,true) where id = p_id returning id into i; end if;
-  perform alog('notice', null, jsonb_build_object('id', i, 'title', p_title, 'active', p_active));
-  return jsonb_build_object('id', i);
+  if p_mail then insert into inbox(uid, gem, note, credit, kind, title) select uid, 0, coalesce(nullif(p_body,''), p_title), false, 'ops', '📢 ' || p_title from wallet; get diagnostics n = row_count; end if;
+  perform alog('notice', null, jsonb_build_object('id', i, 'title', p_title, 'active', p_active, 'mail', n));
+  return jsonb_build_object('id', i, 'mailed', n);
 end $$;
 create or replace function public.admin_notice_delete(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin();
@@ -515,6 +560,175 @@ begin return (select coalesce(jsonb_agg(jsonb_build_object('at', l.at, 'action',
 
 revoke execute on function public.alog(text,uuid,jsonb) from public, anon, authenticated;
 grant execute on function public.admin_whoami(), public.admin_claim(), public.admin_stats(), public.admin_players(text,text,int), public.admin_player(uuid),
-  public.admin_gem(uuid,int,text), public.admin_mail(uuid,int,text), public.admin_ban(uuid,text,int), public.admin_unban(uuid), public.admin_player_set(uuid,text,int),
-  public.admin_market(text), public.admin_market_remove(bigint,text), public.admin_notice_save(bigint,text,text,boolean), public.admin_notice_delete(bigint), public.admin_notices(),
+  public.admin_gem(uuid,int,text), public.admin_mail(uuid,int,text,text), public.admin_ban(uuid,text,int), public.admin_unban(uuid), public.admin_player_set(uuid,text,int),
+  public.admin_market(text), public.admin_market_remove(bigint,text), public.admin_notice_save(bigint,text,text,boolean,boolean), public.admin_notice_delete(bigint), public.admin_notices(),
   public.admin_admins(), public.admin_admin_set(text,boolean), public.admin_logs(int) to authenticated;
+
+-- ============ 後台第二批:即時廣播、活動、兌換碼、維護、聊天管理、客服、儲值紀錄、報表 ============
+create table if not exists public.settings(k text primary key, v jsonb not null default '{}'::jsonb);
+create table if not exists public.live_msg(id bigserial primary key, txt text not null, until timestamptz not null, at timestamptz not null default now());
+create table if not exists public.game_event(id bigserial primary key, kind text not null, starts timestamptz not null, ends timestamptz not null, note text, created timestamptz not null default now());
+create table if not exists public.codes(code text primary key, reward jsonb not null, max_uses int not null default 0, used int not null default 0, expires timestamptz, active boolean not null default true, created timestamptz not null default now());
+create table if not exists public.code_use(code text, uid uuid, at timestamptz not null default now(), primary key(code, uid));
+create table if not exists public.mutes(uid uuid primary key, until timestamptz, reason text, at timestamptz not null default now());
+create table if not exists public.chat_hide(uid uuid, t bigint, at timestamptz not null default now(), primary key(uid, t));
+create table if not exists public.tickets(id bigserial primary key, uid uuid not null default auth.uid(), cat text, body text not null, status text not null default 'open', reply text, at timestamptz not null default now(), replied_at timestamptz);
+alter table public.settings enable row level security; alter table public.live_msg enable row level security; alter table public.game_event enable row level security;
+alter table public.codes enable row level security; alter table public.code_use enable row level security; alter table public.mutes enable row level security;
+alter table public.chat_hide enable row level security; alter table public.tickets enable row level security;
+drop policy if exists settings_read on public.settings; create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint'));
+drop policy if exists live_read on public.live_msg; create policy live_read on public.live_msg for select to authenticated using (until > now());
+drop policy if exists gev_read on public.game_event; create policy gev_read on public.game_event for select to anon, authenticated using (ends > now());
+drop policy if exists mutes_read on public.mutes; create policy mutes_read on public.mutes for select to authenticated using (until is null or until > now());
+drop policy if exists chide_read on public.chat_hide; create policy chide_read on public.chat_hide for select to authenticated using (at > now() - interval '2 days');
+drop policy if exists tickets_read on public.tickets; create policy tickets_read on public.tickets for select to authenticated using (uid = auth.uid());
+grant select on public.settings, public.game_event to anon, authenticated; grant select on public.live_msg, public.mutes, public.chat_hide, public.tickets to authenticated;
+
+-- 即時廣播:所有在線玩家畫面跳出 30 秒
+create or replace function public.admin_live(p_txt text, p_secs int default 30) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  if coalesce(trim(p_txt),'') = '' then raise exception '請輸入廣播內容'; end if;
+  insert into live_msg(txt, until) values (left(p_txt, 120), now() + make_interval(secs => least(greatest(coalesce(p_secs,30),5),300)));
+  delete from live_msg where until < now() - interval '1 day';
+  perform alog('live', null, jsonb_build_object('txt', p_txt));
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 活動:xp2 雙倍經驗、drop2 雙倍掉落、sumup 召喚機率 UP
+create or replace function public.admin_events() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin return (select coalesce(jsonb_agg(to_jsonb(e) order by e.starts desc), '[]'::jsonb) from (select * from game_event order by starts desc limit 50) e); end $$;
+create or replace function public.admin_event_save(p_id bigint, p_kind text, p_starts timestamptz, p_ends timestamptz, p_note text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); i bigint;
+begin
+  if p_kind not in ('xp2','drop2','sumup') then raise exception '活動種類不對'; end if;
+  if p_ends <= p_starts then raise exception '結束時間要晚於開始時間'; end if;
+  if p_id is null then insert into game_event(kind, starts, ends, note) values (p_kind, p_starts, p_ends, p_note) returning id into i;
+  else update game_event set kind = p_kind, starts = p_starts, ends = p_ends, note = p_note where id = p_id returning id into i; end if;
+  perform alog('event', null, jsonb_build_object('id', i, 'kind', p_kind, 'starts', p_starts, 'ends', p_ends));
+  return jsonb_build_object('id', i);
+end $$;
+create or replace function public.admin_event_delete(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin delete from game_event where id = p_id; perform alog('event_delete', null, jsonb_build_object('id', p_id)); return jsonb_build_object('ok', true); end $$;
+
+-- 兌換碼:reward = {"gem":100,"coin":5000,"candy":30,"stones":10,"rtix":1}
+create or replace function public.admin_codes() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin return (select coalesce(jsonb_agg(to_jsonb(c) order by c.created desc), '[]'::jsonb) from codes c); end $$;
+create or replace function public.admin_code_save(p_code text, p_reward jsonb, p_max int, p_expires timestamptz, p_active boolean) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); c text := upper(regexp_replace(coalesce(p_code,''), '[^A-Za-z0-9]', '', 'g'));
+begin
+  if length(c) < 4 or length(c) > 20 then raise exception '兌換碼要 4–20 個英文或數字'; end if;
+  if coalesce((p_reward->>'gem')::int,0) > 100000 then raise exception '鑽石太多了'; end if;
+  insert into codes(code, reward, max_uses, expires, active) values (c, p_reward, greatest(coalesce(p_max,0),0), p_expires, coalesce(p_active,true))
+    on conflict (code) do update set reward = excluded.reward, max_uses = excluded.max_uses, expires = excluded.expires, active = excluded.active;
+  perform alog('code', null, jsonb_build_object('code', c, 'reward', p_reward, 'max', p_max));
+  return jsonb_build_object('code', c);
+end $$;
+create or replace function public.redeem(p_code text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); c codes; k text := upper(regexp_replace(coalesce(p_code,''), '[^A-Za-z0-9]', '', 'g'));
+begin
+  select * into c from codes where code = k for update;
+  if not found or not c.active then raise exception '兌換碼不存在'; end if;
+  if c.expires is not null and c.expires < now() then raise exception '兌換碼已經過期'; end if;
+  if c.max_uses > 0 and c.used >= c.max_uses then raise exception '兌換碼已經被領完了'; end if;
+  insert into code_use(code, uid) values (k, u) on conflict do nothing;
+  if not found then raise exception '你已經兌換過這個碼了'; end if;
+  update codes set used = used + 1 where code = k;
+  insert into inbox(uid, gem, note, credit, kind, title, bonus) values (u, coalesce((c.reward->>'gem')::int,0), '兌換碼 ' || k || ' 的獎勵', true, 'system', '🎁 兌換碼獎勵', c.reward - 'gem');
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 維護模式
+create or replace function public.admin_maint(p_on boolean, p_msg text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  insert into settings(k, v) values ('maint', jsonb_build_object('on', p_on, 'msg', coalesce(p_msg,''))) on conflict (k) do update set v = excluded.v;
+  perform alog('maint', null, jsonb_build_object('on', p_on, 'msg', p_msg));
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 聊天管理
+create or replace function public.admin_chat() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  return jsonb_build_object('msgs', (select coalesce(jsonb_agg(x order by (x->>'t')::bigint desc), '[]'::jsonb) from (
+      select jsonb_build_object('uid', d.owner, 'name', d.data->>'n', 't', (m->>'t')::bigint, 'x', m->>'x', 'hidden', exists (select 1 from chat_hide h where h.uid = d.owner and h.t = (m->>'t')::bigint)) x
+      from docs d, jsonb_array_elements(coalesce(d.data->'cw','[]'::jsonb)) m where d.coll = 'arena' and (d.data->>'cwT')::bigint > (extract(epoch from now()) * 1000)::bigint - 86400000
+      order by (m->>'t')::bigint desc limit 300) s),
+    'mutes', (select coalesce(jsonb_agg(jsonb_build_object('uid', m.uid, 'until', m.until, 'reason', m.reason, 'name', d.data->>'n')), '[]'::jsonb) from mutes m left join docs d on d.path = 'arena/' || m.uid::text where m.until is null or m.until > now()));
+end $$;
+create or replace function public.admin_chat_hide(p_uid uuid, p_t bigint, p_hide boolean) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  if p_hide then insert into chat_hide(uid, t) values (p_uid, p_t) on conflict do nothing; else delete from chat_hide where uid = p_uid and t = p_t; end if;
+  perform alog(case when p_hide then 'chat_hide' else 'chat_unhide' end, p_uid, jsonb_build_object('t', p_t));
+  return jsonb_build_object('ok', true);
+end $$;
+create or replace function public.admin_mute(p_uid uuid, p_hours int, p_reason text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  if p_hours is null or p_hours < 0 then delete from mutes where uid = p_uid; perform alog('unmute', p_uid, '{}'::jsonb); return jsonb_build_object('ok', true); end if;
+  insert into mutes(uid, until, reason) values (p_uid, case when p_hours > 0 then now() + make_interval(hours => p_hours) end, p_reason)
+    on conflict (uid) do update set until = excluded.until, reason = excluded.reason, at = now();
+  perform alog('mute', p_uid, jsonb_build_object('hours', p_hours, 'reason', p_reason));
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 客服回報
+create or replace function public.ticket_submit(p_cat text, p_body text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid();
+begin
+  if length(trim(coalesce(p_body,''))) < 5 then raise exception '請多描述一點(至少 5 個字)'; end if;
+  if (select count(*) from tickets where uid = u and at > now() - interval '1 day') >= 5 then raise exception '今天已經回報 5 次了,請明天再試'; end if;
+  insert into tickets(uid, cat, body) values (u, left(coalesce(p_cat,'其他'),10), left(p_body, 1000));
+  return jsonb_build_object('ok', true);
+end $$;
+create or replace function public.admin_tickets(p_status text default 'open') returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare a uuid := moe_admin();
+begin return (select coalesce(jsonb_agg(to_jsonb(t) || jsonb_build_object('name', d.data->>'n', 'acct', split_part(coalesce(u.email,''),'@',1)) order by t.id desc), '[]'::jsonb)
+  from (select * from tickets where p_status = 'all' or status = p_status order by id desc limit 100) t left join docs d on d.path = 'arena/' || t.uid::text left join auth.users u on u.id = t.uid); end $$;
+create or replace function public.admin_ticket_reply(p_id bigint, p_reply text, p_close boolean) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); t tickets;
+begin
+  select * into t from tickets where id = p_id for update; if not found then raise exception '找不到這張回報單'; end if;
+  if coalesce(trim(p_reply),'') <> '' then
+    update tickets set reply = p_reply, status = case when p_close then 'closed' else 'replied' end, replied_at = now() where id = p_id;
+    insert into inbox(uid, gem, note, credit, kind, title) values (t.uid, 0, '你的回報:「' || left(t.body, 40) || '」' || chr(10) || '回覆:' || p_reply, false, 'ops', '💬 客服回覆');
+  else update tickets set status = case when p_close then 'closed' else status end where id = p_id; end if;
+  perform alog('ticket', t.uid, jsonb_build_object('id', p_id, 'reply', p_reply));
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 儲值紀錄
+create or replace function public.admin_topups(p_from date, p_to date) returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare a uuid := moe_admin();
+begin return (select coalesce(jsonb_agg(jsonb_build_object('at', g.at, 'uid', g.uid, 'pkg', substr(g.reason, 7), 'gem', g.delta, 'name', d.data->>'n', 'acct', split_part(coalesce(u.email,''),'@',1)) order by g.id desc), '[]'::jsonb)
+  from gem_log g left join docs d on d.path = 'arena/' || g.uid::text left join auth.users u on u.id = g.uid
+  where g.reason like 'topup:%' and (g.at at time zone 'Asia/Taipei')::date between coalesce(p_from, moe_today() - 30) and coalesce(p_to, moe_today())); end $$;
+
+-- 數據報表:留存、每日召喚、熱門萌獸
+create or replace function public.admin_report() returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare a uuid := moe_admin(); t date := moe_today();
+begin
+  return jsonb_build_object(
+    'cohorts', (select coalesce(jsonb_agg(x order by x->>'d' desc), '[]'::jsonb) from (
+      select jsonb_build_object('d', c.d, 'n', count(*),
+        'd1', count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.d + 1)),
+        'd3', count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.d + 3)),
+        'd7', count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.d + 7)),
+        'ok1', c.d + 1 <= t, 'ok3', c.d + 3 <= t, 'ok7', c.d + 7 <= t) x
+      from (select id uid, (created_at at time zone 'Asia/Taipei')::date d from auth.users) c where c.d > t - 21 group by c.d) s),
+    'summons', (select coalesce(jsonb_agg(jsonb_build_object('d', d, 'n', n) order by d), '[]'::jsonb) from (
+      select (at at time zone 'Asia/Taipei')::date d, sum(case when reason = 'summon10' then 10 else 1 end) n from gem_log where reason like 'summon%' and at > now() - interval '14 days' group by 1) s),
+    'pets', (select coalesce(jsonb_agg(jsonb_build_object('k', k, 'n', n) order by n desc), '[]'::jsonb) from (
+      select split_part(tm, ',', 1) k, count(*) n from docs d, jsonb_array_elements_text(coalesce(d.data->'team','[]'::jsonb)) tm where d.coll = 'arena' group by 1 order by 2 desc limit 20) s));
+end $$;
+
+revoke execute on function public.redeem(text) from anon;
+grant execute on function public.admin_live(text,int), public.admin_events(), public.admin_event_save(bigint,text,timestamptz,timestamptz,text), public.admin_event_delete(bigint),
+  public.admin_codes(), public.admin_code_save(text,jsonb,int,timestamptz,boolean), public.redeem(text), public.admin_maint(boolean,text),
+  public.admin_chat(), public.admin_chat_hide(uuid,bigint,boolean), public.admin_mute(uuid,int,text), public.ticket_submit(text,text), public.admin_tickets(text),
+  public.admin_ticket_reply(bigint,text,boolean), public.admin_topups(date,date), public.admin_report() to authenticated;
