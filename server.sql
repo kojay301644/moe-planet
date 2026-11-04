@@ -289,6 +289,20 @@ begin
   return jsonb_build_object('items', out, 'gem', (select gem from wallet where uid = u));
 end $$;
 
+-- ============ 刪除帳號 ============
+-- 玩家在設定頁按「刪除帳號」:清掉這個帳號的所有資料(存檔、鑽石、天梯、交易所上架),最後刪掉登入帳號本身
+create or replace function public.delete_account() returns jsonb language plpgsql security definer set search_path = public, auth as $$
+declare u uuid := moe_uid();
+begin
+  update market set status = 'cancelled' where seller = u and status = 'open';
+  delete from inbox where uid = u; delete from mint_quota where uid = u; delete from ladder where uid = u;
+  delete from gem_log where uid = u; delete from pay_first where uid = u; delete from wallet where uid = u;
+  delete from docs where owner = u;
+  delete from auth.users where id = u;
+  return jsonb_build_object('ok', true);
+end $$;
+grant execute on function public.delete_account() to authenticated;
+
 grant execute on function public.wallet_init(int), public.gem_sync(int,int), public.summon(int,text), public.topup_test(text),
   public.ladder_me(), public.ladder_report(boolean,int,int,int,real), public.ladder_buy(), public.ladder_top(int),
   public.market_list(jsonb,int), public.market_browse(), public.market_mine(), public.market_buy(bigint), public.market_cancel(bigint), public.inbox_claim() to authenticated;
