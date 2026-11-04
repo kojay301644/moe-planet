@@ -3120,7 +3120,7 @@ TDCNT.rainbow=['fire','water','grass','elec','ice','rock'];
 const tdBon=el=>TD.tone==='rainbow'?1.12:el===TD.tone?1.25:1;
 const tdBonHtml=()=>TD.tone==='rainbow'?'🌈 所有萌獸攻擊 +12%':`<span class="el el-${TD.tone}">${EL[TD.tone].n}</span>系萌獸攻擊 +25%`;
 const tdBonTxt=()=>TD.tone==='rainbow'?'所有萌獸攻擊 +12% · 怪物屬性隨機':`${EL[TD.tone].n}系萌獸攻擊 +25% · 怪物多為 ${TDCNT[TD.tone].map(e=>EL[e].n).join('、')}系`;
-const TDDIFF=[{n:'普通',hp:2,c:'#3a9a4a'},{n:'困難',hp:7,c:'#e08a1a'},{n:'地獄',hp:13,c:'#d03a4a'}];
+const TDDIFF=[{n:'普通',hp:.5,c:'#3a9a4a'},{n:'困難',hp:4,c:'#e08a1a'},{n:'地獄',hp:11,c:'#d03a4a'}];
 const TDMAX=6,TDWT=3,TDHP=20,TDW=20,TDBUY=[20,30,50],TDLVM=[1,1.45,2];
 const tdCost=k=>40+20*qOf(k),tdUpC=(k,lv)=>lv===1?60+15*qOf(k):100+25*qOf(k);
 const TDBOSS=['worm','golem','yking','serpent','titan','lich'];
