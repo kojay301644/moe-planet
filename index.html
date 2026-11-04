@@ -156,7 +156,7 @@ button.mini{min-height:30px;padding:2px 10px;background:#eee;color:#888}
 #toast{position:fixed;z-index:9;left:50%;top:calc(env(safe-area-inset-top,0px) + 70px);transform:translate(-50%,-10px);opacity:0;transition:.25s;background:#fff;color:var(--ink);padding:8px 18px;border-radius:999px;font-weight:700;box-shadow:0 4px 0 rgba(0,0,0,.2);pointer-events:none;max-width:90vw;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 
-.ov{position:fixed;inset:0;z-index:10;display:grid;place-items:safe center;background:linear-gradient(rgba(20,40,90,.55),rgba(20,30,60,.85)),url(assets/home.webp) center/cover;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ov{position:fixed;inset:0;z-index:10;display:grid;place-items:safe center;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-block:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(20,40,90,.55),rgba(20,30,60,.85)),url(assets/home.webp) center/cover;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .ov.dark{background:radial-gradient(ellipse at 50% 40%,#2a3a6a,#0b1020);color:#fff;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;cursor:pointer}
 .tbox{background:rgba(255,248,236,.96);border-radius:26px;padding:26px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 0 rgba(0,0,0,.25)}
 .logo{font-family:var(--num);font-size:46px;margin:0;color:#ff8a3d;text-shadow:0 4px 0 #b4501a,0 8px 18px rgba(0,0,0,.25)}.sub{margin:0;color:var(--muted)}
@@ -430,6 +430,8 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 #eggPick button{display:flex;flex-direction:column;align-items:center;gap:2px;width:104px;padding:8px 4px;border-radius:16px;background:#fff8ec;border:3px solid #ecd6b0;cursor:pointer}
 #eggPick button.on{border-color:#ff8a3d;background:#fff0dc;transform:translateY(-3px);box-shadow:0 6px 12px rgba(255,138,61,.3)}
 #eggPick img{width:76px;height:76px;object-fit:contain}#eggPick b{font-size:15px;color:#5a3a1a}#eggPick small{font-size:11px;color:#8a6a4a}
+@media (max-height:760px),(max-width:420px){#eggPane .tbox{padding:16px 14px;gap:8px}#eggPet #eggImg{width:96px;height:96px}#eggPick img{width:60px;height:60px}#eggPick{gap:6px;flex-wrap:nowrap}#eggPick button{width:auto;flex:1 1 0;min-width:0;padding:6px 3px}#eggInfo{font-size:13px;margin:4px 0}}
+#eggBtns{justify-content:center}
 #eggPet .pro{color:#2a9a4a;font-weight:700}#eggPet .con{color:#c0503a;font-weight:700}#eggPet #eggImg{width:140px;height:140px}
 /* chat */
 .chatc{display:flex;flex-direction:column;gap:8px}
@@ -2685,7 +2687,7 @@ const STARTERS=[['fox','傷害最高,打頭目最快','血量最少,比較脆'],
 function startEgg(){egg={k:null};$('eggPane').hidden=false;$('eggBig').hidden=true;$('eggReroll').hidden=true;$('eggPet').hidden=true;$('eggBtns').hidden=true;$('eggTip').textContent='三隻夥伴選一隻,其他萌獸之後可以召喚取得';
   $('eggPick').innerHTML=STARTERS.map(([k])=>{const P=PETS[k];return `<button data-k="${k}"><img src="assets/${P.img}1.webp" alt=""><b>${P.n[0]}</b><small>${EL[P.el].n} · ${P.role}</small></button>`}).join('');
   $('eggPick').querySelectorAll('button').forEach(b=>b.onclick=()=>{sfx('click');const k=b.dataset.k,P=PETS[k],S=STARTERS.find(x=>x[0]===k);egg.k=k;$('eggPick').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
-    $('eggPet').hidden=false;$('eggImg').src='assets/'+P.img+'1.webp';$('eggName').textContent=P.n[0];$('eggInfo').innerHTML=`${EL[P.el].n}屬性 · ${P.role}<br>技能「${P.sk.n}」:${P.sk.d}<br><span class="pro">👍 ${S[1]}</span> <span class="con">👎 ${S[2]}</span>`;$('eggBtns').hidden=false;$('eggTip').textContent='就決定是牠嗎?'})}
+    $('eggPet').hidden=false;$('eggImg').src='assets/'+P.img+'1.webp';$('eggName').textContent=P.n[0];$('eggInfo').innerHTML=`${EL[P.el].n}屬性 · ${P.role}<br>技能「${P.sk.n}」:${P.sk.d}<br><span class="pro">👍 ${S[1]}</span> <span class="con">👎 ${S[2]}</span>`;$('eggBtns').hidden=false;$('eggTip').textContent='就決定是牠嗎?';setTimeout(()=>$('eggBtns').scrollIntoView({behavior:'smooth',block:'end'}),60)})}
 function eggReset(){egg.taps=0;egg.k=null;const E=$('eggBig');E.className='egg0';E.hidden=false;$('eggPet').hidden=true;$('eggBtns').hidden=true;$('eggTip').textContent='點蛋,幫牠破殼而出!'}
 $('eggBig').onclick=()=>{if(egg.k)return;egg.taps++;sfx(egg.taps<3?'hit':'egg');const E=$('eggBig');E.className='egg'+egg.taps;
   if(egg.taps>=3){egg.k=COMMONS[Math.floor(rnd()*COMMONS.length)];setTimeout(()=>{E.hidden=true;const P=PETS[egg.k];$('eggPet').hidden=false;$('eggImg').src='assets/'+P.img+'1.webp';$('eggName').textContent=P.n[0];
