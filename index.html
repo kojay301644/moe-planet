@@ -3221,7 +3221,8 @@ function tdUpdate(dt){const T=TD;if(!T)return;TT+=dt;try{skinFx(T.SK,dt)}catch(e
       if(e.E.summon)for(let i=0;i<2;i++)tdSpawn({k:e.E.summon,d:Math.max(0,e.d-30-i*20)});if(e.E.heal){e.hp=Math.min(e.max,e.hp+e.max*.04);tdTxt(x,y-90,'回血!','#7aff9a')}}}
     if(e.stun>0){e.stun-=dt;continue}
     e.d+=e.spd*(1-e.slow)*dt;
-    if(e.d>=TDLEN){e.hp=0;if(e===T.boss)T.boss=null;const dmg=e.boss?5:e.elite?2:1;if(T.shield>0){tdTxt(668,90,'🛡 擋下了!','#9adfff')}else{T.hp-=dmg;T.leak+=dmg;T.shake=.35;sfx('hit');tdTxt(668,80,'-'+dmg,'#ff5a5a',1,true)}if(T.hp<=0){T.hp=0;return tdEnd(false)}}}
+    if(e.d>=TDLEN&&T.shield>0){e.d=0;e.slow=0;tdTxt(668,90,'🛡 彈回起點!','#9adfff');tdPart(668,120,14,['#9adfff','#fff'],180,.5,5);continue}
+    if(e.d>=TDLEN){e.hp=0;if(e===T.boss)T.boss=null;const dmg=e.boss?5:e.elite?2:1;{T.hp-=dmg;T.leak+=dmg;T.shake=.35;sfx('hit');tdTxt(668,80,'-'+dmg,'#ff5a5a',1,true)}if(T.hp<=0){T.hp=0;return tdEnd(false)}}}
   T.en=T.en.filter(e=>e.hp>0);
   for(const s in T.tw){const w=T.tw[s];w.anim+=dt;if(w.hit>0)w.hit-=dt;if(w.stun>0){w.stun-=dt;continue}w.cd-=dt;w.skT-=dt;const [x,y]=TDSLOT[s];
     if(w.cd<=0){const e=tdTarget(w,x,y);if(e){w.cd=w.rate*(w.lv===3?.85:1);if(!w.wt&&w.skT<=0){w.skT=PETS[w.k].sk.cd*1.1;tdTxt(x,y-95,PETS[w.k].sk.n,EL[w.el].c,1.1);tdFire(w,e,true)}else tdFire(w,e,false)}else w.cd=.15}}
@@ -3302,7 +3303,7 @@ function tdHudBuild(){const T=TD;if(!T)return;const cm=CMDS.filter(c=>c.k!=='hol
 function tdHudTick(){const T=TD;if(!T)return;const inf=$('tdInfo');if(inf&&!inf.hidden&&(!T._it||T.t-T._it>.5||T._iw!==T.wave)){T._it=T.t;T._iw=T.wave;inf.innerHTML=tdInfoHtml();iconize(inf)}const w=$('tdWave');if(!w)return;w.textContent=T.prep>0?`準備 ${Math.ceil(T.prep)}`:T.mode==='endless'?`第 ${T.wave} 波`:`${T.wave} / ${TDW}`;$('tdHp').textContent=`${T.hp}/${TDHP}`;$('tdEn').textContent=Math.floor(T.energy);
   const nx=$('tdNext');nx.hidden=!(T.prep>0||(!T.spawn.length&&T.wave<(T.mode==='endless'?1e9:TDW)));nx.textContent=T.prep>0?'開始':'下一波';
   for(const c of CMDS){const b=$('tdc_'+c.k);if(!b)continue;const cd=T.cmd[c.k]||0;b.classList.toggle('cd',cd>0);b.querySelector('.cdm').textContent=cd>1e6?'已用':cd>0?Math.ceil(cd):'';b.classList.toggle('aim',T.aim&&c.k==='rock')}}
-const TDCMD={guard:{cd:1e9,f:()=>{TD.shield=15;tdTxt(668,60,'🛡 城門護盾 15 秒','#9adfff',1.4)}},heal:{cd:1e9,f:()=>{const g=Math.min(6,TDHP-TD.hp);TD.hp+=g;tdTxt(668,60,'💚 城門 +'+g,'#7aff9a',1.4)}},rock:{cd:1e9,aim:1}};
+const TDCMD={guard:{cd:1e9,f:()=>{TD.shield=15;tdTxt(668,60,'🛡 城門護盾 15 秒:撞到的怪物彈回起點','#9adfff',1.6)}},heal:{cd:1e9,f:()=>{const g=Math.min(6,TDHP-TD.hp);TD.hp+=g;tdTxt(668,60,'💚 城門 +'+g,'#7aff9a',1.4)}},rock:{cd:1e9,aim:1}};
 function tdAct(a){const T=TD;if(!T||T.over)return;sfx('click');const [k,arg]=a.split(':');
   if(k==='pause'){T.paused=!T.paused;tdHudBuild()}else if(k==='spd'){T.speed=T.speed===1?2:1;tdHudBuild()}
   else if(k==='next'){if(T.prep>0){T.prep=0;tdNextWave()}else if(!T.spawn.length){const b=8+T.wave;T.energy+=b;tdTxt(1100,560,'提前出怪 ⚡+'+b,'#ffe066',1.2);tdNextWave()}}
