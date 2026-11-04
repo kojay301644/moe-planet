@@ -54,7 +54,7 @@ begin
   return jsonb_build_object('gem',w.gem,'topup',w.topup,'pity',w.pity,'dpity',w.dpity,'bank',w.bank,'free_at',w.free_at);
 end $$;
 
--- 同步:遊戲中賺到的鑽石(每天最多入帳 5000,超過的先存著,之後每天陸續入帳)與花掉的鑽石
+-- 同步:遊戲中賺到的鑽石(不設每日上限,單日收入過高會列入後台異常名單)與花掉的鑽石
 create or replace function public.gem_sync(p_earn int, p_spend int) returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); w wallet; e int; s int;
 begin
@@ -62,9 +62,8 @@ begin
   if not found then insert into wallet(uid) values (u) returning * into w; end if;
   if w.earn_day is distinct from moe_today() then w.earn_day := moe_today(); w.earn_today := 0; end if;
   insert into player_day values (u, moe_today()) on conflict do nothing;
-  w.bank := least(w.bank + greatest(coalesce(p_earn,0),0), 20000);
-  e := least(w.bank, greatest(5000 - w.earn_today, 0));
-  w.bank := w.bank - e;
+  e := w.bank + greatest(coalesce(p_earn,0),0);
+  w.bank := 0;
   s := greatest(coalesce(p_spend,0),0);
   w.gem := w.gem + e; w.earn_today := w.earn_today + e;
   if s > w.gem then w.flags := w.flags + 1; s := w.gem; end if;
@@ -752,7 +751,10 @@ begin
     'summons', (select coalesce(jsonb_agg(jsonb_build_object('d', d, 'n', n) order by d), '[]'::jsonb) from (
       select (at at time zone 'Asia/Taipei')::date d, sum(case when reason = 'summon10' then 10 else 1 end) n from gem_log where reason like 'summon%' and at > now() - interval '14 days' group by 1) s),
     'pets', (select coalesce(jsonb_agg(jsonb_build_object('k', k, 'n', n) order by n desc), '[]'::jsonb) from (
-      select split_part(tm, ',', 1) k, count(*) n from docs d, jsonb_array_elements_text(coalesce(d.data->'team','[]'::jsonb)) tm where d.coll = 'arena' group by 1 order by 2 desc limit 20) s));
+      select split_part(tm, ',', 1) k, count(*) n from docs d, jsonb_array_elements_text(coalesce(d.data->'team','[]'::jsonb)) tm where d.coll = 'arena' group by 1 order by 2 desc limit 20) s),
+    'anom', (select coalesce(jsonb_agg(jsonb_build_object('uid', g.uid, 'n', coalesce(d.data->>'n','守護員'), 'acct', nullif(split_part(coalesce(u.email,''),'@',1),''), 'earn', g.e, 'gem', w.gem) order by g.e desc), '[]'::jsonb) from (
+      select uid, sum(delta) e from gem_log where reason = 'earn' and at > now() - interval '24 hours' group by uid having sum(delta) > 3000) g
+      left join docs d on d.path = 'arena/' || g.uid::text left join auth.users u on u.id = g.uid left join wallet w on w.uid = g.uid));
 end $$;
 
 revoke execute on function public.redeem(text) from anon;
@@ -947,7 +949,7 @@ begin
   if T.uid is null or T.claimed then return jsonb_build_object('gem',0); end if;
   select rn into r from (select uid, row_number() over () rn from td_board(pw)) q where q.uid = u;
   update td_week set claimed = true where uid = u and wk = pw;
-  g := case when r is null then 0 when r = 1 then 300 when r <= 3 then 200 when r <= 10 then 100 when r <= 50 then 30 else 0 end;
+  g := case when r is null then 0 when r = 1 then 600 when r <= 3 then 400 when r <= 10 then 200 when r <= 50 then 60 else 0 end;
   if g > 0 then
     insert into inbox(uid, gem, note, title, kind) values (u, g, '上週守塔挑戰無盡模式第 ' || r || ' 名(' || T.best || ' 波),獎勵請收下!', '🛡️ 守塔排行獎勵', 'system');
   end if;
