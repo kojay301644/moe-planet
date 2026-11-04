@@ -718,7 +718,7 @@ const TLIMIT=90,ENMAX=5,ENT=2*3600e3;
 const tlim=()=>tlim0()+(B&&B.extraT||0),tlim0=()=>{if(!B)return TLIMIT;if(B.mode==='boss')return Math.min(240,180+15*Math.floor((B.cfg.tier||1)/5));if(B.mode==='raid')return 180;if(B.mode==='adv'&&B.L&&!B.cfg.tut){if(B.L.boss)return 150;if(B.L.elite||B.cfg.trial)return 120}return TLIMIT};
 const enrPhase=()=>B&&(B.mode==='boss'||B.mode==='raid'||(B.mode==='adv'&&B.L&&(B.L.boss||B.L.elite)));
 /* AI keepers that live on the planet; their strength follows the player */
-let LORD_NAMES=['長安小霸王','草原狼王','洛陽老街','尼羅河午夜','不勝不歸','奶茶去冰','肝帝阿明','小熊軟糖','雷霆一擊','睡到自然醒','星空下的貓','佛系守護員','鍋貼大王','月光餅乾','鹹魚翻身'];const LORD0=LORD_NAMES.slice();let BOTX={};const botRook=rs=>rs?clamp((Date.now()-rs)/(3*DAY),.15,1):1,botGrow=(n,start,span)=>{const x=BOTX[n];return x&&x.rs>start?clamp((Date.now()-x.rs)/span,0,1):1};
+let LORD_NAMES=['長安小霸王','草原狼王','洛陽老街','尼羅河午夜','不勝不歸','奶茶去冰','肝帝阿明','小熊軟糖','雷霆一擊','睡到自然醒','星空下的貓','佛系守護員','鍋貼大王','月光餅乾','鹹魚翻身'];const LORD0=LORD_NAMES.slice();const botRaidOk=L=>!(L.rs&&Date.now()-L.rs<12*3600e3);let BOTX={};const botRook=rs=>rs?clamp((Date.now()-rs)/(3*DAY),.15,1):1,botGrow=(n,start,span)=>{const x=BOTX[n];return x&&x.rs>start?clamp((Date.now()-x.rs)/span,0,1):1};
 const lordTi=L=>{const A=[...LTITLE,...SPT];return L.i%3===2?'':A[(L.i*7)%A.length].n},tiTag=t=>t?`<i class="ttag">${t}</i>`:'';
 const LTYPE=[{n:'爆肝型',off:3,raid:2},{n:'休閒型',off:-3,raid:.5},{n:'課金型',off:5,raid:1},{n:'塔防型',off:1,raid:.3,tower:1},{n:'掠奪型',off:1,raid:2.5},{n:'棄坑型',off:-5,raid:0,rich:1}];
 /* =============== save =============== */
@@ -1627,7 +1627,7 @@ function raidLoss(){const st=farmStock(),c=Math.floor(st*lootPct());if(c>0)SV.fa
 // what happened while the player was away: keepers attack, unlimited times, with protection and falling loot
 let OFFB=null;function offlineRaids(){OFFB=null;if(!unlocked('siege')||shielded()){SV.lastSeen=Date.now();return 0}const now=Date.now(),away=Math.min(24*3600e3,now-(SV.lastSeen||now));const Ls=lords();let n=0,lossIdx=0,t=SV.lastSeen||now;const LOSS=[.15,.1,.07];
   while(t+90*60e3<=now&&away>20*60e3){t+=60*60e3+rnd()*60*60e3;if(t>now)break;
-    const pool=Ls.filter(L=>LTYPE[L.ty].raid>0&&t-(L.last||0)>4*3600e3&&botRook(L.rs)>=1);if(!pool.length)continue;const w=pool.map(L=>LTYPE[L.ty].raid),s=w.reduce((a,b)=>a+b,0);let r=rnd()*s,L=pool[0];for(let i=0;i<pool.length;i++){r-=w[i];if(r<=0){L=pool[i];break}}
+    const pool=Ls.filter(L=>LTYPE[L.ty].raid>0&&t-(L.last||0)>4*3600e3&&botRaidOk(L));if(!pool.length)continue;const w=pool.map(L=>LTYPE[L.ty].raid),s=w.reduce((a,b)=>a+b,0);let r=rnd()*s,L=pool[0];for(let i=0;i<pool.length;i++){r-=w[i];if(r<=0){L=pool[i];break}}
     L.last=t;const A=L.power*(.8+rnd()*.4),D=defensePower(),win=D>=A;let c=0,f=0;
     if(win){c=150+SV.castle*80;SV.coin+=c;hpHit(.08);twHit(.02,.08)}else{const p=LOSS[lossIdx++]??.05;const r2=raidLoss(p);c=-r2.c;f=-r2.f;hpHit(.25);twHit(.15,.3)}if(shielded())break;
     SV.reports.unshift({t,lord:L.name,li:L.i,win,c,f,off:1,seen:0});if(!win&&(!OFFB||-c>OFFB.c))OFFB={n:L.name,c:-c};n++}
@@ -1952,7 +1952,7 @@ function townUpdate(dt){townPets();townFx(dt);skinFx(skinOf(VISIT?VISIT.skin:SV.
   for(let i=0;i<TP.length;i++)for(let j=i+1;j<TP.length;j++){const a=TP[i],b=TP[j];if(Math.abs(a.x-b.x)<.025&&Math.abs(a.y-b.y)<.025&&!a.emote&&!b.emote&&rnd()<.01){a.emote={s:'👋',t:0,life:1.4};b.emote={s:'😊',t:0,life:1.4};a.face=b.x>a.x?1:-1;b.face=-a.face}}
   for(const f of tfx)f.t+=dt;tfx=tfx.filter(f=>f.t<f.life);
   // a keeper shows up at the gate now and then while you are online
-  if(!raid&&!VISIT&&unlocked('siege')&&!shielded()&&$('sheet').hidden&&!B){townRaidT-=dt;if(townRaidT<=0){townRaidT=240+rnd()*240;const pool=lords().filter(L=>LTYPE[L.ty].raid>0&&botRook(L.rs)>=1&&L.team&&L.team.length&&L.power>0);const L=pool[Math.floor(rnd()*pool.length)];if(L){raid={L,t:30};showRaid()}}}
+  if(!raid&&!VISIT&&unlocked('siege')&&!shielded()&&!B){townRaidT-=dt;if(townRaidT<=0&&$('sheet').hidden&&!EDIT&&ftIdle()){townRaidT=240+rnd()*240;const pool=lords().filter(L=>LTYPE[L.ty].raid>0&&botRaidOk(L)&&L.team&&L.team.length&&L.power>0);const L=pool[Math.floor(rnd()*pool.length)];if(L){raid={L,t:30};showRaid()}}}
   if(raid){raid.t-=dt;$('raidT').textContent=Math.ceil(raid.t);if(raid.t<=0)autoDefend()}}
 let townRaidT=180;
 const farmRate=()=>Math.round((15+10*SV.farmLv)*(vip()>=8?1.2:1)*prodMul()),farmCap=()=>farmRate()*60*capH();
@@ -2373,7 +2373,7 @@ async function evSiege(kind,target,loot){if(!SRV.on())return;try{await SRV.rpc('
 function mqBots(){const w=Math.floor(Date.now()/(12*60e3));if(MQ.botW!==w){MQ.botW=w;const r=seeded(w*131+7),N=[...LORD_NAMES,...BOT_NAMES],L=[];const n=1+Math.floor(r()*3);
     for(let i=0;i<n;i++){const a=N[Math.floor(r()*N.length)];let b=N[Math.floor(r()*N.length)];if(b===a)b=N[(N.indexOf(a)+7)%N.length];const loot=Math.round((3+r()*40)*1000);L.push({txt:`⚔️ ${a} 攻破了 ${b} 的城門,搶走 ⭐${loot.toLocaleString('en-US')}`,at:w*12*60e3+Math.floor(r()*12*60e3)})}MQ.bots=L}
   return MQ.bots.filter(x=>x.at<=Date.now())}
-async function mqEvents(){if(!SRV.on()||Date.now()-MQ.evT<60e3)return;MQ.evT=Date.now();try{const data=await SRV.rpc('events_feed');MQ.ev=(data||[]).map(x=>({txt:x.txt,at:new Date(x.at).getTime()}))}catch(e){}}
+async function mqEvents(){if(!SRV.on()||Date.now()-MQ.evT<60e3)return;MQ.evT=Date.now();try{const data=await SRV.rpc('events_feed');MQ.ev=(data||[]).map(x=>({txt:x.txt,at:new Date(x.at).getTime()}))}catch(e){errReport(new Error('events_feed: '+(e&&e.raw||e&&e.message||e)),'marquee')}}
 function mqBuild(){const N=[...(NET.notice||[]).map(n=>({txt:'📢 '+n.title,n})),...EVT.list.filter(e=>evOn(e.kind)).map(e=>({txt:`🎉 ${EVN[e.kind]}活動進行中${e.note?':'+e.note:''}(${evEnd(e.kind)} 結束)`}))];const E=[...MQ.ev].sort((a,b)=>b.at-a.at).slice(0,5);return [...N,...E]}
 function mqNext(){const bar=$('marq');if(!bar)return;if(!MQ.q.length)MQ.q=mqBuild();const it=MQ.q.shift();MQ.cur=it||null;if(!it){bar.hidden=true;setTimeout(mqNext,15e3);return}
   bar.hidden=false;const s=$('marqT');s.textContent=it.txt;s.classList.toggle('ntc',!!it.n);s.style.transition='none';const W=bar.clientWidth||300;s.style.transform=`translateX(${W}px)`;void s.offsetWidth;

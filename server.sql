@@ -834,7 +834,7 @@ begin
   for rr in 1..rounds loop
     -- 攻城 1~3 場
     for kk in 1..(1 + floor(random() * 3))::int loop
-      select * into a from bots where active and (reset_at is null or reset_at < now() - interval '1 day') order by random() limit 1;
+      select * into a from bots where active and (reset_at is null or reset_at < now() - interval '12 hours') order by random() limit 1;
       select * into d from bots where active and id <> coalesce(a.id, 0) order by random() limit 1;
       exit when a.id is null or d.id is null;
       ap := a.power; dp := d.power;
