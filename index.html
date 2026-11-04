@@ -2066,7 +2066,7 @@ const ACT={
     SV.equips=SV.equips.filter(e=>!e.mx);PK.forEach((k,n)=>{const set=SETK[n%SETK.length];for(const t of Object.keys(EQT)){const e=mkEq(t,3,set);e.lv=15;e.mx=1;SV.equips.push(e);SV.pets[k].eq[t]=e.id}});SV.castle=Math.max(SV.castle,10);TP=[];sfx('win');toast('測試用:全部萌獸滿級、滿星、三階,穿上整套傳說 +15 裝備')},
   star:k=>{const s=SV.pets[k];if(!canStar(k))return;s.shards-=starNeed(s.stars);s.stars++;sfx('up');toast(`${PETS[k].n[s.st]} 升到 ${s.stars} 星!`)},
   sk:k=>{const s=SV.pets[k],c=skCost(s.sk);if(s.sk>=5)return;if(!costOk(c))return toast('材料不足');pay(c);s.sk++;sfx('up');toast(`${skn(k,s.st)} 升到 Lv${s.sk}`)},
-  lvl:(li,hd)=>{li=+li;const L=LEVELS[li];if(!advOpen(li))return toast('還沒解鎖');if(hd&&SV.stars[li]<3)return toast('三星通關後才能挑戰困難');if(!useSta())return;$('sheet').hidden=true;advGo(li,!!+hd)},
+  lvl:(li,hd)=>{li=+li;const L=LEVELS[li];if(!advOpen(li))return toast('還沒解鎖');hd=+hd||0;if(hd&&(SV.stars[li]||0)<3)return toast('三星通關後才能挑戰困難');if(!useSta())return;$('sheet').hidden=true;advGo(li,!!+hd)},
   trialGo:()=>{if(trialTries()<=0)return toast('今天的挑戰次數用完了');const T=trialSV(),f=T.wkBest+1;$('sheet').hidden=true;startBattle({mode:'adv',li:40,L:mkTrial(f),trial:f,tm:trialM(f)})},
   lsel:li=>{SV.advSel=+li},chSel:c=>{if(c==='T'){if(!trialOpen())return toast('打倒第 2 章頭目後開放');SV.advCh='T';return}c=+c;if(!chOpen(c))return toast(chLock(c));SV.advCh=c;SV.advSel=c*10+Math.min(9,firstOpenIn(c))},
   sweep:(li,n)=>{li=+li;n=+n;const L=LEVELS[li];if((SV.stars[li]||0)<3)return toast('三星通關的關卡才能掃蕩');regen();if(SV.sta<STC*n)return toast(`體力不足(需要 ${STC*n})`);if(SV.sta>=STMAX)SV.staT=Date.now();SV.sta-=STC*n;eqFix();let c=0,o=0,st=0;
