@@ -469,7 +469,7 @@ begin
     'ladder', (select to_jsonb(l) from ladder l where uid = p_uid),
     'arena', (select data - 'chat' - 'cm' from docs where path = 'arena/' || p_uid::text),
     'ban', (select to_jsonb(b) from bans b where uid = p_uid and (until is null or until > now())),
-    'sess', (select jsonb_build_object('dev', dev, 'at', at, 'seen', seen) from sessions where uid = p_uid),
+    'sess', (select jsonb_build_object('dev', dev, 'at', at, 'seen', seen, 'act', act) from sessions where uid = p_uid),
     'log', (select coalesce(jsonb_agg(to_jsonb(g) order by g.id desc), '[]'::jsonb) from (select * from gem_log where uid = p_uid order by id desc limit 60) g),
     'market', (select coalesce(jsonb_agg(to_jsonb(m) order by m.id desc), '[]'::jsonb) from (select * from market where seller = p_uid or buyer = p_uid order by id desc limit 30) m));
 end $$;
@@ -970,14 +970,34 @@ begin if u is null then raise exception 'not signed in'; end if;
   insert into sessions(uid, sid, dev, at, seen) values (u, s, left(coalesce(p_dev,''),60), now(), now())
     on conflict (uid) do update set sid = excluded.sid, dev = excluded.dev, at = now(), seen = now();
   return jsonb_build_object('sid', s); end $$;
-create or replace function public.session_ping(p_sid uuid) returns jsonb language plpgsql security definer set search_path = public as $$
-declare u uuid := auth.uid(); S sessions;
+alter table public.sessions add column if not exists act text;
+drop function if exists public.session_ping(uuid);
+create or replace function public.session_ping(p_sid uuid, p_act text default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := auth.uid(); S sessions; n int; pk jsonb;
 begin if u is null then return jsonb_build_object('ok', true); end if;
   select * into S from sessions where uid = u;
   if S.uid is null then return jsonb_build_object('ok', true); end if;
   if S.sid <> p_sid then return jsonb_build_object('ok', false, 'dev', S.dev); end if;
-  update sessions set seen = now() where uid = u; return jsonb_build_object('ok', true); end $$;
-grant execute on function public.session_start(text), public.session_ping(uuid) to authenticated;
+  update sessions set seen = now(), act = coalesce(left(p_act,30), act) where uid = u;
+  if random() < .2 then
+    select count(*) into n from sessions where seen > now() - interval '2 minutes';
+    select v into pk from settings where k = 'peak';
+    if pk is null or (pk->>'d') is distinct from moe_today()::text or n > (pk->>'n')::int then
+      insert into settings(k, v) values ('peak', jsonb_build_object('d', moe_today()::text, 'n', n, 'at', now())) on conflict (k) do update set v = excluded.v;
+    end if;
+  end if;
+  return jsonb_build_object('ok', true); end $$;
+grant execute on function public.session_start(text), public.session_ping(uuid,text) to authenticated;
+-- 後台:即時在線與各模式人數
+create or replace function public.admin_live_status() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin return jsonb_build_object(
+  'online', (select count(*) from sessions where seen > now() - interval '2 minutes'),
+  'peak', (select v from settings where k = 'peak' and v->>'d' = moe_today()::text),
+  'players', (select coalesce(jsonb_agg(jsonb_build_object('uid', s.uid, 'act', coalesce(s.act,'town'), 'dev', s.dev, 'seen', s.seen, 'n', coalesce(d.data->>'n','守護員')) order by s.seen desc), '[]'::jsonb)
+     from sessions s left join docs d on d.path = 'arena/' || s.uid::text where s.seen > now() - interval '2 minutes'));
+end $$;
+grant execute on function public.admin_live_status() to authenticated;
 -- 被擠掉的裝置不能再寫入存檔
 drop policy if exists docs_sess on public.docs;
 create policy docs_sess on public.docs as restrictive for all to authenticated using (moe_sess_ok()) with check (moe_sess_ok());

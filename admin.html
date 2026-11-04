@@ -134,10 +134,22 @@ async function render(){navR();const m=$('main');m.innerHTML='<div class="empty"
 const A={};function bind(root){root.querySelectorAll('[data-a]').forEach(el=>{el.onclick=e=>{e.stopPropagation();e.preventDefault();const [k,...a]=el.dataset.a.split(':');A[k]&&A[k](...a)}})}
 const V={};
 // ---------- 總覽 ----------
-V.home=async()=>{const s=await rpc('admin_stats'),D=s.days||[];
+const LACT={town:'城鎮',adv:'冒險',siege:'攻城',defend:'守城',boss:'個人副本',raid:'團隊 Boss',pvp:'天梯',event:'每日活動',trial:'試煉塔',visit:'拜訪好友','td':'守塔挑戰'};
+const actName=a=>{a=a||'town';if(a.startsWith('td:')){const [,m,d]=a.split(':');return '守塔挑戰 · '+(m==='endless'?'無盡':m==='practice'?'練習('+['普通','困難','地獄'][+d||0]+')':['普通','困難','地獄'][+d||0])}return LACT[a]||a};
+let LIVE=null,LIVEsel=null;
+async function liveCard(){let R;try{R=await rpc('admin_live_status')}catch(e){return `<div class="card"><h2>即時狀態</h2><p class="mut">需要先貼最新的 server.sql</p></div>`}LIVE=R;const P=R.players||[],g={};P.forEach(x=>{const k=(x.act||'town').startsWith('td:')?'td':(x.act||'town');(g[k]=g[k]||[]).push(x)});
+  const ks=Object.keys(g).sort((a,b)=>g[b].length-g[a].length),mx=Math.max(1,...ks.map(k=>g[k].length));
+  const sub=k=>k!=='td'?'':' <small class="mut">('+Object.entries(g.td.reduce((o,x)=>{const n=actName(x.act).split(' · ')[1];o[n]=(o[n]||0)+1;return o},{})).map(([n,c])=>n+' '+c).join('、')+')</small>';
+  return `<div class="card" id="liveCard"><h2>🟢 即時狀態 <small>最近 2 分鐘有活動的玩家,每 30 秒自動更新</small></h2>
+  <div class="kpis"><div class="kpi"><b>${fmt(R.online)}</b><small>目前在線</small></div><div class="kpi"><b>${R.peak?fmt(R.peak.n):'-'}</b><small>今日最高同時在線${R.peak?' · '+tm(R.peak.at).slice(-5):''}</small></div></div>
+  ${ks.length?ks.map(k=>`<div class="hb" style="cursor:pointer" data-a="livesel:${k}"><span>${k==='td'?'守塔挑戰':actName(k)}</span><i style="width:${g[k].length/mx*100}%;background:${k==='td'?'var(--blue)':''}"></i><b>${g[k].length}</b></div>${sub(k)?`<div class="mut" style="margin:-4px 0 6px 6px">${sub(k)}</div>`:''}
+    ${LIVEsel===k?`<div class="tw" style="margin:4px 0 10px"><table><tbody>${g[k].map(x=>`<tr><td><a href="#" data-a="pdet:${x.uid}">${esc(x.n)}</a></td><td>${esc(actName(x.act))}</td><td class="mut">${esc(x.dev||'')}</td></tr>`).join('')}</tbody></table></div>`:''}`).join(''):'<div class="empty">目前沒有人在線</div>'}</div>`}
+setInterval(async()=>{if(TAB==='home'&&document.getElementById('liveCard')&&document.visibilityState==='visible'){const h=await liveCard();const c=document.getElementById('liveCard');if(c){c.outerHTML=h;bind(document.getElementById('liveCard'))}}},30000);
+A.livesel=async k=>{LIVEsel=LIVEsel===k?null:k;const h=await liveCard();const c=document.getElementById('liveCard');if(c){c.outerHTML=h;bind(document.getElementById('liveCard'))}};
+V.home=async()=>{const s=await rpc('admin_stats'),D=s.days||[],LC=await liveCard();
   const bar=(k,cls)=>{const mx=Math.max(1,...D.map(d=>+d[k]||0));return `<div class="bars ${cls||''}">${D.map(d=>`<div style="height:${(+d[k]||0)/mx*100}%" title="${d.d}:${fmt(d[k])}"></div>`).join('')}</div><div class="bl">${D.map((d,i)=>`<span>${i%2?'':d.d.slice(5).replace('-','/')}</span>`).join('')}</div>`};
   const sum=k=>D.reduce((a,d)=>a+(+d[k]||0),0);
-  return `<div class="kpis">
+  return LC+`<div class="kpis">
     <div class="kpi"><small>玩家總數</small><b>${fmt(s.players)}</b><small>已建帳號 ${fmt(s.registered)}</small></div>
     <div class="kpi"><small>今日新增</small><b>${fmt(s.new_today)}</b></div>
     <div class="kpi"><small>今日活躍</small><b>${fmt(s.active_today)}</b><small>7 天活躍 ${fmt(s.active_7d)}</small></div>
@@ -169,7 +181,7 @@ A.pdet=async uid=>{CUR=uid;const d=$('drawer'),I=$('dIn');d.hidden=false;I.inner
   const u=P.user||{},w=P.wallet||{},l=P.ladder||{},a=P.arena||{},b=P.ban,team=(a.team||[]).map(s=>String(s).split(',')).map(([k,lv,st,,,,,q])=>`${PET[k]||k} Lv${lv}${q!==undefined&&q!==''?' <span class="tag">'+(RAR[q]||'')+'</span>':''}`);
   I.innerHTML=`<div class="hd"><h2>${esc(a.n||'(未命名)')}</h2><button data-a="close">關閉</button></div>
   ${b?`<div class="card" style="border-color:var(--bad)"><b style="color:var(--bad)">⛔ 停權中</b> · ${esc(b.reason||'')} · ${b.until?'到 '+tm(b.until):'永久'} <button class="s" data-a="unban">解除停權</button></div>`:''}
-  <div class="grid2"><div class="card"><h2>基本資料</h2><dl><dt>帳號</dt><dd>${u.acct?esc(u.acct):'訪客(沒有帳號密碼)'}</dd><dt>UID</dt><dd><code>${uid}</code></dd><dt>註冊</dt><dd>${tm(u.created)}</dd><dt>最後登入</dt><dd>${tm(u.last)}</dd><dt>目前裝置</dt><dd>${P.sess?esc(P.sess.dev||'-')+' · 開啟於 '+tm(P.sess.at)+' · 最後上線 '+tm(P.sess.seen):'-'}</dd><dt>主城</dt><dd>Lv${a.lv||'-'} · 守護員 Lv${a.gl||'-'}</dd><dt>隊伍戰力</dt><dd>${fmt(a.pw)}</dd><dt>出戰隊伍</dt><dd>${team.join('、')||'-'}</dd><dt>萌獸數</dt><dd>${(a.pets||[]).length}</dd></dl></div>
+  <div class="grid2"><div class="card"><h2>基本資料</h2><dl><dt>帳號</dt><dd>${u.acct?esc(u.acct):'訪客(沒有帳號密碼)'}</dd><dt>UID</dt><dd><code>${uid}</code></dd><dt>註冊</dt><dd>${tm(u.created)}</dd><dt>最後登入</dt><dd>${tm(u.last)}</dd><dt>目前裝置</dt><dd>${P.sess?esc(P.sess.dev||'-')+' · 開啟於 '+tm(P.sess.at)+' · 最後上線 '+tm(P.sess.seen)+(Date.now()-new Date(P.sess.seen).getTime()<120e3?' · <b style="color:var(--ok,#2a9a4a)">正在:'+esc(actName(P.sess.act))+'</b>':''):'-'}</dd><dt>主城</dt><dd>Lv${a.lv||'-'} · 守護員 Lv${a.gl||'-'}</dd><dt>隊伍戰力</dt><dd>${fmt(a.pw)}</dd><dt>出戰隊伍</dt><dd>${team.join('、')||'-'}</dd><dt>萌獸數</dt><dd>${(a.pets||[]).length}</dd></dl></div>
   <div class="card"><h2>鑽石與天梯</h2><dl><dt>鑽石</dt><dd><b>💎${fmt(w.gem)}</b></dd><dt>待入帳</dt><dd>💎${fmt(w.bank)} <span class="mut">(超過每日上限,之後陸續入帳)</span></dd><dt>今日已入帳</dt><dd>💎${fmt(w.earn_today)} / 1000</dd><dt>累積儲值</dt><dd>💎${fmt(w.topup)}</dd><dt>召喚保底</dt><dd>傳說 ${w.pity||0}/80 · 神獸 ${w.dpity||0}/200</dd><dt>天梯</dt><dd>${fmt(l.pts)} 分(最高 ${fmt(l.best)})· ${l.w||0} 勝 ${l.l||0} 敗</dd><dt>可疑紀錄</dt><dd>${(w.flags||0)+(l.flags||0)?`<span class="tag warn">錢包 ${w.flags||0} · 天梯 ${l.flags||0}</span> <button class="s" data-a="clrflag">清除</button>`:'<span class="tag ok">無</span>'}</dd></dl></div></div>
   <div class="card act"><h2>操作</h2>
     <label>加 / 扣鑽石(扣請輸入負數,玩家信箱會收到說明)</label><div class="row"><input id="ag" type="number" inputmode="numeric" placeholder="例如 500 或 -200"><input id="agr" placeholder="原因(玩家看得到)"><button class="p" data-a="gem">執行</button></div>

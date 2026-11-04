@@ -788,11 +788,12 @@ async function cloudWrite(force){if(!ACC.cloud||SES.kicked||ACC.busy||(!ACC.dirt
 const SES={sid:null,kicked:false,t:0};
 function devName(){const u=navigator.userAgent||'';const os=/iPhone/.test(u)?'iPhone':/iPad/.test(u)?'iPad':/Android/.test(u)?'Android':/Windows/.test(u)?'Windows':/Mac/.test(u)?'Mac':'其他裝置';const br=/CriOS|Chrome/.test(u)&&!/Edg/.test(u)?'Chrome':/Edg/.test(u)?'Edge':/Firefox|FxiOS/.test(u)?'Firefox':/Safari/.test(u)?'Safari':'瀏覽器';return os+' · '+br+(matchMedia('(display-mode: standalone)').matches?'(桌面捷徑)':'')}
 async function sessStart(){if(!window.MOE_SB)return;try{const {data,error}=await MOE_SB.rpc('session_start',{p_dev:devName()});if(error||!data||!data.sid)return;SES.sid=data.sid;SES.t=Date.now();if(MOE_SB.rest&&MOE_SB.rest.headers)MOE_SB.rest.headers['x-moe-sid']=SES.sid}catch(e){}}
-async function sessPing(){if(!SES.sid||SES.kicked||!window.MOE_SB)return;try{const {data,error}=await MOE_SB.rpc('session_ping',{p_sid:SES.sid});if(!error&&data&&data.ok===false)sessKicked(data.dev)}catch(e){}}
+function curAct(){try{if(TD)return 'td:'+TD.mode+':'+TD.diff;if(typeof VISIT!=='undefined'&&VISIT)return 'visit';if(B){const c=B.cfg||{};return c.trial?'trial':c.event?'event':B.mode}}catch(e){}return 'town'}
+async function sessPing(){if(!SES.sid||SES.kicked||!window.MOE_SB)return;SES.act=curAct();try{const {data,error}=await MOE_SB.rpc('session_ping',{p_sid:SES.sid,p_act:SES.act});if(!error&&data&&data.ok===false)sessKicked(data.dev)}catch(e){}}
 function sessKicked(dev){if(SES.kicked)return;SES.kicked=true;try{if(TD)TD.paused=true}catch(e){}const d=document.createElement('div');d.className='ov';d.id='kickOv';d.style.zIndex=120;
   d.innerHTML=`<div class="tbox"><h2>⚠️ 帳號已在其他裝置登入</h2><p>你的帳號剛剛在${dev?'「'+esc(dev)+'」':'另一台裝置'}開啟,這台已經暫停,避免兩邊同時遊玩造成進度錯亂。</p><p class="mut">如果不是你本人登入,請盡快到「設定」修改密碼。</p><button class="go big" id="kickGo">在這台繼續玩</button></div>`;
   document.body.appendChild(d);$('kickGo').onclick=()=>location.reload()}
-setInterval(sessPing,30000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sessPing()});
+setInterval(sessPing,30000);setInterval(()=>{if(SES.sid&&!SES.kicked&&curAct()!==SES.act)sessPing()},4000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sessPing()});
 setInterval(()=>cloudWrite(),10000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')cloudWrite()});
 function setAcc(){const el=$('accInfo');if(!el)return;el.textContent=!ACC.checked?'連線中…':ACC.cloud?`☁ 已登入${ACC.name?':'+ACC.name:''} · 進度雲端保存`:ACC.uid&&!ACC.canWrite?'👤 已登入,但沒有寫入權限:以遊客身分保存在這台裝置':'👤 遊客模式 · 進度只存在這台裝置'}
 async function accInit(){const C=window.claude;let user=null,db=null;
