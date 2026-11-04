@@ -392,7 +392,7 @@ button.red{background:linear-gradient(#ff8a8a,#e04a4a);color:#fff;box-shadow:0 4
 #a2hs .x{background:none;border:0;font-size:18px;color:#a08a70;padding:4px}
 .a2steps{display:grid;gap:8px;margin:8px 0}.a2steps div{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;background:#fff6e6}.a2steps i{font-style:normal;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#ff8a3d;color:#fff;font-weight:900;flex-shrink:0}
 body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.standalone #tBot{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
-.accf{display:grid;gap:8px;margin:8px 0}.accf input,#loginPane input{padding:10px 12px;border-radius:12px;border:2px solid #e6cfa8;font-size:16px;width:100%;box-sizing:border-box}#loginPane input{margin:6px 0}#loginPane{z-index:30}.accd summary{cursor:pointer;font-weight:700;margin:6px 0}
+.accf{display:grid;gap:8px;margin:8px 0}.accf input,#loginPane input,#delPw{margin-bottom:8px;padding:10px 12px;border-radius:12px;border:2px solid #e6cfa8;font-size:16px;width:100%;box-sizing:border-box}#loginPane input{margin:6px 0}#loginPane{z-index:30}.accd summary{cursor:pointer;font-weight:700;margin:6px 0}
 #tLogin{margin-top:8px}
 /* gem + */
 .gemc{cursor:pointer}.gplus{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:4px;border-radius:50%;background:linear-gradient(#5ad65a,#2a9a3a);color:#fff;font-style:normal;font-weight:900;font-size:15px;line-height:1;box-shadow:0 2px 0 rgba(0,0,0,.25);animation:gpulse 1.6s ease-in-out infinite}
@@ -2764,9 +2764,9 @@ function accCard(){if(!window.MOE_AUTH)return window.MOE_CFG?`<div class="card">
     <p class="mut">已經有帳號?<button class="blue" data-act="accGoLogin">登入其他帳號</button></p></div></div>`}
 function pSet(){return accCard()+a2hsCard()+`<div class="card"><h3>守護員</h3><p>守護員名稱:<b>${SV.name||'-'}</b> <button data-act="rename">改名</button></p></div>
   <div class="card"><h3>其他</h3><div class="row"><button data-act="snd">${SND.on?'🔊 音效開':'🔇 音效關'}</button><button data-act="replay">重看開場</button></div></div>
-  <div class="card"><h3>刪除帳號</h3><p class="mut">${window.MOE_SB?'刪除後這個帳號的所有進度、鑽石、天梯紀錄和交易所上架的裝備都會永久消失,無法復原。':'刪除後所有進度都會清除,無法復原。'}</p><button class="red" data-act="reset">${resetArm?'⚠ 確定要刪除?再按一次':'刪除帳號'}</button></div>`}
+  <div class="card"><h3>刪除帳號</h3><p class="mut">${window.MOE_SB?'刪除後這個帳號的所有進度、鑽石、天梯紀錄和交易所上架的裝備都會永久消失,無法復原。':'刪除後所有進度都會清除,無法復原。'}</p>${window.MOE_SB?(ACC.auth&&ACC.auth.name?`<input id="delPw" type="password" placeholder="輸入密碼確認刪除" autocomplete="current-password">`:`<input id="delPw" placeholder="訪客帳號請輸入「刪除」兩個字確認" autocomplete="off">`):''}<button class="red" data-act="reset">${resetArm?'⚠ 確定要刪除?再按一次':'刪除帳號'}</button></div>`}
 let resetArm=0;
-async function delAccount(){if(accBusy.del)return;accBusy.del=1;toast('刪除中…');try{const {error}=await withTimeout(MOE_SB.rpc('delete_account'),12000);if(error)throw error;ACC.cloud=false;ACC.deleted=1;SRV.ok=0;
+async function delAccount(){if(accBusy.del)return;const el=$('delPw'),v=el?el.value:'';const reg=!!(ACC.auth&&ACC.auth.name);if(!v)return toast(reg?'請先輸入密碼':'請先輸入「刪除」兩個字');if(!reg&&v.trim()!=='刪除')return toast('請輸入「刪除」兩個字');accBusy.del=1;toast('刪除中…');try{if(reg){try{await MOE_AUTH.verify(v)}catch(e){accBusy.del=0;return toast(e.message||'密碼錯誤')}}const {error}=await withTimeout(MOE_SB.rpc('delete_account'),12000);if(error)throw error;ACC.cloud=false;ACC.deleted=1;SRV.ok=0;
     try{Object.keys(localStorage).filter(k=>/^moe\./.test(k)).forEach(k=>localStorage.removeItem(k))}catch(e){}try{await MOE_SB.auth.signOut()}catch(e){}toast('帳號已刪除');setTimeout(()=>location.reload(),1200)}
   catch(e){accBusy.del=0;toast('刪除失敗,請稍後再試')}}
 const accBusy={v:0};
@@ -2784,7 +2784,7 @@ $('tLogin').onclick=()=>{sfx('click');openLogin()};
 Object.assign(ACT,{rename:()=>{const n=prompt?null:null;openName()},sync:()=>{ACC.dirty=1;cloudWrite(true).then(()=>toast('已同步'))},
   mkcode:()=>openCode('make'),usecode:()=>openCode('use'),snd:()=>{SND.on=!SND.on;$('sndBtn').textContent=SND.on?'🔊':'🔇'},
   replay:()=>{closeSheet();$('town').hidden=true;startIntro();$('namePane').dataset.replay='1'},
-  reset:()=>{if(!resetArm){resetArm=1;toast('再按一次「刪除帳號」就會永久刪除');setTimeout(()=>{resetArm=0;if(sheetK==='set')renderSheet()},4000);return}resetArm=0;if(window.MOE_SB)return delAccount();const uid=SV.uid;SV=DEF();SV.uid=uid;save();cloudWrite(true);TP=[];closeSheet();$('town').hidden=true;$('title').hidden=false;$('tStart').textContent='開始遊戲'}});
+  reset:()=>{if(window.MOE_SB)return delAccount();if(!resetArm){resetArm=1;toast('再按一次「刪除帳號」就會永久刪除');setTimeout(()=>{resetArm=0;if(sheetK==='set')renderSheet()},4000);return}resetArm=0;if(window.MOE_SB)return delAccount();const uid=SV.uid;SV=DEF();SV.uid=uid;save();cloudWrite(true);TP=[];closeSheet();$('town').hidden=true;$('title').hidden=false;$('tStart').textContent='開始遊戲'}});
 function openName(){$('namePane').hidden=false;$('namePane').dataset.rename='1';$('nameIn').value=SV.name}
 const nameOk0=$('nameOk').onclick;$('nameOk').onclick=()=>{if($('namePane').dataset.rename){const n=$('nameIn').value.trim().slice(0,12);if(n){SV.name=n;save();townHud();renderSheet()}delete $('namePane').dataset.rename;$('namePane').hidden=true;return}
   if($('namePane').dataset.replay){delete $('namePane').dataset.replay;$('namePane').hidden=true;$('town').hidden=false;return}nameOk0()};

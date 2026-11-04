@@ -28,6 +28,7 @@ window.MOE_AUTH={
   async info(){await ready.catch(()=>{});const {data:{user}}=await sb.auth.getUser();if(!user)return {uid:null};const e=user.email||'';return {uid:user.id,anon:!e,name:e?e.split('@')[0]:null,pending:!!user.new_email&&!e}},
   async register(u,p){const {data,error}=await sb.auth.updateUser({email:em(u),password:p});if(error)throw new Error(msg(error));if(!data.user.email)throw new Error('伺服器需要關閉「Confirm email」設定才能建立帳號')},
   async login(u,p){const {error}=await sb.auth.signInWithPassword({email:em(u),password:p});if(error)throw new Error(msg(error))},
+  async verify(p){const {data:{user}}=await sb.auth.getUser();if(!user||!user.email)throw new Error('訪客帳號沒有密碼');const {error}=await sb.auth.signInWithPassword({email:user.email,password:p});if(error)throw new Error(/Invalid login/i.test(error.message||'')?'密碼錯誤':msg(error))},
   async logout(){await sb.auth.signOut()},
   async changePw(p){const {error}=await sb.auth.updateUser({password:p});if(error)throw new Error(msg(error))}};
 })();
