@@ -2,6 +2,9 @@
 -- 在 Supabase → SQL Editor 貼上整段 → Run。可以重複執行,不會刪除資料。
 
 -- ============ 錢包 ============
+-- 後台顯示用的帳號名稱:帳號密碼玩家顯示帳號,Google 玩家顯示「G:信箱」
+create or replace function public.moe_acct(e text) returns text language sql immutable as $$
+  select case when coalesce(e, '') = '' then '' when e ilike '%@player.moe-planet.app' then split_part(e, '@', 1) else 'G:' || e end $$;
 create table if not exists public.wallet(
   uid uuid primary key default auth.uid(),
   gem int not null default 160 check (gem >= 0),
@@ -452,7 +455,7 @@ create or replace function public.admin_players(p_q text default '', p_sort text
 declare a uuid := moe_admin(); r jsonb; q text := lower(trim(coalesce(p_q,'')));
 begin
   select coalesce(jsonb_agg(row_to_json(x)), '[]'::jsonb) into r from (
-    select u.id uid, nullif(split_part(coalesce(u.email,''),'@',1),'') acct, d.data->>'n' name, coalesce((d.data->>'lv')::int,0) castle,
+    select u.id uid, nullif(moe_acct(u.email),'') acct, d.data->>'n' name, coalesce((d.data->>'lv')::int,0) castle,
       coalesce(w.gem,0) gem, coalesce(w.topup,0) topup, moe_vip(coalesce(w.topup,0)) vip, coalesce(l.pts,0) pts,
       coalesce(w.flags,0) + coalesce(l.flags,0) flags, (b.uid is not null and (b.until is null or b.until > now())) banned,
       greatest(w.updated_at, u.last_sign_in_at) seen, u.created_at created
@@ -470,7 +473,7 @@ create or replace function public.admin_player(p_uid uuid) returns jsonb languag
 declare a uuid := moe_admin();
 begin
   return jsonb_build_object(
-    'user', (select jsonb_build_object('uid', id, 'acct', nullif(split_part(coalesce(email,''),'@',1),''), 'created', created_at, 'last', last_sign_in_at) from auth.users where id = p_uid),
+    'user', (select jsonb_build_object('uid', id, 'acct', nullif(moe_acct(email),''), 'created', created_at, 'last', last_sign_in_at) from auth.users where id = p_uid),
     'wallet', (select to_jsonb(w) from wallet w where uid = p_uid),
     'ladder', (select to_jsonb(l) from ladder l where uid = p_uid),
     'arena', (select data - 'chat' - 'cm' from docs where path = 'arena/' || p_uid::text),
@@ -574,7 +577,7 @@ begin return (select coalesce(jsonb_agg(to_jsonb(n) order by n.id desc), '[]'::j
 
 create or replace function public.admin_admins() returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
 declare a uuid := moe_admin();
-begin return (select coalesce(jsonb_agg(jsonb_build_object('uid', x.uid, 'acct', split_part(coalesce(u.email,''),'@',1), 'added', x.added)), '[]'::jsonb) from admins x left join auth.users u on u.id = x.uid); end $$;
+begin return (select coalesce(jsonb_agg(jsonb_build_object('uid', x.uid, 'acct', moe_acct(u.email), 'added', x.added)), '[]'::jsonb) from admins x left join auth.users u on u.id = x.uid); end $$;
 create or replace function public.admin_admin_set(p_acct text, p_add boolean) returns jsonb language plpgsql security definer set search_path = public, auth as $$
 declare a uuid := moe_admin(); t uuid;
 begin
@@ -588,7 +591,7 @@ end $$;
 
 create or replace function public.admin_logs(p_limit int default 100) returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
 declare a uuid := moe_admin();
-begin return (select coalesce(jsonb_agg(jsonb_build_object('at', l.at, 'action', l.action, 'target', l.target, 'detail', l.detail, 'admin', split_part(coalesce(u.email,''),'@',1), 'tname', d.data->>'n') order by l.id desc), '[]'::jsonb)
+begin return (select coalesce(jsonb_agg(jsonb_build_object('at', l.at, 'action', l.action, 'target', l.target, 'detail', l.detail, 'admin', moe_acct(u.email), 'tname', d.data->>'n') order by l.id desc), '[]'::jsonb)
   from (select * from admin_log order by id desc limit least(greatest(p_limit,1),300)) l left join auth.users u on u.id = l.admin left join docs d on d.path = 'arena/' || l.target::text); end $$;
 
 revoke execute on function public.alog(text,uuid,jsonb) from public, anon, authenticated;
@@ -721,7 +724,7 @@ begin
 end $$;
 create or replace function public.admin_tickets(p_status text default 'open') returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
 declare a uuid := moe_admin();
-begin return (select coalesce(jsonb_agg(to_jsonb(t) || jsonb_build_object('name', d.data->>'n', 'acct', split_part(coalesce(u.email,''),'@',1)) order by t.id desc), '[]'::jsonb)
+begin return (select coalesce(jsonb_agg(to_jsonb(t) || jsonb_build_object('name', d.data->>'n', 'acct', moe_acct(u.email)) order by t.id desc), '[]'::jsonb)
   from (select * from tickets where case when p_status = 'err' then cat = '系統錯誤' else cat is distinct from '系統錯誤' and (p_status = 'all' or status = p_status) end order by id desc limit 100) t left join docs d on d.path = 'arena/' || t.uid::text left join auth.users u on u.id = t.uid); end $$;
 create or replace function public.admin_ticket_reply(p_id bigint, p_reply text, p_close boolean) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); t tickets;
@@ -738,7 +741,7 @@ end $$;
 -- 儲值紀錄
 create or replace function public.admin_topups(p_from date, p_to date) returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
 declare a uuid := moe_admin();
-begin return (select coalesce(jsonb_agg(jsonb_build_object('at', g.at, 'uid', g.uid, 'pkg', substr(g.reason, 7), 'gem', g.delta, 'name', d.data->>'n', 'acct', split_part(coalesce(u.email,''),'@',1)) order by g.id desc), '[]'::jsonb)
+begin return (select coalesce(jsonb_agg(jsonb_build_object('at', g.at, 'uid', g.uid, 'pkg', substr(g.reason, 7), 'gem', g.delta, 'name', d.data->>'n', 'acct', moe_acct(u.email)) order by g.id desc), '[]'::jsonb)
   from gem_log g left join docs d on d.path = 'arena/' || g.uid::text left join auth.users u on u.id = g.uid
   where g.reason like 'topup:%' and (g.at at time zone 'Asia/Taipei')::date between coalesce(p_from, moe_today() - 30) and coalesce(p_to, moe_today())); end $$;
 
@@ -758,7 +761,7 @@ begin
       select (at at time zone 'Asia/Taipei')::date d, sum(case when reason = 'summon10' then 10 else 1 end) n from gem_log where reason like 'summon%' and at > now() - interval '14 days' group by 1) s),
     'pets', (select coalesce(jsonb_agg(jsonb_build_object('k', k, 'n', n) order by n desc), '[]'::jsonb) from (
       select split_part(tm, ',', 1) k, count(*) n from docs d, jsonb_array_elements_text(coalesce(d.data->'team','[]'::jsonb)) tm where d.coll = 'arena' group by 1 order by 2 desc limit 20) s),
-    'anom', (select coalesce(jsonb_agg(jsonb_build_object('uid', g.uid, 'n', coalesce(d.data->>'n','守護員'), 'acct', nullif(split_part(coalesce(u.email,''),'@',1),''), 'earn', g.e, 'gem', w.gem) order by g.e desc), '[]'::jsonb) from (
+    'anom', (select coalesce(jsonb_agg(jsonb_build_object('uid', g.uid, 'n', coalesce(d.data->>'n','守護員'), 'acct', nullif(moe_acct(u.email),''), 'earn', g.e, 'gem', w.gem) order by g.e desc), '[]'::jsonb) from (
       select uid, sum(delta) e from gem_log where reason = 'earn' and at > now() - interval '24 hours' group by uid having sum(delta) > 3000) g
       left join docs d on d.path = 'arena/' || g.uid::text left join auth.users u on u.id = g.uid left join wallet w on w.uid = g.uid));
 end $$;
@@ -1160,7 +1163,7 @@ declare a uuid := moe_admin(); k text; nk int; ke text; rws jsonb; lst text; lim
 begin
   if p_table = 'auth_users' then
     select coalesce(jsonb_agg(j order by kk), '[]'::jsonb), max(kk) into rws, lst from (
-      select jsonb_build_object('id', id, 'acct', split_part(coalesce(email, ''), '@', 1), 'created_at', created_at, 'last_sign_in_at', last_sign_in_at) j, id::text collate "C" kk
+      select jsonb_build_object('id', id, 'acct', moe_acct(email), 'created_at', created_at, 'last_sign_in_at', last_sign_in_at) j, id::text collate "C" kk
       from auth.users where id::text collate "C" > coalesce(p_after, '') order by 2 limit lim) s;
     return jsonb_build_object('rows', rws, 'last', lst, 'done', jsonb_array_length(rws) < lim);
   end if;
@@ -1174,7 +1177,7 @@ begin
 end $$;
 create or replace function public.admin_backup_done(p_rows bigint, p_bytes bigint) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); v jsonb; begin
-  v := jsonb_build_object('at', now(), 'rows', p_rows, 'bytes', p_bytes, 'by', (select split_part(coalesce(email, ''), '@', 1) from auth.users where id = a));
+  v := jsonb_build_object('at', now(), 'rows', p_rows, 'bytes', p_bytes, 'by', (select moe_acct(email) from auth.users where id = a));
   insert into settings(k, v) values ('backup', v) on conflict (k) do update set v = excluded.v;
   perform alog('backup', null, v); return v; end $$;
 -- 從備份還原單一玩家:存檔 + 鑽石錢包(不動儲值累計)。還原前先把目前存檔放進存檔歷史,並讓玩家在線的裝置登出,避免舊進度又被存回來
