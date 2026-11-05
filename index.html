@@ -3351,13 +3351,17 @@ function tdGuestUpdate(dt){const T=TD;T.t+=dt;if(T.banner>0)T.banner-=dt;if(T.sh
   if(T.cut){T.cut.t+=dt;if(T.cut.t>1.2)T.cut=null}if(T.flash){T.flash.t+=dt;if(T.flash.t>T.flash.life)T.flash=null}
   for(const n of T.nums)n.t+=dt;T.nums=T.nums.filter(n=>n.t<n.life);tdFxTick(dt);if(T.parts.length>650)T.parts.splice(0,T.parts.length-650)}
 // 好友邀請(各自聽自己的邀請頻道)
-function netInvListen(){if(INVCH||!ACC.uid||!(window.MOE_SB&&MOE_SB.channel))return;INVCH=rtOpen('moeinv-'+ACC.uid,m=>{if(!m||m.t!=='inv'||TD||NETR)return;netInvShow(m)})}
+// 好友邀請只在需要時連線:守塔頁/好友頁開著時一直連;城鎮閒著時每 30 秒連 7 秒;戰鬥、副本中不連(省 Supabase 同時連線數)
+let INVSEEN={};
+function netInvWant(){if(!ACC.uid||!(window.MOE_SB&&MOE_SB.channel)||TD||NETR||B||VISIT)return false;if(sheetK==='friends'||sheetK==='boss'&&sheetTab==='td')return true;return $('sheet').hidden&&!$('town').hidden&&Date.now()%30000<7000}
+function netInvListen(){const want=netInvWant();if(want&&!INVCH)INVCH=rtOpen('moeinv-'+ACC.uid,m=>{if(!m||m.t!=='inv'||TD||NETR)return;const k=m.code+':'+m.n;if(INVSEEN[k]&&Date.now()-INVSEEN[k]<70000)return;INVSEEN[k]=Date.now();netInvShow(m)});
+  else if(!want&&INVCH){const c=INVCH;INVCH=null;try{c.close()}catch(e){}}}
 function netInvShow(m){let el=$('tdInv');if(!el){el=document.createElement('div');el.id='tdInv';document.body.appendChild(el)}
   el.innerHTML=`<div class="tdlb"><h3>👥 守塔邀請</h3><p><b>${esc(m.n)}</b> 邀請你一起守塔!</p><div class="bt"><button class="go" id="ivY">加入</button><button id="ivN">不要</button></div></div>`;
   el.querySelector('#ivY').onclick=()=>{el.remove();closeSheet();netJoin(m.code)};el.querySelector('#ivN').onclick=()=>el.remove();setTimeout(()=>el.isConnected&&el.remove(),30000)}
 function netInvite(fid,fn){if(!(window.MOE_SB&&MOE_SB.channel))return toast('需要連上雲端才能邀請');if(!NETR||!NETR.host)netHost();const code=NETR.code,ch=rtOpen('moeinv-'+fid,()=>{});
-  let n=0;const go=()=>{ch.send({t:'inv',code,n:myNm()});if(++n<3)setTimeout(go,1500);else setTimeout(()=>ch.close(),1500)};setTimeout(go,900);toast(`已邀請 ${fn||'好友'},等對方加入`)}
-setInterval(()=>{try{netInvListen()}catch(e){}},5000);
+  let n=0;const go=()=>{if(!NETR||NETR.code!==code||NETR.peer||n>=16){setTimeout(()=>ch.close(),500);return}ch.send({t:'inv',code,n:myNm()});n++;setTimeout(go,4000)};setTimeout(go,900);toast(`已邀請 ${fn||'好友'},對方最慢 30 秒內會收到`)}
+setInterval(()=>{try{netInvListen()}catch(e){}},1000);
 // ---- 無盡模式:每 5 波買強化卡(單次使用的手牌) ----
 const TDBF=[{id:'rage',ic:'⚔️',n:'狂暴',v:[.4,.6,1],s:[15,20,25],d:(v,o,s)=>`全體攻擊 +${Math.round(v*100)}%,${s} 秒`},
   {id:'wind',ic:'💨',n:'疾風',v:[.4,.6,1],s:[15,20,25],d:(v,o,s)=>`攻擊速度 +${Math.round(v*100)}%,${s} 秒`},
