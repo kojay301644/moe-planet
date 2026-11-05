@@ -1896,3 +1896,44 @@ create or replace function public.moe_backup_list() returns text[] language sql 
 -- 新手教學完成禮物(一次)
 insert into gem_rule(p, per, lim, maxn, cap, re, need, note) values ('tut','once',1,100,null,null,null,'新手教學完成')
 on conflict (p) do update set per = excluded.per, lim = excluded.lim, maxn = excluded.maxn, cap = excluded.cap, re = excluded.re, need = excluded.need, note = excluded.note;
+
+-- ============ 平衡調整(2026-11-05):單筆鑽石超過上限時只截掉超過的部分;資源每日上限收斂到實際最高收入約 2 倍 ============
+create or replace function public.moe_gem_src(u uuid, src jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare x jsonb; k text; n int; pp text; suf text; r gem_rule; ok int := 0; rej jsonb := '[]'::jsonb; v_pid text; c gem_cnt; tp int; why text; i int := 0;
+begin
+  if src is null or jsonb_typeof(src) <> 'array' then return jsonb_build_object('ok', 0, 'rej', rej); end if;
+  select topup into tp from wallet where uid = u; tp := coalesce(tp, 0);
+  for x in select value from jsonb_array_elements(src) loop
+    i := i + 1; exit when i > 300; why := null;
+    k := left(coalesce(x->>0, ''), 80); n := coalesce((x->>1)::numeric, 0)::int;
+    pp := split_part(k, ':', 1); suf := substr(k, length(pp) + 2);
+    select * into r from gem_rule where p = pp and p <> 'misc';
+    if not found then why := 'unknown';
+    elsif n <= 0 then why := 'amount';
+    elsif r.re is not null and suf !~ r.re then why := 'id';
+    elsif r.need = 'vip' and moe_vip(tp) < 1 then why := 'need';
+    elsif r.need = 'viplv' and (suf !~ '^[0-9]+$' or suf::int > moe_vip(tp)) then why := 'need';
+    elsif r.need = 'card' and not exists (select 1 from gem_log where uid = u and reason = 'topup:card' and at > now() - interval '31 days') then why := 'need';
+    elsif r.need = 'fund' and not exists (select 1 from gem_log where uid = u and reason = 'topup:fund') then why := 'need';
+    end if;
+    if why is null and n > r.maxn then n := r.maxn; end if;
+    if why is null and r.per = 'once' then
+      insert into gem_once(uid, k, n) values (u, k, n) on conflict do nothing; if not found then why := 'dup'; end if;
+    elsif why is null then
+      v_pid := case r.per when 'week' then moe_week()::text else moe_today()::text end;
+      if r.re is not null then insert into gem_once(uid, k, n) values (u, k || '@' || v_pid, n) on conflict do nothing; if not found then why := 'dup'; end if; end if;
+      if why is null then
+        insert into gem_cnt(uid, p, pid) values (u, pp, v_pid) on conflict do nothing;
+        select * into c from gem_cnt where uid = u and gem_cnt.p = pp and gem_cnt.pid = v_pid for update;
+        if c.cnt >= r.lim then why := 'limit'; elsif r.cap is not null and c.sum + n > r.cap then n := greatest(0, r.cap - c.sum); if n = 0 then why := 'cap'; end if; end if;
+        if why is null then update gem_cnt set cnt = cnt + 1, sum = sum + n where uid = u and gem_cnt.p = pp and gem_cnt.pid = v_pid; end if;
+      end if;
+    end if;
+    if why is null then ok := ok + n; else rej := rej || jsonb_build_array(jsonb_build_object('k', k, 'n', n, 'why', why)); end if;
+  end loop;
+  return jsonb_build_object('ok', ok, 'rej', rej);
+end $$;
+revoke execute on function public.moe_gem_src(uuid,jsonb) from public, anon, authenticated;
+create or replace function public.moe_res_cap(p_k text, p_castle int) returns bigint language plpgsql stable set search_path = public as $$
+declare c jsonb := coalesce((select st.v from settings st where st.k = 'res_caps'), '{}'::jsonb); d jsonb := '{"coin":[300000,70000],"stones":[100,15],"candy":[800,80],"shards":[300,30]}'::jsonb; x jsonb;
+begin x := coalesce(c->p_k, d->p_k); return ((x->>0)::bigint + (x->>1)::bigint * greatest(1, least(coalesce(p_castle, 1), 50))); end $$;
