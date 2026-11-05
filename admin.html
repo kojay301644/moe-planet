@@ -116,7 +116,7 @@ const itemSubs=e=>(e&&!e.mat&&e.subs||[]).map(s=>`${SUB[s[0]]||s[0]} +${s[1]}`).
 const REASON=r=>{r=r||'';return r==='earn'?'遊戲獲得':r==='spend'?'遊戲花費':r==='mail'?'信件領取':r.startsWith('summon')?'召喚 ×'+r.slice(6):r.startsWith('topup:')?'儲值 '+r.slice(6):r.startsWith('admin:')?'營運調整 '+r.slice(6):r.startsWith('market_buy')?'交易所購買':r.startsWith('market_sell_bot')?'交易所賣出(系統)':r.startsWith('market_sell')?'交易所賣出':r==='ladder_ticket'?'天梯挑戰券':r};
 const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',save_restore:'還原存檔',backup:'匯出備份',backup_restore:'從備份還原',save_accept:'接受存檔',admin_remove:'移除管理員'};
 let ME=null,TAB='home',PQ={q:'',sort:'recent'},MKS='open';
-const TABS=[['home','總覽'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['events','活動'],['codes','兌換碼'],['saves','存檔異常'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['tickets','客服回報'],['market','交易所'],['backup','💾 備份'],['system','維護 / 管理員'],['logs','操作紀錄']];
+const TABS=[['home','總覽'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['events','活動'],['codes','兌換碼'],['saves','存檔異常'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['tickets','客服回報'],['backup','💾 備份'],['system','維護 / 管理員'],['logs','操作紀錄']];
 // ---------- login ----------
 const em=u=>String(u).trim().toLowerCase()+'@player.moe-planet.app';
 $('lgo').onclick=async()=>{const u=$('lu').value.trim(),p=$('lp').value;if(!u||!p)return toast('請輸入帳號和密碼');$('lgo').disabled=true;$('lmsg').textContent='登入中…';
@@ -165,7 +165,7 @@ V.home=async()=>{const s=await rpc('admin_stats'),D=s.days||[],LC=(await bkCard(
     <div class="kpi"><small>全服鑽石存量</small><b>💎${fmt(s.gem_total)}</b></div>
     <div class="kpi ${s.flagged?'warn':''}"><small>可疑玩家</small><b>${fmt(s.flagged)}</b><small><a href="#players" data-a="pf:!flag">查看</a></small></div>
     <div class="kpi ${s.banned?'bad':''}"><small>停權中</small><b>${fmt(s.banned)}</b></div>
-    <div class="kpi"><small>交易所上架中</small><b>${fmt(s.market_open)}</b><small>7 天成交 ${fmt(s.market_sold_7d)}</small></div>
+
   </div>
   <div class="card"><h2>最近 14 天</h2><div class="charts">
     <div><h3>新增玩家 <b>${fmt(sum('new'))}</b></h3>${bar('new')}</div>
@@ -327,7 +327,7 @@ const BR={lord:'領主',player:'一般'},BM=[[.85,'弱'],[1,'普通'],[1.2,'強'
 let BOTS=[];
 V.bots=async()=>{const {data,error}=await sb.from('bots').select('*').order('sort').order('id');if(error)throw new Error(/does not exist|Could not find/.test(error.message)?'伺服器還沒安裝電腦玩家功能,請先在 Supabase 執行最新的 server.sql':error.message);BOTS=data||[];
   const na=BOTS.filter(b=>b.active).length,grow=b=>b.reset_at&&Date.now()-new Date(b.reset_at)<3*864e5;
-  return `<div class="card act"><h2 id="bh">新增電腦玩家 <small>每位電腦玩家都會攻城、守城、打天梯、打團隊 Boss、在交易所賣東西</small></h2><input type="hidden" id="bid">
+  return `<div class="card act"><h2 id="bh">新增電腦玩家 <small>每位電腦玩家都會攻城、守城、打天梯、打團隊 Boss</small></h2><input type="hidden" id="bid">
     <div class="grid2"><div class="act"><label>名字(最多 12 字)</label><input id="bn" maxlength="12" placeholder="例如:泡泡茶大王"></div>
     <div class="act"><label>強度(在自動配對的戰力上再調整)</label><select id="bm">${BM.map(([v,n])=>`<option value="${v}" ${v===1?'selected':''}>${n}(×${v})</option>`).join('')}</select></div></div>
     <div class="row"><button class="p" data-a="bsave">儲存</button><button data-a="bclear">清空</button></div></div>

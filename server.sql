@@ -1537,3 +1537,20 @@ begin
   if coalesce((select (v->>'at')::timestamptz from settings where k = 'cleanup'), now() - interval '2 days') < now() - interval '1 day' then perform moe_cleanup(); end if;
 exception when others then null; end $$;
 revoke execute on function public.moe_cleanup_maybe() from public, anon, authenticated;
+
+-- ============ 交易所關閉:上架中的物品全部用信件退回賣家,交易功能停用 ============
+do $$ begin
+  if to_regclass('public.market') is not null then
+    insert into inbox(uid, item, note, kind, title)
+      select seller, item, '交易所已關閉,你上架的物品退回給你,領取後回到背包。', 'market', '交易所關閉:上架物品退回' from market where status = 'open';
+    update market set status = 'cancelled' where status = 'open';
+  end if;
+end $$;
+create or replace function public.market_list(p_item jsonb, p_price int) returns jsonb language plpgsql security definer set search_path = public as $$
+begin raise exception '交易所已關閉'; end $$;
+create or replace function public.market_list_mat(p_mat text, p_pet text, p_n int, p_price int) returns jsonb language plpgsql security definer set search_path = public as $$
+begin raise exception '交易所已關閉'; end $$;
+create or replace function public.market_buy(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+begin raise exception '交易所已關閉'; end $$;
+create or replace function public.market_tick(u uuid) returns void language plpgsql security definer set search_path = public as $$
+begin return; end $$;
