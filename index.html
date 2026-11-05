@@ -573,6 +573,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 #tdLob,#tdInv{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(20,10,30,.45);padding:16px}#tdInv{background:rgba(20,10,30,.25)}.tdlb{width:min(360px,100%);background:#fff8ec;border:3px solid #8a5a2b;border-radius:20px;padding:16px 18px;text-align:center;display:grid;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,.4)}.tdlb h3{margin:0}.tdlb p{margin:0}.tdcode{font-size:48px;font-weight:900;letter-spacing:10px;color:#8a3a10}.tdlb .st{font-size:15px}.tdlb .bt{display:flex;gap:8px;justify-content:center}.tdnet{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.tdnet input{width:96px;font-size:18px;padding:8px;border-radius:12px;border:2px solid #d8b890;text-align:center;letter-spacing:4px}
 .tdcd{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}.tdcd button{padding:8px 4px;border-radius:12px;border:2px solid var(--c);background:#fff;color:var(--c);font-weight:900;font-size:14px}.tdcd button.on{background:var(--c);color:#fff}.tdcd button.lock{opacity:.5}.tdcd small{display:block;font-size:10px}
 .tdrh{margin:10px 0 4px;font-size:15px}.tdrw{overflow-x:auto}.tdrw table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;border-radius:10px;overflow:hidden}.tdrw th,.tdrw td{padding:5px 4px;border-bottom:1px solid #f0e2c8;text-align:center}.tdrw th{background:#f6e7c8}.tdrw td:first-child{text-align:left;font-weight:700;white-space:nowrap}.tdrn{margin:4px 0;padding-left:18px;font-size:13px}
+#tdDraft{position:fixed;inset:0;z-index:58;display:grid;place-items:center;background:rgba(15,8,30,.6);padding:16px}.tdft{width:min(560px,100%);text-align:center;color:#fff}.tdft h3{margin:0 0 4px;font-size:22px;color:#ffe066}.tdft .dim{color:#ddd}.tdfc{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.tdfk{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px;border-radius:16px;border:3px solid var(--rc);background:linear-gradient(#fffaf0,#f3e3c3);color:#3a2a1a;box-shadow:0 0 18px var(--rc);animation:tdflip .45s both}.tdfk i{font-size:34px;font-style:normal}.tdfk b{font-size:15px}.tdfk small{color:var(--rc);font-weight:900}.tdfk span{font-size:12px;line-height:1.35}@keyframes tdflip{from{transform:rotateY(90deg) scale(.8);opacity:0}to{transform:none;opacity:1}}
 </style>
 </head><body>
 
@@ -1001,7 +1002,8 @@ function bgmSet(n){BGM.want=n;const a=BGM.el;if(!a)return;const s=BGM.src[n]||BG
 const cv=$('cv'),ctx=cv.getContext('2d');let W=0,H=0,dpr=1,F={x:0,y:0,w:0,h:0};
 function resize(){dpr=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
   F=W>=H?{x:0,y:0,w:W,h:H}:{x:0,y:Math.max(70,H*.1),w:W,h:H*.64}}
-addEventListener('resize',resize);
+addEventListener('resize',resize);try{cv.addEventListener('contextlost',e=>{try{e.preventDefault()}catch(_){}});cv.addEventListener('contextrestored',()=>resize())}catch(e){}
+setInterval(()=>{try{if(ctx.isContextLost&&ctx.isContextLost()){resize();if(TD)toast('畫面已自動恢復')}}catch(e){}},1000);
 const fx=x=>F.x+x*F.w,fy=y=>F.y+y*F.h,U=()=>F.h>F.w?F.w*.85:Math.min(F.h,F.w*.7);
 let toastT;function toast(s){const t=$('toast');t.textContent=s;t.className='show';clearTimeout(toastT);toastT=setTimeout(()=>t.className='',2000)}
 function drawImgFit(im,x,y,h,flip,sx=1,sy=1,alpha=1,flt,rot=0){if(!im||!im.naturalWidth)return h;const w=h*im.naturalWidth/im.naturalHeight;ctx.save();ctx.globalAlpha=alpha;if(flt)ctx.filter=flt;ctx.translate(x,y);if(rot)ctx.rotate(rot);ctx.scale((flip?-1:1)*sx,sy);ctx.drawImage(im,-w/2,-h,w,h);ctx.restore();return w}
@@ -3219,7 +3221,7 @@ function tdWave(w){const T=TD,P=tdPool(T.tone),q=[];const n=Math.min(26,6+Math.f
   return q}
 function tdHpMul(w){return (1+.16*w+.011*w*w)*(w<=6?.4+.1*w:1)*(w>20?Math.pow(1.12,w-20):1)}
 // ---- start / end
-function tdStart(mode,diff,cfg){au();for(const k in TDPEEK)delete TDPEEK[k];const t=tdSV(),coop=mode==='coop';if(mode!=='practice'&&!coop){if(tdTix()<1)return toast('今天的守塔券用完了');t.used++}
+function tdStart(mode,diff,cfg){try{for(const k in SKC)delete SKC[k]}catch(e){}au();for(const k in TDPEEK)delete TDPEEK[k];const t=tdSV(),coop=mode==='coop';if(mode!=='practice'&&!coop){if(tdTix()<1)return toast('今天的守塔券用完了');t.used++}
   const S=cfg&&TDSK.find(x=>x.id===cfg.sid)||TDSK[Math.floor(rnd()*TDSK.length)],tone=S.el;SKP=[];
   const cinf=coop&&diff===3;if(coop&&diff===3)diff=0;
   TD={mode,inf:mode==='endless'||cinf,diff:mode==='endless'?0:diff,tone,S,SK:skinOf(S.id),deco2:TDDECO.map((p,i)=>S.deco[(i*7+Math.floor(rnd()*3))%S.deco.length]),coop,pt:cfg?!!cfg.pt:coop&&H>W*1.05,slots:coop?TDSLOT2:TDSLOT,decos:coop?TDDECO2:TDDECO,map:coop?'td_map6':'td_map',mr:[0,0,1344,752],hpMax:coop?30:TDHP,side:'A',store:{A:0,B:250},spT:{A:0,B:0},ping:null,ults:[],wave:0,waveOn:false,spawn:[],st:0,en:[],tw:{},proj:[],parts:[],nums:[],hp:coop?30:TDHP,energy:250,speed:1,paused:false,t:0,over:null,cmd:{},sel:null,aim:null,shield:0,kills:0,prep:30,gap:0,leak:0,banner:8,bt:0,used:[],uid:0,shake:0,boss:null,later:[],cut:null,cutT:-9,flash:null};
@@ -3297,19 +3299,20 @@ function netApply(m){const T=TD;if(T.over||T.net.lost)return;const a=m.a,i=m.i,w
   else if(a==='sup'){if(T.t<T.spT.B||T.store.B<50)return;T.store.B-=50;T.energy+=50;T.spT.B=T.t+20;tdTxt(668,330,'右路隊友收到支援 ✦50','#ffe066',1.4,true);tdPart(668,330,18,['#ffe066','#fff'],180,.6,5);sfx('coin')}
   else if(a==='help'){const e=T.en.filter(e=>e.hp>0&&e.r===1).sort((p,q)=>q.d-p.d)[0];const [x,y]=e?tdPos(e.d,1):T.slots[13];T.ping={x,y,t:0,side:'B'};tdTxt(x,y-90,'🆘 左路需要幫忙!','#ff8a8a',2,true);sfx('boss')}
   else if(a==='next'){if(T.prep>0){T.prep=0;tdNextWave()}else if(!T.spawn.length){T.store.B+=8+T.wave;tdNextWave()}}
-  else if(a==='ult')T.ults.push({side:'B',t:T.t,x:m.x,y:m.y})}
+  else if(a==='ult')T.ults.push({side:'B',t:T.t,x:m.x,y:m.y})
+  else if(a==='pick'){if(T.draft&&!T.draft.done.B)tdDraftPick('B',+m.i||0)}}
 function netAct(a,o,spend){const R=NETR,T=TD;if(!R||!T||!T.guest)return;R.sq=(R.sq||0)+1;if(spend>0){T.pend=T.pend||[];T.pend.push({n:R.sq,c:spend,t:T.t});T.energy-=spend}R.ch.send(Object.assign({t:'a',a,n:R.sq},o||{}))}
 // 房主每 0.125 秒送一次畫面
 function netTick(dt){const T=TD,N=T.net;if(!N)return;
   if(N.host){if(!N.lost&&T.t-N.hb>8)netLost();N.acc+=dt;if(N.acc<.1)return;N.acc=0;
     const sig=Object.keys(T.tw).map(s=>s+':'+T.tw[s].k+T.tw[s].lv).join(','),tw=sig!==N.sig?(N.sig=sig,Object.fromEntries(Object.entries(T.tw).map(([s,w])=>[s,Object.assign({},w,{tx:undefined})]))):null;
-    NETR&&NETR.ch.send({t:'s',ak:N.ak||0,w:T.wave,p:T.prep,hp:T.hp,hm:T.hpMax,sp:T.spawn.length,sh:T.shield,eA:T.energy,eB:T.store.B,spT:T.spT,cmd:T.cmd,bn:T.banner,ks:T.kills,sk:T.shake,
+    NETR&&NETR.ch.send({t:'s',ak:N.ak||0,dr:T.draft?{w:T.draft.w,o:T.draft.done.B?null:T.draft.opts.B,wa:!T.draft.done.A}:null,bfl:T.bfl?T.bfl.B:null,w:T.wave,p:T.prep,hp:T.hp,hm:T.hpMax,sp:T.spawn.length,sh:T.shield,eA:T.energy,eB:T.store.B,spT:T.spT,cmd:T.cmd,bn:T.banner,ks:T.kills,sk:T.shake,
       fl:T.flash&&T.flash.t<.05?[T.flash.c,T.flash.a,T.flash.life]:null,ping:T.ping&&T.ping.t<.2?T.ping:null,bid:T.boss?T.boss.id:0,
       en:T.en.filter(e=>e.hp>0).map(e=>[e.id,e.k,Math.round(e.d*10)/10,e.r,Math.round(e.hp),Math.round(e.max),(e.boss?1:0)|(e.elite?2:0)|(e.fly?4:0),e.stun>0?1:0]),
       tw,st:Object.fromEntries(Object.entries(T.tw).map(([s,w])=>[s,[w.stun>0?1:0,w.face]])),ev:N.ev.splice(0,80)});N.ev.length=0}
   else{N.hbT-=dt;if(N.hbT<=0){N.hbT=1;NETR&&NETR.ch.send({t:'hb'})}if(T.t-N.last>7&&!T.over){toast('和房主的連線中斷了');tdEnd(false)}}}
 // 隊友:套用房主送來的畫面
-function netSnap(s){const T=TD,N=T.net;N.last=T.t;T.wave=s.w;T.prep=s.p;T.hp=s.hp;T.hpMax=s.hm;T.shield=s.sh;T.pend=(T.pend||[]).filter(p=>p.n>(s.ak||0)&&T.t-p.t<5);T.energy=s.eB-T.pend.reduce((a,p)=>a+p.c,0);T.store.A=s.eA;T.spT=s.spT||T.spT;T.cmd=s.cmd||{};T.kills=s.ks;if(s.bn<T.banner)T.banner=s.bn;
+function netSnap(s){const T=TD,N=T.net;N.last=T.t;{const k=s.dr?s.dr.w+':'+(s.dr.o?'o':'d')+(s.dr.wa?1:0):'';if(k!==T.gdrK){T.gdrK=k;if(!s.dr){T.gdr=null;T.gdrW=0}else if(s.dr.o){if(!T.gdr||T.gdr.w!==s.dr.w||T.gdr.done&&!T.gdrW)T.gdr={w:s.dr.w,opts:s.dr.o,done:false}}else{T.gdr={w:s.dr.w,done:true};T.gdrW=s.dr.wa?1:0}tdDraftUI()}}if(s.bfl&&(s.bfl.length!==(T.gbfl||[]).length)){T.gbfl=s.bfl;tdHudBuild()}T.wave=s.w;T.prep=s.p;T.hp=s.hp;T.hpMax=s.hm;T.shield=s.sh;T.pend=(T.pend||[]).filter(p=>p.n>(s.ak||0)&&T.t-p.t<5);T.energy=s.eB-T.pend.reduce((a,p)=>a+p.c,0);T.store.A=s.eA;T.spT=s.spT||T.spT;T.cmd=s.cmd||{};T.kills=s.ks;if(s.bn<T.banner)T.banner=s.bn;
   T.spawn=Array(s.sp||0).fill(0);if(s.sk>T.shake)T.shake=s.sk;if(s.fl)T.flash={t:0,c:s.fl[0],a:s.fl[1],life:s.fl[2]};if(s.ping)T.ping=Object.assign({},s.ping);
   if(s.tw){const old=T.tw;T.tw={};for(const k in s.tw){const w=s.tw[k];T.tw[k]=Object.assign(w,{anim:old[k]?old[k].anim:rnd()*9,hit:0})}}
   if(s.st)for(const k in s.st){const w=T.tw[k];if(w){w.stun=s.st[k][0]?.5:0;w.face=s.st[k][1]}}
@@ -3341,8 +3344,45 @@ function netInvShow(m){let el=$('tdInv');if(!el){el=document.createElement('div'
 function netInvite(fid,fn){if(!(window.MOE_SB&&MOE_SB.channel))return toast('需要連上雲端才能邀請');if(!NETR||!NETR.host)netHost();const code=NETR.code,ch=rtOpen('moeinv-'+fid,()=>{});
   let n=0;const go=()=>{ch.send({t:'inv',code,n:myNm()});if(++n<3)setTimeout(go,1500);else setTimeout(()=>ch.close(),1500)};setTimeout(go,900);toast(`已邀請 ${fn||'好友'},等對方加入`)}
 setInterval(()=>{try{netInvListen()}catch(e){}},5000);
-function tdQuit(){if(TD&&TD.net)netLeave();TD=null;SKP=[];$('tdHud').hidden=true;$('tdLayer').hidden=true;$('tdRes').hidden=true;$('tdPick').hidden=true;$('tdInfo').hidden=true;$('town').hidden=false;townHud();openSheet('td')}
-function tdEnd(win){const T=TD;if(T.over)return;if(T.net&&T.net.host&&NETR)NETR.ch.send({t:'end',win:!!win});if(T.coop&&T.inf&&T.net&&!T.net.lost&&T.net.mate&&SRV.on()&&T.wave>1){T.duoW=T.wave-1;SRV.rpc('td_report2',{p_mate:T.net.mate,p_mate_n:T.net.peer||'',p_my_n:myNm(),p_wave:T.wave-1,p_secs:Math.round(T.t)}).then(()=>{TDNET.t=0}).catch(()=>{})}T.over=win?'win':'lose';sfx(win?'win':'lose');const t=tdSV(),cl=T.mode==='endless'?T.wave-1:win?TDW:T.wave-1;
+// ---- 無盡模式:每 5 波抽強化 ----
+const TDBF=[{id:'el',ic:'🔥',n:'屬性專精',v:[.2,.35,.6],d:(v,o)=>`${EL[o.el].n}系萌獸攻擊 +${Math.round(v*100)}%`},{id:'atk',ic:'⚔️',n:'全體攻擊',v:[.1,.18,.3],d:v=>`所有塔攻擊 +${Math.round(v*100)}%`},
+  {id:'rg',ic:'🎯',n:'射程延伸',v:[.08,.12,.2],d:v=>`所有塔射程 +${Math.round(v*100)}%`},{id:'as',ic:'💨',n:'攻速提升',v:[.1,.15,.25],d:v=>`攻擊速度 +${Math.round(v*100)}%`},
+  {id:'cr',ic:'💥',n:'暴擊',v:[.06,.1,.18],d:v=>`暴擊率 +${Math.round(v*100)}%`},{id:'cd',ic:'🌀',n:'大招充能',v:[.1,.15,.25],d:v=>`萌獸技能冷卻 -${Math.round(v*100)}%`},
+  {id:'boss',ic:'👑',n:'頭目剋星',v:[.25,.4,.7],d:v=>`對頭目傷害 +${Math.round(v*100)}%`},{id:'en',ic:'✦',n:'能量增幅',v:[.2,.35,.6],d:v=>`打怪能量 +${Math.round(v*100)}%`},
+  {id:'sup',ic:'💰',n:'每波補給',v:[40,70,120],d:v=>`每波開始 +${v} 能量`},{id:'gate',ic:'🧱',n:'城門加固',v:[3,5,8],d:v=>`城門上限 +${v},並立刻補滿`,team:1},
+  {id:'reg',ic:'💚',n:'自動修補',v:[1,2,3],d:v=>`每波結束城門回 ${v}`,team:1},{id:'slow',ic:'🐢',n:'減速陷阱',v:[.06,.1,.15],d:v=>`所有怪物移動 -${Math.round(v*100)}%`,team:1},
+  {id:'cmd',ic:'🔁',n:'指令重置',v:[1,2,2],d:v=>`已用過的指令${v>1?'(最多 2 個)':''}再用一次`}];
+const TDRAR=[{n:'普通',c:'#8a8a9a'},{n:'稀有',c:'#3a8ae0'},{n:'傳說',c:'#e0a020'}];
+const tdSideOf=w=>TD&&TD.coop?(w&&w.side||'A'):'A';
+function tdBF(sd){const T=TD;if(!T||!T.bf)return null;return T.bf[sd]}
+function tdBFv(w,k){const b=tdBF(tdSideOf(w));return b?(b[k]||0):0}
+function tdBFel(w){const b=tdBF(tdSideOf(w));return b&&b.el?(b.el[w.el]||0):0}
+function tdDraftOpts(sd){const T=TD,w=T.wave,used=Object.keys(TDCMD).some(k=>(T.cmd[T.coop?k+sd:k]||0)>0);
+  const pool=TDBF.filter(c=>c.id!=='cmd'||used),out=[],els=[...new Set(Object.values(T.tw).filter(x=>tdSideOf(x)===sd&&!x.wt).map(x=>x.el))];
+  while(out.length<3&&pool.length){const c=pool.splice(Math.floor(rnd()*pool.length),1)[0];const r=rnd(),pl=Math.min(.35,.04+.012*w),rr=r<pl?2:r<pl+.3?1:0;
+    const o={id:c.id,r:rr};if(c.id==='el')o.el=els.length?els[Math.floor(rnd()*els.length)]:TDBEL[Math.floor(rnd()*6)];out.push(o)}return out}
+const tdCardTxt=o=>{const c=TDBF.find(x=>x.id===o.id);return {c,v:c.v[o.r],t:c.d(c.v[o.r],o)}};
+function tdDraftApply(sd,o){const T=TD,{c,v}=tdCardTxt(o);T.bf=T.bf||{A:{el:{}},B:{el:{}},team:{}};const b=T.bf[sd];T.bfl=T.bfl||{A:[],B:[]};T.bfl[sd].push(o);
+  if(c.id==='el')b.el[o.el]=(b.el[o.el]||0)+v;else if(c.id==='gate'){T.hpMax+=v;T.hp=T.hpMax}else if(c.id==='reg'||c.id==='slow')T.bf.team[c.id]=(T.bf.team[c.id]||0)+v;
+  else if(c.id==='cmd'){let n=v;for(const k of Object.keys(TDCMD)){const ck=T.coop?k+sd:k;if(n>0&&(T.cmd[ck]||0)>0){T.cmd[ck]=0;n--}}}else b[c.id]=(b[c.id]||0)+v;
+  tdTxt(668,120,`${c.ic} ${c.n}!`,TDRAR[o.r].c,1.6,true);tdHudBuild()}
+function tdDraftOpen(){const T=TD;T.draft={w:T.wave,t:0,opts:{A:tdDraftOpts('A'),B:T.coop?tdDraftOpts('B'):null},done:{A:false,B:!T.coop}};sfx('up');
+  if(T.coop&&T.bot&&(!T.net||T.net.lost)){const o=T.draft.opts.B,pr=['atk','el','as','boss','cd','rg','cr','en','sup','gate','reg','slow','cmd'];o.sort((a,b)=>(b.r-a.r)*20+pr.indexOf(a.id)-pr.indexOf(b.id));tdDraftApply('B',o[0]);T.draft.done.B=true}
+  tdDraftUI()}
+function tdDraftPick(sd,i){const T=TD,D=T&&T.draft;if(!D||D.done[sd])return;const o=D.opts[sd][i]||D.opts[sd][0];tdDraftApply(sd,o);D.done[sd]=true;sfx('win');tdDraftUI();tdDraftCheck()}
+function tdDraftCheck(){const T=TD,D=T.draft;if(D&&D.done.A&&D.done.B){T.draft=null;tdDraftUI();T.dr=T.dr||{};T.dr[D.w]=1;tdNextWave()}}
+function tdDraftTick(dt){const T=TD,D=T.draft;D.t+=dt;if(T.net&&D.t>20){if(!D.done.B)tdDraftPick('B',Math.floor(rnd()*3));if(!D.done.A&&D.t>30)tdDraftPick('A',Math.floor(rnd()*3))}}
+function tdDraftUI(){const T=TD;let el=$('tdDraft');const D=T&&T.draft,sd=T?T.side:'A',my=D?(T.guest?(T.gdr&&!T.gdr.done?T.gdr.opts:null):(!D.done[sd]?D.opts[sd]:null)):(T&&T.guest&&T.gdr&&!T.gdr.done?T.gdr.opts:null);
+  const wait=T&&(T.guest?(T.gdr&&T.gdr.done&&T.gdrW):(D&&D.done[sd]&&!(D.done.A&&D.done.B)));
+  if(!my&&!wait){if(el)el.remove();return}
+  if(!el){el=document.createElement('div');el.id='tdDraft';document.body.appendChild(el)}
+  const w=T.guest?(T.gdr&&T.gdr.w):D.w;
+  el.innerHTML=`<div class="tdft"><h3>🃏 第 ${w} 波強化</h3><p class="dim">${my?'選一張,效果會一直累積到這場結束':'⏳ 等待隊友選擇…'}</p>${my?`<div class="tdfc">${my.map((o,i)=>{const {c,t}=tdCardTxt(o);return `<button class="tdfk" data-i="${i}" style="--rc:${TDRAR[o.r].c};animation-delay:${i*.12}s"><i>${c.ic}</i><b>${c.n}</b><small>${TDRAR[o.r].n}</small><span>${t}</span></button>`}).join('')}</div>`:''}</div>`;
+  el.querySelectorAll('.tdfk').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(T.guest){T.gdr.done=true;T.gdrW=1;netAct('pick',{i});tdDraftUI()}else tdDraftPick(sd,i)});iconize(el)}
+function tdBfList(){const T=TD,L=(T.bfl&&T.bfl[T.side])||[];if(!L.length&&!(T.bf&&Object.keys(T.bf.team).length))return toast('還沒有強化,每撐過 5 波可以抽一張');
+  toast(L.map(o=>{const {c,t}=tdCardTxt(o);return c.ic+' '+t}).join(' · ').slice(0,300))}
+function tdQuit(){if($('tdDraft'))$('tdDraft').remove();if(TD&&TD.net)netLeave();TD=null;SKP=[];$('tdHud').hidden=true;$('tdLayer').hidden=true;$('tdRes').hidden=true;$('tdPick').hidden=true;$('tdInfo').hidden=true;$('town').hidden=false;townHud();openSheet('td')}
+function tdEnd(win){const T=TD;if(T.over)return;T.draft=null;T.gdr=null;if($('tdDraft'))$('tdDraft').remove();if(T.net&&T.net.host&&NETR)NETR.ch.send({t:'end',win:!!win});if(T.coop&&T.inf&&T.net&&!T.net.lost&&T.net.mate&&SRV.on()&&T.wave>1){T.duoW=T.wave-1;SRV.rpc('td_report2',{p_mate:T.net.mate,p_mate_n:T.net.peer||'',p_my_n:myNm(),p_wave:T.wave-1,p_secs:Math.round(T.t)}).then(()=>{TDNET.t=0}).catch(()=>{})}T.over=win?'win':'lose';sfx(win?'win':'lose');const t=tdSV(),cl=T.mode==='endless'?T.wave-1:win?TDW:T.wave-1;
   let stars=0,lines=[],first=false;
   const used=(T.used||[]).filter(k=>SV.pets[k]),pn=k=>PETS[k].n[SV.pets[k].st];
   if(T.mode==='normal'){
@@ -3389,7 +3429,7 @@ function tdBossStep(e,mv,dt){const T=TD,st=e.boss?TDBST[e.k]||'stomp':'hop',stri
   else if(e.k==='titan'){e.fxT=Rn(.25,.6);P({bolt:1,x:x+Rn(-50,50),y:y-Rn(90,160),x2:x+Rn(-50,50),y2:y-Rn(20,80),life:.12,w:2,seed:rnd()*99})}
   else if(e.k==='yking'){e.fxT=.15;P({x:x+Rn(-40,40),y:y-Rn(20,100),vx:Rn(-20,20),vy:Rn(10,40),g:20,life:Rn(.8,1.2),c:'#ffffff',sz:Rn(1.5,3)})}
   else if(e.k==='golem'){e.fxT=.12;P({x:x+Rn(-20,20),y:y-Rn(60,100),vx:Rn(-20,20),vy:Rn(-80,-40),g:-20,life:Rn(.4,.7),c:['#ffb030','#ff6a20'][Math.floor(rnd()*2)],sz:Rn(2,3.5),glow:1})}}
-function tdGain(r,g){const T=TD;if(!T.coop){T.energy+=g;return}const sd=r===1?'B':'A';if(sd===T.side)T.energy+=g;else T.store[sd]+=g}
+function tdGain(r,g){const T=TD;{const b=tdBF(T.coop&&r===1?'B':'A');if(b&&b.en)g=Math.round(g*(1+b.en))}if(!T.coop){T.energy+=g;return}const sd=r===1?'B':'A';if(sd===T.side)T.energy+=g;else T.store[sd]+=g}
 function tdSwap(){const T=TD;if(!T.coop||T.bot)return;const o=T.side==='A'?'B':'A';T.store[T.side]=T.energy;T.energy=T.store[o];T.side=o;T.sel=null;$('tdPick').hidden=true;toast(o==='A'?'🎮 現在操作:右路玩家':'🎮 現在操作:左路玩家');tdHudBuild()}
 function tdSupport(){const T=TD;if(!T.coop)return;const o=T.side==='A'?'B':'A';if(T.t<T.spT[T.side])return toast('支援冷卻中');if(T.energy<50)return toast('能量不足 50');T.energy-=50;T.store[o]+=50;T.spT[T.side]=T.t+20;tdTxt(668,330,(o==='A'?'右路':'左路')+'隊友收到支援 ✦50','#ffe066',1.4,true);tdPart(668,330,18,['#ffe066','#fff'],180,.6,5);sfx('coin');tdHudBuild()}
 function tdPingHelp(){const T=TD;if(!T.coop)return;const r=T.side==='A'?0:1,e=T.en.filter(e=>e.hp>0&&e.r===r).sort((a,b)=>b.d-a.d)[0];const [x,y]=e?tdPos(e.d,r):T.slots[T.side==='A'?1:4];T.ping={x,y,t:0,side:T.side};tdTxt(x,y-90,'🆘 '+(T.side==='A'?'右路':'左路')+'需要幫忙!','#ff8a8a',2,true);sfx('boss')}
@@ -3410,14 +3450,14 @@ function tdTips(ttl){const T=TD,L=[],ow=owned(),mx=ow.reduce((a,k)=>SV.pets[k].l
 function tdTower(k,slot){const P=PETS[k],s=SV.pets[k],S=stat(k);return {k,slot,lv:1,spent:tdCost(k),cd:.5,skT:P.sk.cd*.8,atk:S.atk,crit:S.crit||.05,rate:P.rate,el:P.el,far:P.range!=='melee',img:imgName(k),face:1,anim:rnd()*9,hit:0,stun:0,q:qOf(k)}}
 function tdWTower(tk,slot){const T2=TOWERS[tk],lv=towerLv(tk);return {k:'wt:'+tk,wt:tk,slot,lv:1,plv:lv,spent:tdWCost(tk),cd:.5,skT:1e9,atk:T2.dmg*(1+.35*(lv-1))*(3+.5*(SV.castle||1)),crit:.05,rate:T2.rate,el:T2.el,far:true,img:T2.img,face:1,anim:rnd()*9,hit:0,stun:0,q:0}}
 const tdWCost=tk=>50+10*towerLv(tk),tdUpW=w=>w.wt?(w.lv===1?70:110):tdUpC(w.k,w.lv,w.q),tdNP=()=>Object.values(TD.tw).filter(w=>!w.wt).length,tdNW=()=>Object.values(TD.tw).filter(w=>w.wt).length;
-const TDRG=[1,1.15,1.3],tdRange=w=>(w.far?205:185)*TDRG[w.lv-1];
-const tdAtk=w=>w.atk*TDLVM[w.lv-1]*tdBon(w.el)*(w.far?1:1.3);
+const TDRG=[1,1.15,1.3],tdRange=w=>(w.far?205:185)*TDRG[w.lv-1]*(1+tdBFv(w,'rg'));
+const tdAtk=w=>w.atk*TDLVM[w.lv-1]*tdBon(w.el)*(w.far?1:1.3)*(1+tdBFv(w,'atk'))*(1+tdBFel(w));
 function tdSpawn(x){const T=TD,E=ENEMY[x.k],w=T.wave,m=tdHpMul(w)*TDDIFF[T.diff].hp*(x.boss?1:x.elite?2.5:1);let hp=E.hp*m*(x.boss?.55:1);
   const e={id:++T.uid,k:x.k,E,d:x.d||0,r:x.r||0,hp,max:hp,spd:(36+E.spd*330)*(x.boss?.85:1),slow:0,slowT:0,stun:0,poi:0,poiT:0,fly:!!E.fly,boss:!!x.boss,elite:!!x.elite,anim:rnd()*9,rev:E.revive?1:0,heal:E.shield?2.5:0,sk:4+rnd()*2,hitT:0};
   T.en.push(e);if(e.boss){T.boss=e;sfx('boss');T.shake=.6;tdTxt(TDR[e.r||0].P[0][0]-120,TDR[e.r||0].P[0][1]-80,'⚠ 頭目來襲!','#ff6a5a',1.6)}return e}
 function tdTxt(x,y,s,c,life,big){if(TD.net&&TD.net.host&&TD.net.ev.length<200)TD.net.ev.push(['x',Math.round(x),Math.round(y),s,c||'#fff',life||.9,big?1:0]);TD.nums.push({x,y,s,c:c||'#fff',t:0,life:life||.9,big})}
 function tdPart(x,y,n,c,v,life,sz){for(let i=0;i<n;i++){const a=rnd()*7,sp=(v||120)*(.3+rnd());TD.parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*.6-40,t:0,life:(life||.6)*(.6+rnd()*.6),c:Array.isArray(c)?c[i%c.length]:c,sz:(sz||4)*(.6+rnd()*.8)})}}
-function tdDmg(e,dmg,el,src,show){if(e.hp<=0||TD.guest)return;let m=elemMul(el,e.E.el);if(el==='rock'&&e.E.def>=15)m*=1.5;let d=dmg*m*100/(100+e.E.def*3)*(.9+rnd()*.2);let cr=false;if(src&&rnd()<src.crit){d*=1.8;cr=true}
+function tdDmg(e,dmg,el,src,show){if(e.hp<=0||TD.guest)return;let m=elemMul(el,e.E.el);if(el==='rock'&&e.E.def>=15)m*=1.5;let d=dmg*m*100/(100+e.E.def*3)*(.9+rnd()*.2);let cr=false;if(src&&e.boss)d*=1+tdBFv(src,'boss');if(src&&rnd()<(src.crit||0)+tdBFv(src,'cr')){d*=1.8;cr=true}
   e.hp-=d;e.hitT=.12;if(show!==false&&(cr||d>e.max*.06||rnd()<.35)){const [x,y]=tdPos(e.d,e.r);tdTxt(x+(rnd()-.5)*20,y-55-(e.fly?30:0),fmt(d),cr?'#ffd84a':m>1.2?'#ff9a6a':'#fff',.7,cr)}
   if(e.hp<=0)tdKill(e)}
 function tdKill(e){const T=TD;if(T.guest)return;if(e.rev&&!e.boss){e.rev=0;e.hp=e.max*.5;const [x,y]=tdPos(e.d,e.r);tdTxt(x,y-70,'復活!','#c8a0ff');return}
@@ -3472,7 +3512,7 @@ function tdHit(w,e,a,skill){if(TD.guest)return;const T=TD,[ex,ey]=tdPos(e.d,e.r)
   if(el==='elec')tdChain(T,e,a,el,skill?F.elec.n[L]+1:F.elec.n[L],.6);
 }
 // ---- update
-function tdUpdate(dt){const T=TD;if(!T)return;TT+=dt;try{skinFx(T.SK,dt)}catch(e){}if(T.guest)return tdGuestUpdate(dt);if(T.net&&!T.over)netTick(dt);if(T.over||T.paused)return;T.t+=dt;if(T.bot)tdBotAI(dt);if(T.banner>0)T.banner-=dt;if(T.shake>0)T.shake-=dt;
+function tdUpdate(dt){const T=TD;if(!T)return;TT+=dt;try{skinFx(T.SK,dt)}catch(e){}if(T.guest)return tdGuestUpdate(dt);if(T.net&&!T.over)netTick(dt);if(T.over||T.paused)return;if(T.draft){tdDraftTick(dt);return}T.t+=dt;if(T.bot)tdBotAI(dt);if(T.banner>0)T.banner-=dt;if(T.shake>0)T.shake-=dt;
   for(const k in T.cmd)if(T.cmd[k]>0)T.cmd[k]-=dt;if(T.shield>0)T.shield-=dt;
   if(T.prep>0){if($('tdPick').hidden)T.prep-=dt;if(T.prep<=0)tdNextWave();}
   else{T.st+=dt;while(T.spawn.length&&T.spawn[0].t<=T.st){tdSpawn(T.spawn.shift())}
@@ -3484,12 +3524,12 @@ function tdUpdate(dt){const T=TD;if(!T)return;TT+=dt;try{skinFx(T.SK,dt)}catch(e
     if(e.boss){e.sk-=dt;if(e.sk<=0){e.sk=6.5;const [x,y]=tdPos(e.d,e.r);let n=0;for(const s in T.tw){const w=T.tw[s],[sx,sy]=TD.slots[s];if(Math.hypot(sx-x,sy-y)<190){w.stun=Math.max(w.stun,1.3);n++}}T.parts.push({ring:1,x,y,r:190,t:0,life:.6,c:'#ff6a4a'});T.shake=.5;sfx('boss');if(n)tdTxt(x,y-110,'震暈萌獸!','#ff8a6a',1.2);
       if(e.E.summon)for(let i=0;i<2;i++)tdSpawn({k:e.E.summon,r:e.r,d:Math.max(0,e.d-30-i*20)});if(e.E.heal){e.hp=Math.min(e.max,e.hp+e.max*.04);tdTxt(x,y-90,'回血!','#7aff9a')}}}
     if(e.stun>0){e.stun-=dt;continue}
-    {const mv=e.spd*(1-e.slow)*dt;e.d+=mv;if(e.boss||e.elite)tdBossStep(e,mv,dt)}
+    {const mv=e.spd*(1-e.slow)*(1-Math.min(.5,T.bf&&T.bf.team.slow||0))*dt;e.d+=mv;if(e.boss||e.elite)tdBossStep(e,mv,dt)}
     if(e.d>=TDR[e.r||0].len&&T.shield>0){e.d=0;e.slow=0;tdTxt(668,90,'🛡 彈回起點!','#9adfff');tdPart(668,120,14,['#9adfff','#fff'],180,.5,5);continue}
     if(e.d>=TDR[e.r||0].len){e.hp=0;if(e===T.boss)T.boss=null;const dmg=e.boss?5:e.elite?2:1;T.lk=T.lk||{boss:0,fly:0,n:0};T.lk.n+=dmg;if(e.boss)T.lk.boss+=dmg;if(e.fly)T.lk.fly+=dmg;{T.hp-=dmg;T.leak+=dmg;T.shake=.35;sfx('hit');tdTxt(668,80,'-'+dmg,'#ff5a5a',1,true)}if(T.hp<=0){T.hp=0;return tdEnd(false)}}}
   T.en=T.en.filter(e=>e.hp>0);
   for(const s in T.tw){const w=T.tw[s];w.anim+=dt;if(w.hit>0)w.hit-=dt;if(w.stun>0){w.stun-=dt;continue}w.cd-=dt;w.skT-=dt;const [x,y]=TD.slots[s];
-    if(w.cd<=0){const e=tdTarget(w,x,y);if(e){w.cd=w.rate*(w.lv===3?.85:1)*(w.wt==='bee'?TDFX.bee.r[w.lv-1]:1);if(!w.wt&&w.skT<=0){if(T.bot&&w.side==='A')T.bot.pu=T.t;w.skT=PETS[w.k].sk.cd*1.1;tdTxt(x,y-95,PETS[w.k].sk.n,EL[w.el].c,1.1);tdFire(w,e,true)}else tdFire(w,e,false)}else w.cd=.15}}
+    if(w.cd<=0){const e=tdTarget(w,x,y);if(e){w.cd=w.rate*(w.lv===3?.85:1)*(w.wt==='bee'?TDFX.bee.r[w.lv-1]:1)/(1+tdBFv(w,'as'));if(!w.wt&&w.skT<=0){if(T.bot&&w.side==='A')T.bot.pu=T.t;w.skT=PETS[w.k].sk.cd*1.1*(1-Math.min(.7,tdBFv(w,'cd')));tdTxt(x,y-95,PETS[w.k].sk.n,EL[w.el].c,1.1);tdFire(w,e,true)}else tdFire(w,e,false)}else w.cd=.15}}
   for(const p of T.proj){p.t+=dt;const e=p.tx;if(e.hp<=0&&!p.lx){const [ex,ey]=tdPos(e.d,e.r);p.lx=ex;p.ly=ey}const [tx,ty]=e.hp>0?tdPos(e.d,e.r):[p.lx,p.ly];const ty2=ty-25-(e.fly?30:0),dx=tx-p.x,dy=ty2-p.y,dd=Math.hypot(dx,dy),st=p.sp*dt;
     p.rot+=dt*9;p.hist.push([p.x,p.y]);if(p.hist.length>7)p.hist.shift();
     if(dd<=st+4){p.done=1;if(e.hp>0)tdHit(p.w,e,p.a,false);tdImpact(p.kd,tx,ty2,0)}else{p.x+=dx/dd*st;p.y+=dy/dd*st}}
@@ -3500,7 +3540,9 @@ function tdUpdate(dt){const T=TD;if(!T)return;TT+=dt;try{skinFx(T.SK,dt)}catch(e
   for(const s2 in T.tw){const w=T.tw[s2];if(w.lunge>0)w.lunge-=dt}
   for(const n of T.nums)n.t+=dt;T.nums=T.nums.filter(n=>n.t<n.life);
   if(T.parts.length>650)T.parts.splice(0,T.parts.length-650)}
-function tdNextWave(){const T=TD;T.wave++;T.spawn=TDPEEK[T.wave+T.tone]||tdWave(T.wave);delete TDPEEK[T.wave+T.tone];T.st=0;T.gap=0;T.waveOn=true;T.bt=2;sfx('up');tdHudBuild()}
+function tdNextWave(){const T=TD;if(T.inf&&T.wave>0&&T.wave%5===0&&!(T.dr&&T.dr[T.wave])&&!T.guest){if(!T.draft)tdDraftOpen();return}
+  if(T.bf&&T.wave>0){const rg=T.bf.team.reg||0;if(rg)T.hp=Math.min(T.hpMax,T.hp+rg);for(const sd of ['A','B']){const v=(T.bf[sd]||{}).sup||0;if(v){if(!T.coop||sd===T.side)T.energy+=v;else T.store[sd]+=v}}}
+  T.wave++;T.spawn=TDPEEK[T.wave+T.tone]||tdWave(T.wave);delete TDPEEK[T.wave+T.tone];T.st=0;T.gap=0;T.waveOn=true;T.bt=2;sfx('up');tdHudBuild()}
 // ---- draw
 function tdLayout(){const port=H>W*1.05,top=port?50:46,bot=port?118:4,cp=TD&&TD.coop,pv=TD&&TD.pt;const vx0=pv?288:cp?(port?298:200):port?292:200,vx1=pv?1048:cp?(port?1235:1300):port?1050:1300,vy0=pv?-115:port?-20:-15,vy1=pv?1060:port?690:650;const vw=vx1-vx0,vh=vy1-vy0;
   const rsv=!port&&W>=1000?330:0,s=Math.min((W-rsv)/vw,(H-top-bot)/vh),sy=cp&&port?Math.max(s,Math.min(s*2.2,(H-top-bot-12)/vh)):s;TDV.s=s;TDV.sy=sy;TDV.port=port;TDV.ox=(W-rsv-vw*s)/2-vx0*s;TDV.rsv=rsv;TDV.oy=(port?top:top+((H-top-bot)-vh*sy)/2)-vy0*sy;TDV.mb=TDV.oy+vy1*sy;
@@ -3508,7 +3550,10 @@ function tdLayout(){const port=H>W*1.05,top=port?50:46,bot=port?118:4,cp=TD&&TD.
   else{pk.style.top='';pk.style.bottom='';pk.style.maxHeight='';const side=rsv?rsv:(W-vw*s)/2,ib=$('tdInfoBtn'),room=!port&&side>=250;if(ib)ib.hidden=port||room;
     if(room||(!port&&TD&&TD.infOn)){const w=room?Math.min(340,side-20):Math.min(320,W-20);inf.style.left='auto';inf.style.right='10px';inf.style.width=w+'px';inf.style.fontSize=rsv?'14px':'';inf.style.top=(top+12)+'px';inf.style.bottom='auto';inf.style.maxHeight=(H-top-24-(room?0:Math.round(bb.height?H-bb.top:78)))+'px';inf.hidden=!pk.hidden}else inf.hidden=true}}
 const tdX=x=>TDV.ox+x*TDV.s,tdY=y=>TDV.oy+y*TDV.sy;
-function tdDraw(){const T=TD;tdLayout();const s=TDV.s,TO=T.S,SK=T.SK,sh=T.shake>0?T.shake*8:0;
+function tdDraw(){for(let i=0;i<40;i++)ctx.restore();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';try{ctx.filter='none';ctx.setLineDash([])}catch(e){}
+  try{tdDraw0()}catch(e){TDERR.n++;if(Date.now()-TDERR.t>20000){TDERR.t=Date.now();toast('畫面錯誤已自動修復('+String(e&&e.message||e).slice(0,50)+')')}for(let i=0;i<40;i++)ctx.restore();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over'}}
+const TDERR={n:0,t:0};
+function tdDraw0(){const T=TD;tdLayout();const s=TDV.s,TO=T.S,SK=T.SK,sh=T.shake>0?T.shake*8:0;
   ctx.setTransform(dpr,0,0,dpr,0,0);drawSky(SK);
   ctx.setTransform(dpr,0,0,dpr,dpr*(rnd()-.5)*sh,dpr*(rnd()-.5)*sh);
   const tt=performance.now()/1000;
@@ -3628,7 +3673,7 @@ let TDBARS=[];
 function tdHudBuild(){const T=TD;if(!T)return;const cm=CMDS.filter(c=>c.k!=='hold').map(c=>c.k==='rock'?{...c,n:'雷霆',ic:'🌩️'}:c);
   $('tdTop').innerHTML=`<button class="tdb" data-td="pause">${T.paused?'▶':'❚❚'}</button><button class="tdb" data-td="spd">×${T.speed}</button>
     <div class="tdst"><b id="tdWave"></b><small>${T.inf?'無盡模式':T.mode==='practice'?'練習 · '+TDDIFF[T.diff].n:TDDIFF[T.diff].n}</small></div>
-    <div class="tdst hp"><b id="tdHp"></b><small>城門</small></div><div class="tdst en"><b id="tdEn"></b><small>✦ ${T.coop?(T.side==='A'?'右路':'左路'):'能量'}</small></div><button class="tdb" data-td="info" id="tdInfoBtn" hidden>👾<small style="display:block;font-size:10px">本波怪物</small></button>${T.coop&&!T.bot&&!T.net?`<button class="tdb" data-td="swap">🎮${T.side==='A'?'右':'左'}</button>`:''}<button class="tdb go2" data-td="next" id="tdNext">出怪</button>`;
+    <div class="tdst hp"><b id="tdHp"></b><small>城門</small></div><div class="tdst en"><b id="tdEn"></b><small>✦ ${T.coop?(T.side==='A'?'右路':'左路'):'能量'}</small></div>${T.inf?`<button class="tdb" data-td="bf">🃏<small style="display:block;font-size:10px">強化 ${((T.guest?T.gbfl:(T.bfl&&T.bfl[T.side]))||[]).length}</small></button>`:''}<button class="tdb" data-td="info" id="tdInfoBtn" hidden>👾<small style="display:block;font-size:10px">本波怪物</small></button>${T.coop&&!T.bot&&!T.net?`<button class="tdb" data-td="swap">🎮${T.side==='A'?'右':'左'}</button>`:''}<button class="tdb go2" data-td="next" id="tdNext">出怪</button>`;
   $('tdBot').innerHTML=cm.map(c=>`<button class="tdc" data-td="cmd:${c.k}" id="tdc_${c.k}"><i>${c.ic}</i><small>${c.n}</small><span class="cdm"></span></button>`).join('')+(T.coop?`<button class="tdc" data-td="sup"><i>🤝</i><small>支援50</small></button><button class="tdc" data-td="help"><i>🆘</i><small>求救</small></button>`:'')+`<button class="tdc quit" data-td="quit"><i>🏳</i><small>撤退</small></button>`;
   document.querySelectorAll('#tdHud [data-td]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();tdAct(b.dataset.td)});tdHudTick()}
 function tdHudTick(){const T=TD;if(!T)return;const inf=$('tdInfo');if(inf&&!inf.hidden&&(!T._it||T.t-T._it>.5||T._iw!==T.wave)){T._it=T.t;T._iw=T.wave;inf.innerHTML=tdInfoHtml();iconize(inf)}const w=$('tdWave');if(!w)return;w.textContent=T.prep>0?`準備 ${Math.ceil(T.prep)}`:T.inf?`第 ${T.wave} 波`:`${T.wave} / ${TDW}`;$('tdHp').textContent=`${T.hp}/${T.hpMax}`;$('tdEn').textContent=Math.floor(T.energy);
@@ -3640,10 +3685,11 @@ function tdThunder(){if(TD.net&&TD.net.host)TD.net.ev.push(['th']);const T=TD,be
     const pct=e.max*(e.boss?.05:.15)*(100+(e.E.def||0)*3)/100/Math.max(.5,elemMul('elec',e.E.el));tdDmg(e,best*5+pct,'elec',null);e.stun=Math.max(e.stun||0,e.boss?1:2)}
     T.flash={t:0,life:.55,a:.85,c:'255,255,235'};T.shake=1;sfx('zap')})}
 function tdAct(a){const T=TD;if(!T||T.over)return;sfx('click');const [k,arg]=a.split(':');
+  if(T.guest&&k==='bf'){const L=T.gbfl||[];return toast(L.length?L.map(o=>{const {c,t}=tdCardTxt(o);return c.ic+' '+t}).join(' · ').slice(0,300):'還沒有強化,每撐過 5 波可以抽一張')}
   if(T.guest&&k!=='quit'&&k!=='info'){if(k==='swap')return;if(k==='sup'){if(T.t<(T.spT.B||0))return toast('支援冷卻中');if(T.energy<50)return toast('能量不足 50');netAct('sup',{},50);return toast('已送出支援 ✦50')}
     if(k==='help'){netAct('help');return toast('已向隊友求救')}if(k==='next'){netAct('next');return}if(k==='pause'||k==='spd')return toast('只有房主可以暫停或加速');
     if(k==='cmd'){const C=CMDS.find(c=>c.k===arg);if(!C)return;if((SV.castle||1)<C.lv)return toast(`主城 Lv.${C.lv} 解鎖「${C.n}」`);if((T.cmd[arg+'B']||0)>0)return toast('這一場已經用過了');netAct('cmd',{k:arg});T.cmd[arg+'B']=1e9;tdHudTick();return}return}
-  if(k==='swap')return tdSwap();if(k==='info'){T.infOn=!T.infOn;T._it=0;tdLayout();tdHudTick();return}if(k==='sup')return tdSupport();if(k==='help')return tdPingHelp();
+  if(k==='bf')return tdBfList();if(k==='swap')return tdSwap();if(k==='info'){T.infOn=!T.infOn;T._it=0;tdLayout();tdHudTick();return}if(k==='sup')return tdSupport();if(k==='help')return tdPingHelp();
   if(k==='pause'){T.paused=!T.paused;tdHudBuild()}else if(k==='spd'){T.speed=T.speed===1?2:1;tdHudBuild()}
   else if(k==='next'){if(T.prep>0){T.prep=0;tdNextWave()}else if(!T.spawn.length){const b=8+T.wave;T.energy+=b;tdTxt(Math.min(1000,TDR[0].P[0][0]-80),TDR[0].P[0][1]-70,'提前出怪 ⚡+'+b,'#ffe066',1.2);tdNextWave()}}
   else if(k==='quit'){if(T.quitAsk&&Date.now()-T.quitAsk<2500){tdEnd(false)}else{T.quitAsk=Date.now();toast(T.mode==='endless'?'再按一次「撤退」結束,獎勵照已撐過的波數計算':'再按一次「撤退」結束這場')}}
