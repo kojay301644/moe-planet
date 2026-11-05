@@ -1123,3 +1123,60 @@ begin
 end $$;
 revoke execute on function public.topup_test_impl(text) from public, anon, authenticated;
 grant execute on function public.topup_test(text) to authenticated;
+
+-- ============ 後台備份(#43):匯出全部資料、從備份還原單一玩家 ============
+-- 要備份的資料表(暫存性質的 events / live_msg / sessions / save_hist 不備份)
+create or replace function public.moe_backup_list() returns text[] language sql stable set search_path = public as $$
+  select coalesce(array_agg(t order by t), '{}') from unnest(array['docs','wallet','admins','notice','admin_log','bans','bots','chat_hide','code_use','codes','game_event','gem_log','inbox','ladder','ladder_def','market','mint_quota','mutes','pay_first','player_day','save_flags','settings','td_duo','td_week','tickets']) t
+  where to_regclass('public.' || t) is not null $$;
+create or replace function public.admin_backup_tables() returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); r jsonb := '[]'::jsonb; t text; n bigint;
+begin
+  foreach t in array moe_backup_list() loop execute format('select count(*) from public.%I', t) into n; r := r || jsonb_build_array(jsonb_build_object('t', t, 'n', n)); end loop;
+  r := r || jsonb_build_array(jsonb_build_object('t', 'auth_users', 'n', (select count(*) from auth.users)));
+  return jsonb_build_object('tables', r, 'last', (select v from settings where k = 'backup'));
+end $$;
+-- 分頁讀取一個資料表:依主鍵排序,p_after 傳上一頁最後一筆的 key
+create or replace function public.admin_backup_page(p_table text, p_after text default '', p_limit int default 500) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); k text; nk int; ke text; rws jsonb; lst text; lim int := greatest(1, least(coalesce(p_limit, 500), 2000));
+begin
+  if p_table = 'auth_users' then
+    select coalesce(jsonb_agg(j order by kk), '[]'::jsonb), max(kk) into rws, lst from (
+      select jsonb_build_object('id', id, 'acct', split_part(coalesce(email, ''), '@', 1), 'created_at', created_at, 'last_sign_in_at', last_sign_in_at) j, id::text collate "C" kk
+      from auth.users where id::text collate "C" > coalesce(p_after, '') order by 2 limit lim) s;
+    return jsonb_build_object('rows', rws, 'last', lst, 'done', jsonb_array_length(rws) < lim);
+  end if;
+  if not (p_table = any(moe_backup_list())) then raise exception '不能備份這個資料表'; end if;
+  select string_agg('x.' || quote_ident(at.attname), ',' order by array_position(i.indkey::int2[], at.attnum)), count(*) into k, nk
+    from pg_index i join pg_attribute at on at.attrelid = i.indrelid and at.attnum = any(i.indkey) where i.indrelid = ('public.' || p_table)::regclass and i.indisprimary;
+  ke := case when k is null then 'x::text' when nk = 1 then k || '::text' else 'row(' || k || ')::text' end;
+  execute format('select coalesce(jsonb_agg(j order by kk), ''[]''::jsonb), max(kk) from (select to_jsonb(x) j, (%1$s) collate "C" kk from public.%2$I x where (%1$s) collate "C" > $1 order by 2 limit $2) s', ke, p_table)
+    into rws, lst using coalesce(p_after, ''), lim;
+  return jsonb_build_object('rows', rws, 'last', lst, 'done', jsonb_array_length(rws) < lim);
+end $$;
+create or replace function public.admin_backup_done(p_rows bigint, p_bytes bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); v jsonb; begin
+  v := jsonb_build_object('at', now(), 'rows', p_rows, 'bytes', p_bytes, 'by', (select split_part(coalesce(email, ''), '@', 1) from auth.users where id = a));
+  insert into settings(k, v) values ('backup', v) on conflict (k) do update set v = excluded.v;
+  perform alog('backup', null, v); return v; end $$;
+-- 從備份還原單一玩家:存檔 + 鑽石錢包(不動儲值累計)。還原前先把目前存檔放進存檔歷史,並讓玩家在線的裝置登出,避免舊進度又被存回來
+create or replace function public.admin_backup_restore(p_uid uuid, p_save jsonb, p_wallet jsonb default null, p_from text default '') returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); pth text := 'data/users/' || p_uid::text || '/save'; cur jsonb; begin
+  if p_save is null or p_save->>'json' is null then raise exception '備份裡沒有這位玩家的存檔'; end if;
+  if not exists (select 1 from auth.users where id = p_uid) then raise exception '這個帳號已經不存在,無法還原'; end if;
+  select data into cur from docs where path = pth;
+  if cur is not null then insert into save_hist(uid, data) values (p_uid, cur); end if;
+  perform set_config('moe.skip', '1', true);
+  update docs set data = jsonb_set(p_save, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint)), updated_at = now() where path = pth;
+  if not found then insert into docs(path, coll, owner, data, updated_at) values (pth, 'data/users/' || p_uid::text, p_uid, jsonb_set(p_save, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint)), now()); end if;
+  if p_wallet is not null and p_wallet ? 'gem' then
+    update wallet set gem = greatest(0, (p_wallet->>'gem')::int), pity = coalesce((p_wallet->>'pity')::int, pity), dpity = coalesce((p_wallet->>'dpity')::int, dpity), updated_at = now() where uid = p_uid;
+  end if;
+  update sessions set sid = gen_random_uuid(), dev = '管理員還原存檔', seen = now() where uid = p_uid;
+  perform alog('backup_restore', p_uid, jsonb_build_object('from', p_from, 'gem', p_wallet->'gem'));
+  return jsonb_build_object('ok', true); end $$;
+revoke execute on function public.moe_backup_list() from public, anon, authenticated;
+grant execute on function public.admin_backup_tables(), public.admin_backup_page(text,text,int), public.admin_backup_done(bigint,bigint), public.admin_backup_restore(uuid,jsonb,jsonb,text) to authenticated;
+create or replace function public.admin_backup_last() returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); begin return (select v from settings where k = 'backup'); end $$;
+grant execute on function public.admin_backup_last() to authenticated;

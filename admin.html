@@ -114,9 +114,9 @@ const MATN={stones:'進化石',enh:'強化石',ore:'礦石',reroll:'洗練石',c
 const itemName=e=>e&&e.mat?`<b>${e.mat==='shard'?(PET[e.pet]||e.pet)+'碎片':MATN[e.mat]||e.mat} ×${fmt(e.n)}</b> <span class="tag">${e.mat==='shard'?'碎片':'材料'}</span>`:e?`<span class="item r${e.rar}c"><b>${e.uq?UQ[e.uq]:SET[e.set||'basic']+EQT[e.type]}${e.lv?' +'+e.lv:''}</b></span> <span class="tag">${RAR[e.rar]||''}</span>`:'-';
 const itemSubs=e=>(e&&!e.mat&&e.subs||[]).map(s=>`${SUB[s[0]]||s[0]} +${s[1]}`).join('、');
 const REASON=r=>{r=r||'';return r==='earn'?'遊戲獲得':r==='spend'?'遊戲花費':r==='mail'?'信件領取':r.startsWith('summon')?'召喚 ×'+r.slice(6):r.startsWith('topup:')?'儲值 '+r.slice(6):r.startsWith('admin:')?'營運調整 '+r.slice(6):r.startsWith('market_buy')?'交易所購買':r.startsWith('market_sell_bot')?'交易所賣出(系統)':r.startsWith('market_sell')?'交易所賣出':r==='ladder_ticket'?'天梯挑戰券':r};
-const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',save_restore:'還原存檔',save_accept:'接受存檔',admin_remove:'移除管理員'};
+const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',save_restore:'還原存檔',backup:'匯出備份',backup_restore:'從備份還原',save_accept:'接受存檔',admin_remove:'移除管理員'};
 let ME=null,TAB='home',PQ={q:'',sort:'recent'},MKS='open';
-const TABS=[['home','總覽'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['events','活動'],['codes','兌換碼'],['saves','存檔異常'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['tickets','客服回報'],['market','交易所'],['system','維護 / 管理員'],['logs','操作紀錄']];
+const TABS=[['home','總覽'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['events','活動'],['codes','兌換碼'],['saves','存檔異常'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['tickets','客服回報'],['market','交易所'],['backup','💾 備份'],['system','維護 / 管理員'],['logs','操作紀錄']];
 // ---------- login ----------
 const em=u=>String(u).trim().toLowerCase()+'@player.moe-planet.app';
 $('lgo').onclick=async()=>{const u=$('lu').value.trim(),p=$('lp').value;if(!u||!p)return toast('請輸入帳號和密碼');$('lgo').disabled=true;$('lmsg').textContent='登入中…';
@@ -150,7 +150,10 @@ async function liveCard(){let R;try{R=await rpc('admin_live_status')}catch(e){re
     ${LIVEsel===k?`<div class="tw" style="margin:4px 0 10px"><table><tbody>${g[k].map(x=>`<tr><td><a href="#" data-a="pdet:${x.uid}">${esc(x.n)}</a></td><td>${esc(actName(x.act))}</td><td class="mut">${esc(x.dev||'')}</td></tr>`).join('')}</tbody></table></div>`:''}`).join(''):'<div class="empty">目前沒有人在線</div>'}</div>`}
 setInterval(async()=>{if(TAB==='home'&&document.getElementById('liveCard')&&document.visibilityState==='visible'){const h=await liveCard();const c=document.getElementById('liveCard');if(c){c.outerHTML=h;bind(document.getElementById('liveCard'))}}},30000);
 A.livesel=async k=>{LIVEsel=LIVEsel===k?null:k;const h=await liveCard();const c=document.getElementById('liveCard');if(c){c.outerHTML=h;bind(document.getElementById('liveCard'))}};
-V.home=async()=>{const s=await rpc('admin_stats'),D=s.days||[],LC=await liveCard();
+async function bkCard(){let b=null;try{b=await rpc('admin_backup_last')}catch(e){return ''}const d=b&&b.at?Math.floor((Date.now()-new Date(b.at))/864e5):null,bad=d==null||d>=7;
+  return `<div class="card" style="${bad?'border:2px solid var(--bad)':''}"><div class="row" style="justify-content:space-between;align-items:center"><div><b>💾 上次備份:</b>${d==null?'<b style="color:var(--bad)">從來沒有備份過</b>':`<b style="color:${bad?'var(--bad)':'inherit'}">${d===0?'今天':d+' 天前'}</b> <small class="mut">${new Date(b.at).toLocaleString('zh-TW',{hour12:false})}</small>`}${bad?' <small style="color:var(--bad)">建議每週備份一次</small>':''}</div><a href="#backup" class="s mini" style="text-decoration:none;padding:6px 12px;border-radius:8px" data-a="go:backup">前往備份</a></div></div>`}
+A.go=t=>{TAB=t;location.hash=t;render()};
+V.home=async()=>{const s=await rpc('admin_stats'),D=s.days||[],LC=(await bkCard())+(await liveCard());
   const bar=(k,cls)=>{const mx=Math.max(1,...D.map(d=>+d[k]||0));return `<div class="bars ${cls||''}">${D.map(d=>`<div style="height:${(+d[k]||0)/mx*100}%" title="${d.d}:${fmt(d[k])}"></div>`).join('')}</div><div class="bl">${D.map((d,i)=>`<span>${i%2?'':d.d.slice(5).replace('-','/')}</span>`).join('')}</div>`};
   const sum=k=>D.reduce((a,d)=>a+(+d[k]||0),0);
   return LC+`<div class="kpis">
@@ -275,6 +278,38 @@ A.svst=v=>{SVST=v;render()};A.svhist=u=>{SVH=u||null;render()};
 A.svok=async id=>{if(!sure('svok'+id,'接受玩家的這份存檔'))return;try{await rpc('admin_save_accept',{p_id:+id});toast('已接受');render()}catch(e){toast(e.message)}};
 A.svcl=async id=>{try{await rpc('admin_save_close',{p_id:+id});render()}catch(e){toast(e.message)}};
 A.svres=async(u,id)=>{if(!sure('svres'+id,'把玩家存檔還原到這份'))return;try{await rpc('admin_save_restore',{p_uid:u,p_hist:+id});toast('已還原,玩家下次開遊戲生效');SVH=null;render()}catch(e){toast(e.message)}};
+// ---------- 備份 ----------
+let BK=null,BKQ='',BKbusy=0;const kb=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+const bkSave=d=>{try{const S=JSON.parse(d.json);return {castle:S.castle,pets:Object.keys(S.pets||{}).length,coin:S.coin,name:S.name}}catch(e){return null}};
+V.backup=async()=>{const R=await rpc('admin_backup_tables'),b=R.last,tot=R.tables.reduce((a,x)=>a+x.n,0);
+  let h=`<div class="card"><h2>💾 匯出全部資料 <small>Supabase 免費方案沒有自動備份,建議每週按一次,把檔案存在電腦或雲端硬碟</small></h2>
+    <p>上次備份:${b&&b.at?`<b>${new Date(b.at).toLocaleString('zh-TW',{hour12:false})}</b> · ${fmt(b.rows)} 筆 · ${kb(b.bytes)} · ${esc(b.by||'')}`:'<b style="color:var(--bad)">從來沒有備份過</b>'}</p>
+    <p class="mut">目前共 ${R.tables.length} 個資料表、${fmt(tot)} 筆資料(包含所有玩家存檔、鑽石錢包、儲值紀錄、天梯、守塔排行、交易所、信箱、帳號清單;不含密碼)</p>
+    <div class="row"><button class="p" id="bkGo" data-a="bkgo">⬇ 開始匯出</button><span id="bkMsg" class="mut"></span></div></div>`;
+  h+=`<div class="card"><h2>♻ 從備份還原單一玩家 <small>只會還原你選的那位玩家,其他人不受影響。還原前會先把他目前的存檔放進「存檔歷史」,還原錯了可以到「存檔異常 → 還原…」救回來</small></h2>
+    <div class="row"><input type="file" id="bkFile" accept=".json,application/json"></div>
+    ${BK?`<p>已讀取備份:<b>${new Date(BK.at).toLocaleString('zh-TW',{hour12:false})}</b> · ${esc(BK.file)} · ${fmt((BK.tables.docs||[]).filter(r=>/^data\/users\/[^/]+\/save$/.test(r.path)).length)} 份玩家存檔</p>
+      <div class="row"><input id="bkQ" placeholder="搜尋帳號、守護員名稱或 UID" value="${esc(BKQ)}"><button class="s" data-a="bkq">搜尋</button></div>${bkList()}`:'<p class="mut">選擇之前匯出的備份檔(moe-backup-….json)</p>'}</div>`;
+  setTimeout(()=>{const f=$('bkFile');if(f)f.onchange=bkLoad;const q=$('bkQ');if(q)q.onkeydown=e=>{if(e.key==='Enter')A.bkq()}},0);return h};
+function bkList(){if(!BK)return '';const q=BKQ.trim().toLowerCase();if(!q)return '<p class="mut">輸入關鍵字搜尋玩家</p>';
+  const acct={};(BK.tables.auth_users||[]).forEach(u=>acct[u.id]=u.acct);const nick={};(BK.tables.docs||[]).forEach(r=>{const m=/^arena\/([^/]+)$/.exec(r.path);if(m&&r.data)nick[m[1]]=r.data.n});const wal={};(BK.tables.wallet||[]).forEach(w=>wal[w.uid]=w);
+  const L=(BK.tables.docs||[]).map(r=>{const m=/^data\/users\/([^/]+)\/save$/.exec(r.path);return m?{uid:m[1],r}:null}).filter(Boolean).map(x=>({...x,acct:acct[x.uid]||'',nick:nick[x.uid]||'',s:bkSave(x.r.data||{}),w:wal[x.uid]}))
+    .filter(x=>x.uid.includes(q)||x.acct.toLowerCase().includes(q)||String(x.nick).toLowerCase().includes(q)||(x.s&&String(x.s.name||'').toLowerCase().includes(q))).slice(0,30);
+  return L.length?`<div class="tw"><table><thead><tr><th>帳號</th><th>守護員</th><th class="n">主城</th><th class="n">萌獸</th><th class="n">星星幣</th><th class="n">鑽石</th><th></th></tr></thead><tbody>${L.map(x=>`<tr><td>${esc(x.acct||'—')}<br><small class="mut">${x.uid.slice(0,8)}</small></td><td>${esc(x.nick||(x.s&&x.s.name)||'—')}</td><td class="n">${x.s&&x.s.castle!=null?'Lv'+x.s.castle:'?'}</td><td class="n">${x.s?x.s.pets:'?'}</td><td class="n">${x.s?fmt(x.s.coin):'?'}</td><td class="n">${x.w?fmt(x.w.gem):'—'}</td><td><button class="d mini" data-a="bkres:${x.uid}">還原到這份</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">備份裡找不到符合的玩家</div>'}
+async function bkLoad(e){const f=e.target.files[0];if(!f)return;toast('讀取中…');try{const j=JSON.parse(await f.text());if(j.app!=='moe-planet'||!j.tables)throw new Error('這不是萌獸星球的備份檔');BK={...j,file:f.name};BKQ='';render()}catch(x){toast(x.message||'檔案讀取失敗')}}
+A.bkq=()=>{BKQ=($('bkQ')||{}).value||'';render()};
+A.bkres=async uid=>{if(!BK)return;const r=(BK.tables.docs||[]).find(x=>x.path==='data/users/'+uid+'/save'),w=(BK.tables.wallet||[]).find(x=>x.uid===uid);if(!r)return toast('備份裡沒有這位玩家的存檔');
+  if(!sure('bk'+uid,'把這位玩家的存檔和鑽石還原到備份當時,玩家若在線會被登出'))return;
+  try{await rpc('admin_backup_restore',{p_uid:uid,p_save:r.data,p_wallet:w?{gem:w.gem,pity:w.pity,dpity:w.dpity}:null,p_from:BK.file+' @ '+BK.at});toast('已還原,玩家重新開遊戲就會看到備份當時的進度')}catch(e){toast(e.message)}};
+A.bkgo=async()=>{if(BKbusy)return;BKbusy=1;const btn=$('bkGo'),msg=$('bkMsg');btn.disabled=true;
+  try{const R=await rpc('admin_backup_tables'),out={app:'moe-planet',v:1,at:new Date().toISOString(),by:ME.acct,tables:{}};let rows=0,done=0;
+    for(const {t,n} of R.tables){const L=[];let after='';for(;;){msg.textContent=`匯出中… ${t}(${fmt(L.length)} / ${fmt(n)})· 已完成 ${done} / ${R.tables.length} 個資料表`;
+        const p=await rpc('admin_backup_page',{p_table:t,p_after:after,p_limit:t==='docs'?40:1000});L.push(...p.rows);if(p.done||!p.last)break;after=p.last}
+      out.tables[t]=L;rows+=L.length;done++}
+    const txt=JSON.stringify(out),blob=new Blob([txt],{type:'application/json'}),a=document.createElement('a'),d=new Date(Date.now()+8*3600e3).toISOString().slice(0,16).replace(/[-:]/g,'').replace('T','-');
+    a.href=URL.createObjectURL(blob);a.download=`moe-backup-${d}.json`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+    await rpc('admin_backup_done',{p_rows:rows,p_bytes:blob.size});toast(`備份完成:${fmt(rows)} 筆、${kb(blob.size)},已下載到你的電腦`);BKbusy=0;render()}
+  catch(e){msg.textContent='匯出失敗:'+e.message;btn.disabled=false;BKbusy=0}};
 V.topups=async()=>{const today=new Date(Date.now()+8*3600e3).toISOString().slice(0,10),f=TPF||new Date(Date.now()+8*3600e3-30*864e5).toISOString().slice(0,10),t=TPT||today,L=await rpc('admin_topups',{p_from:f,p_to:t}),PK={p30:'💎60',p150:'💎300',p300:'💎600',p790:'💎1,580',p1490:'💎2,980',p3290:'💎6,580',card:'月卡',fund:'成長基金'};
   const sum=L.reduce((a,x)=>a+x.gem,0),payers=new Set(L.map(x=>x.uid)).size;
   return `<div class="card"><div class="row"><label class="mut">從</label><input type="date" id="tf" value="${f}"><label class="mut">到</label><input type="date" id="tt" value="${t}"><button class="p" data-a="tpq">查詢</button></div></div>
