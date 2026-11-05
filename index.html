@@ -3268,7 +3268,7 @@ function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?
       if(!t.dw||t.dw.day!==today())t.dw={day:today(),got:[0,0,0],r3:0};if(!t.dw.got[d]){t.dw.got[d]=1;const g=[20,40,80][d];SV.gem+=g;lines.push(`每日首勝 💎${g}`)}
       if(d>=1){const ty=Object.keys(EQT)[Math.floor(rnd()*4)],r=rnd(),q=d===1?(r<.25?2:1):(r<.45?3:2);const e=mkEq(ty,q);SV.equips.push(e);lines.push(`${RAR[q]}${EQT[ty].n} ×1`)}
       if(d===2&&stars===3&&!t.dw.r3){t.dw.r3=1;SV.rtix=(SV.rtix||0)+1;lines.push('🎟️ 召喚券 ×1(地獄 3 星每日獎勵)')}}}
-  else if(T.mode==='endless'){const w=Math.max(0,cl);const coin=3000*w*(1+.04*(SV.castle||1)),st=Math.floor(w/2),g=2*w;SV.coin+=Math.round(coin);SV.stones+=st;SV.gem+=g;if(coin>0)lines.push(`⭐ ${fmt(coin)}`);if(st>0)lines.push(`💠 ${st}`);if(g>0)lines.push(`💎 ${g}`);
+  else if(T.mode==='endless'){const w=Math.max(0,cl);const coin=1000*w*(1+.04*(SV.castle||1)),st=Math.floor(w/2),g=w;SV.coin+=Math.round(coin);SV.stones+=st;SV.gem+=g;if(coin>0)lines.push(`⭐ ${fmt(coin)}`);if(st>0)lines.push(`💠 ${st}`);if(g>0)lines.push(`💎 ${g}`);
     if(w>0&&used.length){const xl=[];for(const k of used)petXp(k,300*w,xl);lines.push(`上場萌獸 ${used.length} 隻:各經驗 +${fmt(300*w)}`);xl.slice(0,3).forEach(x=>lines.push(x))}
     if(!lines.length)lines.push('至少撐過 1 波才有獎勵');
     const nb=w>(t.wbest||0);t.wbest=Math.max(t.wbest||0,w);t.best=Math.max(t.best||0,w);if(nb)lines.push('🏆 本週新紀錄!');
@@ -3591,14 +3591,14 @@ function pTD(){const t=tdSV(),n=tdTix();tdFetch();
     <li>擊倒怪物得「✦能量」,用來放萌獸、場內升級(最高 3 級)或收回萌獸(退一半)。</li>
     <li>屬性招式:🔥範圍爆炸、💧擊退、🌿中毒、⚡連鎖閃電、❄️減速、🪨暈眩;近戰萌獸傷害 +30%,但打不到飛行怪。</li><li>守護、治癒雨、落石每場各能用 1 次,留到關鍵時刻再用!</li>
     <li>怪物闖進城門扣耐久,${TDHP} 點扣光就失敗;撐過 ${TDW} 波(第 10、20 波有頭目)就勝利,城門完全沒被打到(${TDHP}/${TDHP})= 3 星、剩 ${TDHP/2} 以上 = 2 星、守住 = 1 星。</li>
-    <li>每天 ${3} 張守塔券。打贏有星星幣、進化石、糖果,上場的萌獸都能拿碎片和品質精華;每個難度每天第一次勝利再送鑽石,困難、地獄還會掉裝備。</li><li>無盡模式每撐過 1 波,上場萌獸各 +300 經驗、💎2;每週排行前 50 名有鑽石獎勵(寄到信箱)。</li>
+    <li>每天 ${3} 張守塔券。打贏有星星幣、進化石、糖果,上場的萌獸都能拿碎片和品質精華;每個難度每天第一次勝利再送鑽石,困難、地獄還會掉裝備。</li><li>無盡模式每撐過 1 波,上場萌獸各 +300 經驗、💎1;每週排行前 50 名有鑽石獎勵(寄到信箱)。</li>
     <li>練習模式不耗券、沒有獎勵,可以自己練功。</li></ol></details></div>
     <div class="card ladme"><div class="lm"><b>今日守塔券</b><small>普通/困難/地獄、無盡模式都會用 1 張</small></div><div class="tix"><b>🎫 ${n}</b><small>剩餘</small><button class="blue" data-act="tdBuy" ${t.buy>=TDBUY.length?'disabled':''}>${t.buy<TDBUY.length?'💎'+TDBUY[t.buy]+' +1':'今日已買滿'}</button></div></div>`;
   const mxl=Math.max(0,...owned().map(k=>SV.pets[k].lv||1)),TDNEED=[0,20,30];
   h+=`<div class="tdtip">💡 第一次玩建議先按「練習」熟悉玩法(不耗守塔券、沒有獎勵),熟悉後再正式挑戰,避免浪費券。</div><div class="card"><h3>挑戰關卡 <small class="dim" style="font-size:12px;font-weight:400">3★＝滿血守住 · 2★＝剩一半以上</small></h3><div class="tdds">${TDDIFF.map((D,i)=>{const lv0=mxl<TDNEED[i],cl0=i>0&&!(t.clr[i-1]>0),lock=lv0||cl0,st=t.clr[i]||0;return `<div class="tdd ${lock?'lock':''}" style="--c:${D.c}"><b>${D.n}</b><span class="tdstars sm">${[0,1,2].map(j=>`<span class="${j<st?'':'off'}">★</span>`).join('')}</span><small>${lock?[lv0?'需要一隻 Lv'+TDNEED[i]+' 萌獸':'',cl0?'先通關'+TDDIFF[i-1].n:''].filter(Boolean).join('、'):t.first[i]?'每日首勝 💎'+[20,40,80][i]:'首通 💎'+[100,200,400][i]}</small><button class="go" data-act="tdGo:normal:${i}" ${lock||n<1?'disabled':''}>挑戰</button><button class="mini" data-act="tdGo:practice:${i}" ${lock?'disabled':''}>練習</button></div>`}).join('')}</div></div>`;
   h+=`<div class="card"><h3>👥 好友共同守塔 <small>試玩版</small></h3><p class="dim">兩條路線同時來襲,和好友共守一座主城!試玩版由你一人切換操作左右兩路,體驗合作玩法(每人 9 座石台、支援能量、求救、友情合擊)。不耗守塔券、沒有獎勵。</p><div class="bt"><button class="go" data-act="tdGo:coop:0">開始試玩</button><button class="blue" data-act="tdBotList">🤖 找電腦隊友</button></div>${TDBP?`<div class="tdbots">${TDBP.map((c,i)=>`<div class="tdbot"><b>🤖 ${esc(c.n)} <small>${c.tag}</small></b><small>戰力 ${fmt(c.pw)} · 擅長 ${c.top.map(e=>`<span class="el el-${e}">${EL[e].n}</span>`).join('')}</small><button class="go" data-act="tdBotGo:${i}">一起守塔</button></div>`).join('')}<p class="dim" style="font-size:12px">你守右路、電腦隊友守左路。不耗守塔券、沒有獎勵。</p></div>`:''}</div>`;
   const top=TDNET.top||[],me=t.wbest||0;
-  h+=`<div class="card"><h3>♾️ 無盡模式 <small>本週最佳 ${me} 波 · 歷史最佳 ${t.best||0} 波</small></h3><p class="dim">怪物無限湧出,看你能撐幾波!中途撤退也會依撐過的波數拿到獎勵。每撐過 1 波:上場萌獸各 +300 經驗、💎2。每週一重新計算,前 50 名有鑽石獎勵:第 1 名 💎600、2~3 名 💎400、4~10 名 💎200、11~50 名 💎60;前 3 名再送一週限定稱號「🛡️守塔英雄」。</p>
+  h+=`<div class="card"><h3>♾️ 無盡模式 <small>本週最佳 ${me} 波 · 歷史最佳 ${t.best||0} 波</small></h3><p class="dim">怪物無限湧出,看你能撐幾波!中途撤退也會依撐過的波數拿到獎勵。每撐過 1 波:上場萌獸各 +300 經驗、💎1。每週一重新計算,前 50 名有鑽石獎勵:第 1 名 💎600、2~3 名 💎400、4~10 名 💎200、11~50 名 💎60;前 3 名再送一週限定稱號「🛡️守塔英雄」。</p>
     <div class="bt"><button class="go" data-act="tdGo:endless:0" ${n<1?'disabled':''}>開始無盡模式</button></div>
     <h3 style="margin-top:10px">本週排行</h3>${SRV.on()?(TDNET.top?`<ol class="tdlb">${top.slice(0,50).map((r,i)=>`<li class="${r.me?'me':''}"><b>${i+1}</b><span>${esc(r.n||'守護員')}</span><i>${r.w} 波</i></li>`).join('')||'<p class="dim">本週還沒有人上榜,快來搶第一!</p>'}</ol>`:'<p class="dim">讀取中…</p>'):'<p class="dim">登入後才會顯示排行</p>'}</div>`;
   return h}
