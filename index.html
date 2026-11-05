@@ -3270,7 +3270,7 @@ function tdEnd(win){const T=TD;if(T.over)return;T.over=win?'win':'lose';sfx(win?
       if(d>=1){const ty=Object.keys(EQT)[Math.floor(rnd()*4)],r=rnd(),q=d===1?(r<.25?2:1):(r<.45?3:2);const e=mkEq(ty,q);SV.equips.push(e);lines.push(`${RAR[q]}${EQT[ty].n} ×1`)}
       if(d===2&&stars===3&&!t.dw.r3){t.dw.r3=1;SV.rtix=(SV.rtix||0)+1;lines.push('🎟️ 召喚券 ×1(地獄 3 星每日獎勵)')}}}
   else if(T.mode==='endless'){const w=Math.max(0,cl);const coin=1000*w*(1+.04*(SV.castle||1)),st=Math.floor(w/2),g=w;SV.coin+=Math.round(coin);SV.stones+=st;SV.gem+=g;if(coin>0)lines.push(`⭐ ${fmt(coin)}`);if(st>0)lines.push(`💠 ${st}`);if(g>0)lines.push(`💎 ${g}`);
-    if(w>0&&used.length){const xl=[];for(const k of used)petXp(k,100*w,xl);lines.push(`上場萌獸 ${used.length} 隻:各經驗 +${fmt(300*w)}`);xl.slice(0,3).forEach(x=>lines.push(x))}
+    if(w>0&&used.length){const xl=[];for(const k of used)petXp(k,100*w,xl);lines.push(`上場萌獸 ${used.length} 隻:各經驗 +${fmt(100*w)}`);xl.slice(0,3).forEach(x=>lines.push(x))}
     if(!lines.length)lines.push('至少撐過 1 波才有獎勵');
     const nb=w>(t.wbest||0);t.wbest=Math.max(t.wbest||0,w);t.best=Math.max(t.best||0,w);if(nb)lines.push('🏆 本週新紀錄!');
     if(SRV.on()&&w>0)SRV.rpc('td_report',{p_wave:w,p_secs:Math.round(T.t)}).then(()=>{TDNET.t=0}).catch(()=>{})}
