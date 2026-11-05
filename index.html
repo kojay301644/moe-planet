@@ -3116,8 +3116,10 @@ const FTL=[
  {k:'mail',c:()=>SRV.on()&&mailUnread()>0,n:'信箱',d:'你收到了第一封信!營運獎勵、交易所的裝備、客服回覆都會寄到這裡。',go:{el:'#mailBtn',sheet:'mail'},steps:[{sel:'[data-act="mailAll"]',t:'按「全部領取」一次拿走所有附件'}]}];
 const FTS={on:null,step:-2};
 function ftReady(x){return x.f?unlocked(x.f):x.c?x.c():false}
-function ftIdle(){return SV.started&&SV.tut>=9&&SV.a2tut!==1&&!B&&!VISIT&&!EDIT&&$('sheet').hidden&&$('title').hidden&&!$('town').hidden&&[$('a2Pane'),$('sumRes'),$('hatch'),$('result'),$('loot'),$('eggPane'),$('intro')].every(e=>!e||e.hidden)}
-function ftTick(){if(FTS.on){ftDraw();return}if(!SV.started)return;if(!SV.ftd){SV.ftd=SV.tut>=9?FTL.filter(x=>x.f&&unlocked(x.f)).map(x=>x.k):[];save()}
+function ftIdle(){return Date.now()-FTB>3000&&SV.started&&SV.tut>=9&&SV.a2tut!==1&&!B&&!VISIT&&!EDIT&&$('sheet').hidden&&$('title').hidden&&!$('town').hidden&&[$('a2Pane'),$('sumRes'),$('hatch'),$('result'),$('loot'),$('eggPane'),$('intro')].every(e=>!e||e.hidden)}
+let FTB=0;
+function ftTick(){const busy=!!(B||TD||VISIT);if(busy)FTB=Math.max(FTB,Date.now());
+  if(FTS.on){if(busy&&!FTS.paused){FTS.paused=1;$('ftOv').hidden=true}if(FTS.paused){if(!ftIdle())return;FTS.paused=0;const x=FTS.on;FTS.on=null;ftStart(x);return}ftDraw();return}if(!SV.started)return;if(!SV.ftd){SV.ftd=SV.tut>=9?FTL.filter(x=>x.f&&unlocked(x.f)).map(x=>x.k):[];save()}
   if(!ftIdle())return;const x=FTL.find(x=>!SV.ftd.includes(x.k)&&ftReady(x));if(x)ftStart(x)}
 function ftStart(x){FTS.on=x;FTS.step=-2;$('ftOv').hidden=false;$('ftBox').innerHTML=`<div class="ftnew">🎉 新功能開放</div><h3>${x.n}</h3><p>${x.d}</p><button class="go big" id="ftGo">開始介紹</button>`;$('ftBox').hidden=false;$('ftRing').hidden=true;$('ftTip').hidden=true;$('ftGo').onclick=e=>{e.stopPropagation();sfx('click');FTS.step=-1;$('ftBox').hidden=true;ftDraw()};sfx('egg')}
 function ftRect(){const x=FTS.on;if(FTS.step===-1){const g=x.go;if(g.b){const h=thits.find(h=>h.b.k===g.b);if(!h)return null;if(!TV.drag&&(h.x0<20||h.x1>W-20||h.y0<90||h.y1>H-170)){TV.ox+=(W/2-(h.x0+h.x1)/2)*.15;TV.oy+=(H*.45-(h.y0+h.y1)/2)*.15}return {x:h.x0,y:h.y0,w:h.x1-h.x0,h:h.y1-h.y0}}
@@ -3129,6 +3131,7 @@ function ftDraw(){const x=FTS.on;if(!x||FTS.step<-1)return;const r=ftRect(),ring
   if(r){ring.hidden=false;ring.classList.remove('dim');ring.style.left=(r.x-pad)+'px';ring.style.top=(r.y-pad)+'px';ring.style.width=(r.w+pad*2)+'px';ring.style.height=(r.h+pad*2)+'px';const th=tip.offsetHeight||60;let ty=r.y-th-18;if(ty<10)ty=r.y+r.h+18;tip.style.left=clamp(r.x+r.w/2-tw/2,16,innerWidth-tw-16)+'px';tip.style.top=clamp(ty,10,innerHeight-th-10)+'px'}
   else{ring.hidden=false;ring.classList.add('dim');ring.style.left='50%';ring.style.top='50%';ring.style.width='0px';ring.style.height='0px';tip.style.left=(innerWidth-tw)/2+'px';tip.style.top=(innerHeight/2-40)+'px'}FTS.r=r}
 function ftClick(e){const x=FTS.on;if(!x||FTS.step<-1)return;e.preventDefault();e.stopPropagation();
+  if(FTS.step===-1&&!FTS.r){FTS.paused=1;$('ftOv').hidden=true;FTB=Date.now()+12000;return}
   if(FTS.step===-1){const r=FTS.r;if(!r||e.clientX<r.x-10||e.clientX>r.x+r.w+10||e.clientY<r.y-10||e.clientY>r.y+r.h+10){$('ftTip').classList.remove('shake');void $('ftTip').offsetWidth;$('ftTip').classList.add('shake');return}
     if(FTS.via){sfx('click');$('tNav').classList.add('open');setTimeout(ftDraw,250);return}
     sfx('click');$('tNav').classList.remove('open');openSheet(x.go.sheet,x.go.tab||null);FTS.step=0;setTimeout(ftDraw,120);return}
