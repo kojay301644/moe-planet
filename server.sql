@@ -1993,3 +1993,37 @@ revoke execute on function public.moe_beta_gift(uuid) from public, anon, authent
 
 -- 全服重置編號:玩家的遊戲要讀得到
 drop policy if exists settings_read on public.settings; create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint','wipe'));
+
+-- ============ 修正:沒有附加資源的信件領取失敗;內測禮包第 2、3 天至少間隔 20 小時 ============
+create or replace function public.inbox_take(p_id bigint default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); out jsonb; cr int;
+begin
+  with c as (update inbox set claimed = true where uid = u and not claimed and (p_id is null or id = p_id) returning id, item, gem, note, title, credit, bonus)
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'item', item, 'gem', gem, 'note', note, 'title', title, 'credit', credit, 'bonus', bonus) order by id), '[]'::jsonb), coalesce(sum(gem) filter (where credit), 0) into out, cr from c;
+  if cr > 0 then insert into wallet(uid) values (u) on conflict do nothing; update wallet set gem = gem + cr, updated_at = now() where uid = u; insert into gem_log(uid,delta,reason) values (u, cr, 'mail'); end if;
+  -- 資源帳本:信箱附帶的星星幣、進化石、糖果、碎片由伺服器直接入帳
+  if to_regprocedure('public.moe_res_add(uuid,text,bigint)') is not null then
+    perform moe_res_add(u, x.k, x.n::bigint) from (
+      select b.key k, sum(coalesce((b.value #>> '{}')::bigint, 0)) n from jsonb_array_elements(out) it, jsonb_each(case when jsonb_typeof(it->'bonus') = 'object' then it->'bonus' else '{}'::jsonb end) b where b.key in ('coin','stones','candy') group by b.key
+      union all select it->'item'->>'mat', sum(coalesce((it->'item'->>'n')::bigint, 0)) from jsonb_array_elements(out) it where it->'item'->>'mat' in ('stones','candy','shard') group by it->'item'->>'mat') x;
+  end if;
+  return jsonb_build_object('items', out, 'gem', (select gem from wallet where uid = u), 'res', (select moe_res_json(w) from wallet w where uid = u and r_on));
+end $$;
+create or replace function public.moe_beta_gift(u uuid) returns void language plpgsql security definer set search_path = public as $$
+declare b inbox; n int;
+begin
+  if u is null or not coalesce((select (v->>'gift')::boolean from settings where k = 'beta'), false) then return; end if;
+  select * into b from inbox where uid = u and kind = 'beta' order by id limit 1;
+  if b.id is null then
+    insert into inbox(uid, gem, note, credit, kind, title, bonus) values (u, 1000,
+      '感謝參加萌獸星球內測!這是給測試玩家的大禮包,領取後還可以「自選一隻傳說品質的萌獸」。明天、後天登入還會再各收到 💎1,000。正式上線前會刪檔,請盡量體驗各種功能,有問題到「設定 → 回報問題」告訴我們!',
+      true, 'beta', '🎁 內測大禮包(第 1 天)', '{"coin":100000,"candy":500,"stones":100,"rtix":3,"lpick":1}'::jsonb);
+    return;
+  end if;
+  if b.gem <> 1000 then return; end if; -- 舊版一次給 3000 的不再補寄
+  select count(*) into n from inbox where uid = u and kind in ('beta2','beta3');
+  if n >= 2 then return; end if;
+  if exists (select 1 from inbox where uid = u and kind in ('beta','beta2','beta3') and (created > now() - interval '20 hours' or (created at time zone 'Asia/Taipei')::date >= moe_today())) then return; end if;
+  insert into inbox(uid, gem, note, credit, kind, title) values (u, 1000, '內測大禮包第 ' || (n + 2) || ' 天:💎1,000!謝謝你持續幫忙測試。', true, case when n = 0 then 'beta2' else 'beta3' end, '🎁 內測大禮包(第 ' || (n + 2) || ' 天)');
+end $$;
+revoke execute on function public.moe_beta_gift(uuid) from public, anon, authenticated;
