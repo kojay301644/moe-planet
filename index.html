@@ -582,7 +582,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 #tdFxB{position:fixed;right:max(8px,env(safe-area-inset-right,0px));z-index:24;background:rgba(30,15,50,.82);color:#ffe9a0;font-weight:900;font-size:13px;padding:4px 10px;border-radius:12px;pointer-events:none}
 #tdHand{max-width:min(420px,calc(100% - 16px))}#tdHand button{width:78px!important;height:86px!important;gap:2px!important;position:relative;overflow:hidden}#tdHand i{font-size:22px!important}#tdHand small{font-size:11px!important;color:var(--rc)!important}#tdHand em{font-style:normal;font-size:10px;font-weight:800;color:#3a2a1a;line-height:1.15;text-align:center}#tdHand button.leg::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.38) 50%,transparent 65%);background-size:250% 100%;animation:tdshine 2.4s linear infinite;pointer-events:none}@keyframes tdshine{from{background-position:150% 0}to{background-position:-100% 0}}@media (max-width:480px){#tdHand{max-width:250px}}
 #tdHand button.leg small{color:#a86a00!important}#tdHand button.leg i,#tdHand button.leg em,#tdHand button.leg small{position:relative;z-index:1}
-</style>
+@media (min-width:700px){.pdrow{flex-direction:column;align-items:stretch;gap:8px}.pdl{align-self:flex-start}.pdrow .big{width:170px;height:170px;flex:0 0 auto}.pdeq{width:170px}.pdeq .eqslots{justify-items:stretch;width:100%}.pdeq .es{padding:4px 10px 4px 6px;width:100%;box-sizing:border-box}.pdeq .eqbest{width:100%}}</style>
 </head><body>
 
 <canvas id="cv"></canvas>
