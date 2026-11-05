@@ -1776,7 +1776,7 @@ const enMax=()=>ENMAX+(vip()>=3)+(vip()>=9),capH=()=>vip()>=6?12:vip()>=2?10:8,v
 // PAY.buy() is the hook for a real payment gateway later; for now pressing a package grants the gems right away.
 const PAYX={card:{nt:150,g:300,n:'月卡',d:'立即 💎300,之後 30 天每天登入領 💎50(共 💎1,800)'},fund:{nt:300,g:600,n:'成長基金',d:'守護員 Lv.10/20/30/40/50 各領 💎500(共 💎2,500),限購一次'}};
 const PAYP=[{id:'p30',nt:30,g:60,b:0},{id:'p150',nt:150,g:300,b:30},{id:'p300',nt:300,g:600,b:80},{id:'p790',nt:790,g:1580,b:300},{id:'p1490',nt:1490,g:2980,b:700},{id:'p3290',nt:3290,g:6580,b:1900}];
-const PAY={async buy(id){if(SRV.on())return PAY.srv(id);if(PAYX[id]){const X=PAYX[id];/* TODO 串接金流 */if(id==='fund'&&SV.fund)return toast('已購買過');if(id==='card'&&SV.card&&SV.card.until>Date.now()+3*864e5)return toast('月卡剩 3 天內才能續購');const before=vip();SV.gem+=X.g;SV.topup=(SV.topup||0)+X.g;if(id==='card')SV.card={until:Math.max(Date.now(),(SV.card&&SV.card.until)||0)+30*864e5,day:''};else SV.fund={got:[]};SV.payLog=[{t:Date.now(),id,nt:X.nt,g:X.g,b:0},...(SV.payLog||[])].slice(0,30);save();sfx('egg');toast(`購買 ${X.n} 成功!💎+${X.g}`);const v=vip();if(v>before)setTimeout(()=>toast(`🎉 升到 VIP${v}!`),1200);renderSheet();townHud();return}const P=PAYP.find(x=>x.id===id);if(!P)return;
+const PAY={async buy(id){return toast('儲值功能即將開放,敬請期待');if(SRV.on())return PAY.srv(id);if(PAYX[id]){const X=PAYX[id];/* TODO 串接金流 */if(id==='fund'&&SV.fund)return toast('已購買過');if(id==='card'&&SV.card&&SV.card.until>Date.now()+3*864e5)return toast('月卡剩 3 天內才能續購');const before=vip();SV.gem+=X.g;SV.topup=(SV.topup||0)+X.g;if(id==='card')SV.card={until:Math.max(Date.now(),(SV.card&&SV.card.until)||0)+30*864e5,day:''};else SV.fund={got:[]};SV.payLog=[{t:Date.now(),id,nt:X.nt,g:X.g,b:0},...(SV.payLog||[])].slice(0,30);save();sfx('egg');toast(`購買 ${X.n} 成功!💎+${X.g}`);const v=vip();if(v>before)setTimeout(()=>toast(`🎉 升到 VIP${v}!`),1200);renderSheet();townHud();return}const P=PAYP.find(x=>x.id===id);if(!P)return;
     /* TODO 串接金流:在這裡呼叫付款,付款成功後才往下執行 */
     const first=!(SV.payFirst||[]).includes(id),bonus=first?P.g:P.b;const before=vip();SV.gem+=P.g+bonus;SV.topup=(SV.topup||0)+P.g;if(first)SV.payFirst=[...(SV.payFirst||[]),id];
     SV.payLog=[{t:Date.now(),id,nt:P.nt,g:P.g,b:bonus},...(SV.payLog||[])].slice(0,30);save();cloudWrite(true);sfx('egg');toast(`儲值成功!💎+${fmt(P.g+bonus)}${first?'(首儲雙倍)':''}`);
@@ -1787,7 +1787,7 @@ const PAY={async buy(id){if(SRV.on())return PAY.srv(id);if(PAYX[id]){const X=PAY
     SV.payLog=[{t:Date.now(),id,nt:(X||P).nt,g,b},...(SV.payLog||[])].slice(0,30);save();cloudWrite(true);sfx('egg');toast(X?`購買 ${X.n} 成功!💎+${g}`:`儲值成功!💎+${fmt(g+b)}${r.first?'(首儲雙倍)':''}`);
     const v=vip();if(v>before)setTimeout(()=>toast(`🎉 升到 VIP${v}!到 VIP 頁領取升級禮包`),1200);renderSheet();townHud()}};
 function pPay(){const v=vip(),nx=VIPN[v+1],x=SV.topup||0;return `<div class="card vipcard"><div class="vipbig">VIP${v}</div><div class="lm"><h3>儲值鑽石</h3><small>${nx?`累積儲值 💎${fmt(x)},再 💎${fmt(nx-x)} 升到 VIP${v+1}`:'已達 VIP 最高等級'}</small><button class="blue" data-act="goVip">查看 VIP 特權</button></div></div>
-  <p class="note">⚠️ 測試版:目前按下就會直接得到鑽石,不會真的扣款。正式上線會改成串接金流付款。</p>
+  <p class="note">🔒 儲值功能即將開放,敬請期待!</p>
   <div class="card"><h3>特惠方案</h3><div class="list">${Object.entries(PAYX).map(([id,X])=>{const own=id==='card'?(SV.card&&SV.card.until>Date.now()):!!SV.fund;const extra=id==='card'&&own?`剩 ${Math.ceil((SV.card.until-Date.now())/864e5)} 天`:id==='fund'&&own?`已領 ${(SV.fund.got||[]).length}/5`:'';return `<div class="li q"><span class="ic">${id==='card'?'📅':'📈'}</span><div><b>${X.n} · NT$ ${X.nt}</b><small>${X.d}${extra?' · '+extra:''}</small></div><button class="go" data-act="pay:${id}" ${id==='fund'&&own?'disabled':''}>${id==='fund'&&own?'已購買':own?'續購':'購買'}</button></div>`}).join('')}
     ${SV.card&&SV.card.until>Date.now()?`<div class="li q"><span class="ic">💎</span><div><b>月卡每日 💎50</b></div><button class="go" data-act="cardDay" ${SV.card.day===today()?'disabled':''}>${SV.card.day===today()?'今天已領':'領取'}</button></div>`:''}
     ${SV.fund?`<div class="li q"><span class="ic">🎁</span><div><b>成長基金</b><small>${[10,20,30,40,50].map(L=>(SV.fund.got||[]).includes(L)?`Lv${L}✅`:`Lv${L}`).join(' · ')}</small></div><button class="go" data-act="fundGet" ${[10,20,30,40,50].some(L=>glv()>=L&&!(SV.fund.got||[]).includes(L))?'':'disabled'}>領取</button></div>`:''}</div></div>
@@ -2211,8 +2211,6 @@ const ACT={
   shT:k=>{SV.pshiny={...(SV.pshiny||{}),[k]:!(SV.pshiny||{})[k]}},
   eqd:k=>{SV.eqdSel=k},
   todoGo:g=>{const [p,t]=g.split('~');setTimeout(()=>{if(p==='adv'&&t!=null){SV.advCh=t==='T'?'T':+t;SV.advSel=null;openSheet('adv')}else openSheet(p,t||null)},0)},
-  maxAll:()=>{if(!SV.mxArm){SV.mxArm=1;setTimeout(()=>SV.mxArm=0,3000);return toast('測試用:再按一次,全部萌獸會變成滿級、滿星、三階並穿上整套傳說 +15 裝備')}SV.mxArm=0;eqFix();SV.gx=Math.max(SV.gx||0,xpTo(50)+1);for(const k of PK){const old=SV.pets[k];SV.pets[k]={...(old||P0()),lv:30,st:2,stars:5,sk:5,shards:(old&&old.shards)||0,eq:{collar:null,hat:null,charm:null,bell:null}}}
-    SV.equips=SV.equips.filter(e=>!e.mx);PK.forEach((k,n)=>{const set=SETK[n%SETK.length];for(const t of Object.keys(EQT)){const e=mkEq(t,3,set);e.lv=15;e.mx=1;SV.equips.push(e);SV.pets[k].eq[t]=e.id}});SV.castle=Math.max(SV.castle,10);TP=[];sfx('win');toast('測試用:全部萌獸滿級、滿星、三階,穿上整套傳說 +15 裝備')},
   star:k=>{const s=SV.pets[k];if(!canStar(k))return;s.shards-=starNeed(s.stars);s.stars++;sfx('up');toast(`${PETS[k].n[s.st]} 升到 ${s.stars} 星!`)},
   sk:k=>{const s=SV.pets[k],c=skCost(s.sk);if(s.sk>=5)return;if(!costOk(c))return toast('材料不足');pay(c);s.sk++;sfx('up');toast(`${skn(k,s.st)} 升到 Lv${s.sk}`)},
   lvl:(li,hd)=>{li=+li;const L=LEVELS[li];if(!advOpen(li))return toast('還沒解鎖');hd=+hd||0;if(hd&&(SV.stars[li]||0)<3)return toast('三星通關後才能挑戰困難');if(!useSta())return;$('sheet').hidden=true;advGo(li,!!+hd)},
@@ -2304,7 +2302,7 @@ const ACT={
   ev:()=>{if(SV.event.day!==today()){SV.event={day:today(),used:0}}if(SV.event.used)return toast('今天已挑戰過');startBattle({mode:'adv',li:Math.max(3,nextLevel()-2),L:{...LEVELS[19],n:'活動:煉爐巨像討伐',chal:null},event:1})},
   free:()=>{if(Date.now()-SV.gift.freeT<8*3600e3)return;SV.gift.freeT=Date.now();SV.coin+=1000;SV.candy=(SV.candy||0)+5;sfx('coin');toast('免費禮物:⭐1000、🍬5')},
   ach:id=>{const a=ACH.find(x=>x.id===id);if(a&&a.f()&&!SV.ach.includes(id)){SV.ach.push(id);giveRw(a)}},
-  cheat:()=>{SV.coin+=50000;SV.candy=(SV.candy||0)+500;SV.stones+=100;SV.gem+=5000;toast('測試用:資源大量增加')}};
+};
 function showEvo(k,a,b){const el=$('evoFx');if(!el)return;$('evA').src='assets/'+PETS[k].img+(a+1)+'.webp';$('evB').src='assets/'+imgName(k)+'.webp';$('evN').textContent=`${PETS[k].n[a]} → ${PETS[k].n[b]}`;$('evS').textContent=b===2?`究極型態!新技能:${skn(k,b)}`:`新技能:${skn(k,b)}`;
   el.style.setProperty('--ec',EL[PETS[k].el].c);el.classList.remove('go2');void el.offsetWidth;el.hidden=false;el.classList.add('go2');sfx('skill');setTimeout(()=>sfx('boss'),1400);setTimeout(()=>sfx('win'),1900);el.onclick=()=>{if(el.dataset.ok)el.hidden=true};el.dataset.ok='';setTimeout(()=>el.dataset.ok=1,2200)}
 function celebrate(k,text){toast(text);const p=TP.find(p=>p.k===k);if(p){p.jump=.45;p.emote={s:'🌟',t:0,life:2}}}

@@ -1114,12 +1114,12 @@ declare a uuid := moe_admin(); begin update save_flags set status = 'closed' whe
 revoke execute on function public.moe_save_stats(jsonb), public.moe_save_guard() from public, anon, authenticated;
 grant execute on function public.admin_save_flags(text), public.admin_save_hist(uuid), public.admin_save_restore(uuid,bigint), public.admin_save_accept(bigint), public.admin_save_close(bigint) to authenticated;
 
--- 測試儲值:只有管理員能用(正式金流上線前)
+-- 測試儲值:已關閉(正式金流上線前)
 
 create or replace function public.topup_test(p_pkg text) returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if auth.uid() is null or not exists (select 1 from admins where uid = auth.uid()) then raise exception '儲值功能尚未開放'; end if;
-  return topup_test_impl(p_pkg);
+  -- 儲值功能關閉中:正式串接金流後改由金流通知入帳
+  raise exception '儲值功能即將開放,敬請期待';
 end $$;
 revoke execute on function public.topup_test_impl(text) from public, anon, authenticated;
 grant execute on function public.topup_test(text) to authenticated;
