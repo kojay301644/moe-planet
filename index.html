@@ -3528,10 +3528,11 @@ function tdDraw(){const T=TD;tdLayout();const s=TDV.s,TO=T.S,SK=T.SK,sh=T.shake>
     if(T.shield>0){ctx.save();ctx.globalAlpha=.35+.15*Math.sin(tt*8);ctx.fillStyle='#8ad8ff';ctx.beginPath();ctx.ellipse(tdX(668),tdY(60),w*.62,h*.55,0,0,7);ctx.fill();ctx.restore()}}});
   for(const s2 in T.tw){const w=T.tw[s2],[x,y]=TD.slots[s2];L.push({y:y+1,f:()=>tdDrawTower(w,x,y,s2)})}
   for(const e of T.en){const [x,y]=tdPos(e.d,e.r);L.push({y:y+(e.fly?40:0),f:()=>tdDrawEnemy(e,x,y)})}
-  L.sort((a,b)=>a.y-b.y).forEach(o=>o.f());
+  TDBARS=[];L.sort((a,b)=>a.y-b.y).forEach(o=>o.f());
   if(SK.post){ctx.globalCompositeOperation=SK.post[0];ctx.globalAlpha=SK.post[2];ctx.fillStyle=SK.post[1];ctx.fillRect(-20,-20,W+40,H+40);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over'}
   if(SK.lamps){ctx.save();ctx.globalCompositeOperation='lighter';const gl=(x,y,r,c)=>{const g2=ctx.createRadialGradient(x,y,1,x,y,r);g2.addColorStop(0,`rgba(${c},${.5*SK.lamps})`);g2.addColorStop(1,`rgba(${c},0)`);ctx.fillStyle=g2;ctx.fillRect(x-r,y-r,2*r,2*r)};
     gl(tdX(668),tdY(60),150*s,'255,200,110');TD.decos.forEach(([x,y],i)=>{const D=DECOS[T.deco2[i]];if(D&&D.glow)gl(tdX(x),tdY(y)-40*s,90*s,D.glow[2])});ctx.restore()}
+  TDBARS.forEach(f=>f());TDBARS=[];
   ctx.setTransform(dpr,0,0,dpr,0,0);drawSkinFx(SK);ctx.setTransform(dpr,0,0,dpr,dpr*(rnd()-.5)*sh,dpr*(rnd()-.5)*sh);
   if(T.ping){T.ping.t+=1/60;const pk=T.ping,a=Math.max(0,1-pk.t/3);if(a>0){ctx.save();ctx.globalAlpha=a;ctx.strokeStyle='#ff5a5a';ctx.lineWidth=4;const rr2=(30+20*Math.abs(Math.sin(pk.t*6)))*s;ctx.beginPath();ctx.ellipse(tdX(pk.x),tdY(pk.y),rr2*1.3,rr2*.8,0,0,7);ctx.stroke();ctx.restore()}else T.ping=null}
   if(T.coop){const cpm=T.bot||T.net,nm=sd=>{if(!cpm)return sd==='A'?'右路玩家':'左路玩家';if(sd===T.side)return '你';const n=T.net?(T.net.lost&&T.bot?T.bot.n:T.net.peer):T.bot.n;n=n||'隊友';return n.length>4?n.slice(0,4)+'…':n};ctx.save();ctx.font=`900 ${Math.round(10*s+7)}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.55)';
@@ -3617,9 +3618,10 @@ function tdDrawEnemy(e,x,y){const s=TDV.s,im=img(e.E.img);if(!im||!im.naturalWid
   if(e.boss&&e.k==='golem'){ctx.globalCompositeOperation='lighter';const gr=w*.28,gg=ctx.createRadialGradient(0,-h*.42,0,0,-h*.42,gr);gg.addColorStop(0,`rgba(255,170,60,${.45+.3*Math.sin(ta*5)})`);gg.addColorStop(1,'rgba(255,90,20,0)');ctx.fillStyle=gg;ctx.fillRect(-gr,-h*.42-gr,2*gr,2*gr)}
   ctx.restore();
   if(e.boss)tdAuraFx(e,X,Y-fly,w,ta,true);
-  if(e.elite){ctx.fillStyle='#ffd84a';ctx.font=`900 ${Math.round(12*s+5)}px sans-serif`;ctx.textAlign='center';ctx.fillText('精英',X,Y-h-fly-14*s)}
-  if(e.stun>0){ctx.font=`${Math.round(14*s+6)}px sans-serif`;ctx.fillText('💫',X,Y-h-fly-2)}
-  if(!e.boss&&e.hp<e.max){const bw=w*.7;ctx.fillStyle='rgba(30,10,30,.7)';ctx.fillRect(X-bw/2,Y-h-fly-6*s,bw,5*s+1);ctx.fillStyle=e.elite?'#ffb03a':'#ff5a5a';ctx.fillRect(X-bw/2,Y-h-fly-6*s,bw*e.hp/e.max,5*s+1)}}
+  TDBARS.push(()=>{if(e.elite){ctx.fillStyle='#ffd84a';ctx.font=`900 ${Math.round(12*s+5)}px sans-serif`;ctx.textAlign='center';ctx.fillText('精英',X,Y-h-fly-14*s)}
+  if(e.stun>0){ctx.font=`${Math.round(14*s+6)}px sans-serif`;ctx.textAlign='center';ctx.fillText('💫',X,Y-h-fly-2)}
+  if(!e.boss&&e.hp<e.max){const bw=w*.7;ctx.fillStyle='rgba(30,10,30,.7)';ctx.fillRect(X-bw/2,Y-h-fly-6*s,bw,5*s+1);ctx.fillStyle=e.elite?'#ffb03a':'#ff5a5a';ctx.fillRect(X-bw/2,Y-h-fly-6*s,bw*Math.max(0,e.hp)/e.max,5*s+1)}})}
+let TDBARS=[];
 // ---- HUD (DOM)
 function tdHudBuild(){const T=TD;if(!T)return;const cm=CMDS.filter(c=>c.k!=='hold').map(c=>c.k==='rock'?{...c,n:'雷霆',ic:'🌩️'}:c);
   $('tdTop').innerHTML=`<button class="tdb" data-td="pause">${T.paused?'▶':'❚❚'}</button><button class="tdb" data-td="spd">×${T.speed}</button>
