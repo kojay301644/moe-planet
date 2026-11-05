@@ -1006,3 +1006,23 @@ grant execute on function public.admin_live_status() to authenticated;
 -- 被擠掉的裝置不能再寫入存檔
 drop policy if exists docs_sess on public.docs;
 create policy docs_sess on public.docs as restrictive for all to authenticated using (moe_sess_ok()) with check (moe_sess_ok());
+
+-- ============ 好友共同守塔:雙人無盡排行榜(每週) ============
+create table if not exists public.td_duo(wk int not null, a uuid not null, b uuid not null, an text not null default '', bn text not null default '', best int not null default 0, secs int not null default 0, at timestamptz not null default now(), primary key(wk, a, b));
+alter table public.td_duo enable row level security;
+create or replace function public.td_report2(p_mate uuid, p_mate_n text, p_my_n text, p_wave int, p_secs int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); w int := moe_week(); xa uuid; xb uuid; xan text; xbn text; mn text := left(coalesce(nullif(trim(p_my_n),''),'守護員'),20); on2 text := left(coalesce(nullif(trim(p_mate_n),''),'守護員'),20); r int;
+begin
+  if p_mate is null or p_mate = u or p_wave is null or p_wave < 1 or p_wave > 500 or coalesce(p_secs,0) < p_wave * 6 then return jsonb_build_object('ok',false); end if;
+  if u < p_mate then xa := u; xb := p_mate; xan := mn; xbn := on2; else xa := p_mate; xb := u; xan := on2; xbn := mn; end if;
+  insert into td_duo(wk, a, b, an, bn, best, secs) values (w, xa, xb, xan, xbn, p_wave, p_secs)
+  on conflict (wk, a, b) do update set best = greatest(td_duo.best, excluded.best), an = excluded.an, bn = excluded.bn,
+    secs = case when excluded.best > td_duo.best then excluded.secs else td_duo.secs end, at = case when excluded.best > td_duo.best then now() else td_duo.at end
+  returning td_duo.best into r;
+  return jsonb_build_object('ok',true,'best',r);
+end $$;
+create or replace function public.td_top2(p_limit int default 50) returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('a',an,'b',bn,'w',best,'me',(a = auth.uid() or b = auth.uid())) order by best desc, at), '[]'::jsonb)
+  from (select * from td_duo where wk = moe_week() order by best desc, at limit least(greatest(p_limit,1),100)) q $$;
+revoke all on public.td_duo from anon, authenticated;
+grant execute on function public.td_report2(uuid,text,text,int,int), public.td_top2(int) to authenticated;

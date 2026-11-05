@@ -571,6 +571,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 }
 .tdbots{display:grid;gap:8px;margin-top:10px}.tdbot{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;padding:8px 10px;border-radius:12px;background:#fff6e6;border:2px solid #f0d9b0}.tdbot b{font-size:15px}.tdbot small{grid-column:1;color:#7a6650}.tdbot button{grid-row:1/3;grid-column:2}
 #tdLob,#tdInv{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(20,10,30,.45);padding:16px}#tdInv{background:rgba(20,10,30,.25)}.tdlb{width:min(360px,100%);background:#fff8ec;border:3px solid #8a5a2b;border-radius:20px;padding:16px 18px;text-align:center;display:grid;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,.4)}.tdlb h3{margin:0}.tdlb p{margin:0}.tdcode{font-size:48px;font-weight:900;letter-spacing:10px;color:#8a3a10}.tdlb .st{font-size:15px}.tdlb .bt{display:flex;gap:8px;justify-content:center}.tdnet{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.tdnet input{width:96px;font-size:18px;padding:8px;border-radius:12px;border:2px solid #d8b890;text-align:center;letter-spacing:4px}
+.tdcd{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}.tdcd button{padding:8px 4px;border-radius:12px;border:2px solid var(--c);background:#fff;color:var(--c);font-weight:900;font-size:14px}.tdcd button.on{background:var(--c);color:#fff}.tdcd button.lock{opacity:.5}.tdcd small{display:block;font-size:10px}
 </style>
 </head><body>
 
@@ -3219,11 +3220,13 @@ function tdHpMul(w){return (1+.16*w+.011*w*w)*(w<=6?.4+.1*w:1)*(w>20?Math.pow(1.
 // ---- start / end
 function tdStart(mode,diff,cfg){au();for(const k in TDPEEK)delete TDPEEK[k];const t=tdSV(),coop=mode==='coop';if(mode!=='practice'&&!coop){if(tdTix()<1)return toast('今天的守塔券用完了');t.used++}
   const S=cfg&&TDSK.find(x=>x.id===cfg.sid)||TDSK[Math.floor(rnd()*TDSK.length)],tone=S.el;SKP=[];
-  TD={mode,diff:mode==='endless'?0:diff,tone,S,SK:skinOf(S.id),deco2:TDDECO.map((p,i)=>S.deco[(i*7+Math.floor(rnd()*3))%S.deco.length]),coop,pt:cfg?!!cfg.pt:coop&&H>W*1.05,slots:coop?TDSLOT2:TDSLOT,decos:coop?TDDECO2:TDDECO,map:coop?'td_map5':'td_map',mr:[0,0,1344,752],hpMax:coop?30:TDHP,side:'A',store:{A:0,B:250},spT:{A:0,B:0},ping:null,ults:[],wave:0,waveOn:false,spawn:[],st:0,en:[],tw:{},proj:[],parts:[],nums:[],hp:coop?30:TDHP,energy:250,speed:1,paused:false,t:0,over:null,cmd:{},sel:null,aim:null,shield:0,kills:0,prep:30,gap:0,leak:0,banner:8,bt:0,used:[],uid:0,shake:0,boss:null,later:[],cut:null,cutT:-9,flash:null};
+  const cinf=coop&&diff===3;if(coop&&diff===3)diff=0;
+  TD={mode,inf:mode==='endless'||cinf,diff:mode==='endless'?0:diff,tone,S,SK:skinOf(S.id),deco2:TDDECO.map((p,i)=>S.deco[(i*7+Math.floor(rnd()*3))%S.deco.length]),coop,pt:cfg?!!cfg.pt:coop&&H>W*1.05,slots:coop?TDSLOT2:TDSLOT,decos:coop?TDDECO2:TDDECO,map:coop?'td_map5':'td_map',mr:[0,0,1344,752],hpMax:coop?30:TDHP,side:'A',store:{A:0,B:250},spT:{A:0,B:0},ping:null,ults:[],wave:0,waveOn:false,spawn:[],st:0,en:[],tw:{},proj:[],parts:[],nums:[],hp:coop?30:TDHP,energy:250,speed:1,paused:false,t:0,over:null,cmd:{},sel:null,aim:null,shield:0,kills:0,prep:30,gap:0,leak:0,banner:8,bt:0,used:[],uid:0,shake:0,boss:null,later:[],cut:null,cutT:-9,flash:null};
   if(cfg&&cfg.deco2)TD.deco2=cfg.deco2;if(TD.pt){TD.slots=TDSLOT3;TD.decos=TDDECO3;TD.map='td_mapv2';TD.mr=[288,-98,760,1344]}TDR=coop?(TD.pt?TDR3:TDR2):TDR1;if(coop&&TDBOTSEL){TD.bot=tdBotInit(TDBOTSEL);TDBOTSEL=null}
   closeSheet();$('town').hidden=true;$('tdHud').hidden=false;$('tdLayer').hidden=false;$('tdRes').hidden=true;tdHudBuild();save();sfx('boss')}
 // ---- 好友共同守塔:電腦隊友 ----
-let TDBP=null,TDBOTSEL=null;const TDBEL=['fire','water','grass','elec','ice','rock'];
+let TDBP=null,TDBOTSEL=null,TDCD=0;
+function tdCoopLock(d){if(d===1||d===2){const mxl=Math.max(0,...owned().map(k=>SV.pets[k].lv||1)),need=[0,20,30][d];if(mxl<need)return `需要一隻 Lv${need} 以上的萌獸`;if(!(tdSV().clr[d-1]>0))return '先在單人通關'+TDDIFF[d-1].n}return ''}const TDBEL=['fire','water','grass','elec','ice','rock'];
 function tdBotCands(){const ow=owned().sort((a,b)=>power(b)-power(a)).slice(0,3),av=f=>ow.length?ow.reduce((a,k)=>a+(SV.pets[k][f]||0),0)/ow.length:1,
   lv=Math.max(1,Math.round(av('lv'))),st=Math.round(av('st')),stars=Math.max(1,Math.round(av('stars'))),q=Math.round(ow.length?ow.reduce((a,k)=>a+qOf(k),0)/ow.length:0),mr=Math.max(1,...ow.map(k=>PETS[k].rar));
   const ns=[...LORD_NAMES,...BOT_NAMES].filter(Boolean).sort(()=>rnd()-.5).slice(0,3);
@@ -3261,7 +3264,7 @@ function rtOpen(name,onMsg){if(window.MOE_SB&&MOE_SB.channel&&!window.MOE_RTLOCA
     return {send:d=>{try{ch.send({type:'broadcast',event:'m',payload:d})}catch(e){}},close:()=>{try{MOE_SB.removeChannel(ch)}catch(e){}}}}
   if(!window.BroadcastChannel)return {send:()=>{},close:()=>{}};const bc=new BroadcastChannel(name);bc.onmessage=e=>{try{onMsg(e.data)}catch(er){console.warn(er)}};return {send:d=>bc.postMessage(d),close:()=>bc.close()}}
 const myNm=()=>SV.name||ACC.name||'玩家';
-function netHost(){netLeave();const code=String(1000+Math.floor(Math.random()*9000));NETR={code,host:1,peer:null,ch:null};NETR.ch=rtOpen('moetd-'+code,netMsg);netLobby();return NETR}
+function netHost(){netLeave();const code=String(1000+Math.floor(Math.random()*9000));NETR={code,host:1,peer:null,ch:null,d:TDCD};NETR.ch=rtOpen('moetd-'+code,netMsg);netLobby();return NETR}
 function netJoin(code){code=String(code||'').replace(/\D/g,'');if(code.length!==4)return toast('請輸入 4 位數房號');netLeave();NETR={code,host:0,peer:null,ch:null,hiT:0};NETR.ch=rtOpen('moetd-'+code,netMsg);
   const hi=()=>{if(!NETR||NETR.code!==code||NETR.peer)return;NETR.ch.send({t:'hi',n:myNm(),u:ACC.uid||'g'+Math.random()});NETR.hiT=setTimeout(hi,1200)};setTimeout(hi,600);
   NETR.to=setTimeout(()=>{if(NETR&&NETR.code===code&&!NETR.peer){toast('找不到這個房號,或房主已離開');netLeave()}},12000);netLobby()}
@@ -3269,17 +3272,17 @@ function netLeave(){if(!NETR)return;try{NETR.ch.send({t:'bye'})}catch(e){}clearT
 function netLobby(){let el=$('tdLob');if(!NETR||TD&&TD.net){if(el)el.remove();return}
   if(!el){el=document.createElement('div');el.id='tdLob';document.body.appendChild(el)}
   const R=NETR;el.innerHTML=`<div class="tdlb"><h3>👥 好友連線守塔</h3>${R.host?`<p>把房號給朋友,在「好友共同守塔」輸入就能加入</p><div class="tdcode">${R.code}</div><button class="blue mini" id="lbCopy">複製房號</button><p class="st">${R.peer?`✅ <b>${esc(R.peer.n)}</b> 已加入!`:'⏳ 等待朋友加入…'}</p><div class="bt"><button class="go" id="lbGo" ${R.peer?'':'disabled'}>開始守塔</button><button id="lbX">取消</button></div>`
-    :`<p>房號 <b>${R.code}</b></p><p class="st">${R.peer?`✅ 已加入 <b>${esc(R.peer.n)}</b> 的房間,等房主開始…`:'⏳ 連線中…'}</p><div class="bt"><button id="lbX">離開</button></div>`}<small class="dim">你守${R.host?'右路(紅)':'左路(藍)'} · 不耗守塔券、沒有獎勵</small></div>`;
+    :`<p>房號 <b>${R.code}</b></p><p class="st">${R.peer?`✅ 已加入 <b>${esc(R.peer.n)}</b> 的房間,等房主開始…`:'⏳ 連線中…'}</p><div class="bt"><button id="lbX">離開</button></div>`}<p>難度:<b>${['普通','困難','地獄','♾️ 無盡'][R.d||0]}</b></p><small class="dim">你守${R.host?'右路(紅)':'左路(藍)'} · 不耗守塔券、沒有獎勵${(R.d||0)===3?' · 成績會上雙人排行':''}</small></div>`;
   const q=id=>el.querySelector('#'+id);if(q('lbX'))q('lbX').onclick=()=>netLeave();if(q('lbGo'))q('lbGo').onclick=()=>netStart();
   if(q('lbCopy'))q('lbCopy').onclick=()=>{try{navigator.clipboard.writeText(R.code).then(()=>toast('已複製房號 '+R.code),()=>toast('房號 '+R.code))}catch(e){toast('房號 '+R.code)}}}
-function netStart(){const R=NETR;if(!R||!R.host||!R.peer)return;TDBOTSEL=null;tdStart('coop',0);const T=TD;if(!T)return;T.net={host:1,acc:0,hb:T.t,ev:[],sig:'',peer:R.peer.n};T.side='A';
-  R.ch.send({t:'go',cfg:{sid:T.S.id,pt:T.pt,deco2:T.deco2},n:myNm()});netLobby();tdHudBuild()}
+function netStart(){const R=NETR;if(!R||!R.host||!R.peer)return;TDBOTSEL=null;tdStart('coop',R.d||0);const T=TD;if(!T)return;T.net={host:1,mate:R.peer.u,acc:0,hb:T.t,ev:[],sig:'',peer:R.peer.n};T.side='A';
+  R.ch.send({t:'go',cfg:{sid:T.S.id,pt:T.pt,deco2:T.deco2},d:R.d||0,n:myNm(),u:ACC.uid});netLobby();tdHudBuild()}
 function netMsg(m){const R=NETR;if(!R||!m)return;const T=TD;
-  if(m.t==='hi'&&R.host){if(R.peer&&R.peer.u!==m.u)return R.ch.send({t:'full',u:m.u});R.peer={n:m.n,u:m.u};R.ch.send({t:'wel',n:myNm(),u:m.u});netLobby();sfx('up');return}
-  if(m.t==='wel'&&!R.host){if(m.u!==ACC.uid&&ACC.uid)return;R.peer={n:m.n};clearTimeout(R.to);netLobby();return}
+  if(m.t==='hi'&&R.host){if(R.peer&&R.peer.u!==m.u)return R.ch.send({t:'full',u:m.u});R.peer={n:m.n,u:m.u};R.ch.send({t:'wel',n:myNm(),u:m.u,d:R.d||0});netLobby();sfx('up');return}
+  if(m.t==='wel'&&!R.host){if(m.u!==ACC.uid&&ACC.uid)return;R.peer={n:m.n};R.d=+m.d||0;clearTimeout(R.to);netLobby();return}
   if(m.t==='full'&&!R.host&&(m.u===ACC.uid)){toast('這個房間已經滿了');netLeave();return}
   if(m.t==='bye'){if(T&&T.net&&!T.over){if(R.host)netLost();else{toast('房主離開了,這場結束');tdEnd(false)}}else if(R.host){R.peer=null;netLobby()}else{toast('房主取消了房間');netLeave()}return}
-  if(m.t==='go'&&!R.host){tdStart('coop',0,m.cfg);const T2=TD;if(!T2)return;T2.guest=1;T2.side='B';T2.net={host:0,last:T2.t,hbT:0,peer:m.n,tv:''};T2.prep=30;netLobby();tdHudBuild();return}
+  if(m.t==='go'&&!R.host){tdStart('coop',+m.d||0,m.cfg);const T2=TD;if(!T2)return;T2.guest=1;T2.side='B';T2.net={host:0,last:T2.t,hbT:0,peer:m.n,tv:'',mate:m.u};T2.prep=30;netLobby();tdHudBuild();return}
   if(!T||!T.net)return;
   if(R.host){T.net.hb=T.t;if(m.t==='a')netApply(m)}
   else{if(m.t==='s')netSnap(m);else if(m.t==='end'){if(!T.over)tdEnd(!!m.win)}}}
@@ -3337,7 +3340,7 @@ function netInvite(fid,fn){if(!(window.MOE_SB&&MOE_SB.channel))return toast('需
   let n=0;const go=()=>{ch.send({t:'inv',code,n:myNm()});if(++n<3)setTimeout(go,1500);else setTimeout(()=>ch.close(),1500)};setTimeout(go,900);toast(`已邀請 ${fn||'好友'},等對方加入`)}
 setInterval(()=>{try{netInvListen()}catch(e){}},5000);
 function tdQuit(){if(TD&&TD.net)netLeave();TD=null;SKP=[];$('tdHud').hidden=true;$('tdLayer').hidden=true;$('tdRes').hidden=true;$('tdPick').hidden=true;$('tdInfo').hidden=true;$('town').hidden=false;townHud();openSheet('td')}
-function tdEnd(win){const T=TD;if(T.over)return;if(T.net&&T.net.host&&NETR)NETR.ch.send({t:'end',win:!!win});T.over=win?'win':'lose';sfx(win?'win':'lose');const t=tdSV(),cl=T.mode==='endless'?T.wave-1:win?TDW:T.wave-1;
+function tdEnd(win){const T=TD;if(T.over)return;if(T.net&&T.net.host&&NETR)NETR.ch.send({t:'end',win:!!win});if(T.coop&&T.inf&&T.net&&!T.net.lost&&T.net.mate&&SRV.on()&&T.wave>1){T.duoW=T.wave-1;SRV.rpc('td_report2',{p_mate:T.net.mate,p_mate_n:T.net.peer||'',p_my_n:myNm(),p_wave:T.wave-1,p_secs:Math.round(T.t)}).then(()=>{TDNET.t=0}).catch(()=>{})}T.over=win?'win':'lose';sfx(win?'win':'lose');const t=tdSV(),cl=T.mode==='endless'?T.wave-1:win?TDW:T.wave-1;
   let stars=0,lines=[],first=false;
   const used=(T.used||[]).filter(k=>SV.pets[k]),pn=k=>PETS[k].n[SV.pets[k].st];
   if(T.mode==='normal'){
@@ -3358,7 +3361,7 @@ function tdEnd(win){const T=TD;if(T.over)return;if(T.net&&T.net.host&&NETR)NETR.
     if(SRV.on()&&w>0)SRV.rpc('td_report',{p_wave:w,p_secs:Math.round(T.t)}).then(()=>{TDNET.t=0}).catch(()=>{})}
   else lines.push(T.mode==='coop'?'好友共同守塔(試玩)沒有獎勵':'練習模式沒有獎勵');
   save();townHud();
-  const R=$('tdRes');R.hidden=false;R.innerHTML=`<div class="tdrbox"><h2>${win?'守住家園了!':T.mode==='endless'?'無盡模式結束':'城門被攻破了…'}</h2>${T.bot?`<p class="dim">🤖 ${T.bot.n}:「${win?'守住了!好隊友 👍 下次再一起!':'沒關係,下次再一起努力!'}」</p>`:''}
+  const R=$('tdRes');R.hidden=false;R.innerHTML=`<div class="tdrbox"><h2>${win?'守住家園了!':T.inf?'無盡模式結束':'城門被攻破了…'}</h2>${T.duoW?`<p class="dim">👥 雙人無盡:撐過 <b>${T.duoW}</b> 波,已記錄到本週雙人排行</p>`:''}${T.bot?`<p class="dim">🤖 ${T.bot.n}:「${win?'守住了!好隊友 👍 下次再一起!':'沒關係,下次再一起努力!'}」</p>`:''}
    ${T.mode==='normal'&&win?`<div class="tdstars">${[0,1,2].map(i=>`<span class="${i<stars?'':'off'}">★</span>`).join('')}</div>`:''}
    <p>${T.mode==='endless'?`撐過 <b>${Math.max(0,cl)}</b> 波`:`第 ${Math.min(T.wave,TDW)} / ${TDW} 波 · 城門剩 ${T.hp} / ${T.hpMax}`} · 擊倒 ${T.kills} 隻</p>
    <ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul>${!win?tdTips():T.mode==='normal'&&stars<3?tdTips(`💪 想拿 3 星?要一隻怪都不漏、城門保持 ${T.hpMax}/${T.hpMax} 滿血。這場剩 ${Math.max(0,Math.ceil(T.hp))},${stars<2?`少被扣 ${Math.ceil(T.hpMax/2-T.hp)} 點就 2 星、`:''}少被扣 ${Math.ceil(T.hpMax-T.hp)} 點就 3 星`):''}<button class="go" id="tdBack">回到城鎮</button></div>`;iconize(R);$('tdBack').onclick=()=>{sfx('click');tdQuit()};R.querySelectorAll('[data-tgo]').forEach(b=>b.onclick=()=>{sfx('click');const [s2,tb]=b.dataset.tgo.split(':');tdQuit();setTimeout(()=>{closeSheet();openSheet(s2,tb||null)},60)})}
@@ -3471,7 +3474,7 @@ function tdUpdate(dt){const T=TD;if(!T)return;TT+=dt;try{skinFx(T.SK,dt)}catch(e
   for(const k in T.cmd)if(T.cmd[k]>0)T.cmd[k]-=dt;if(T.shield>0)T.shield-=dt;
   if(T.prep>0){if($('tdPick').hidden)T.prep-=dt;if(T.prep<=0)tdNextWave();}
   else{T.st+=dt;while(T.spawn.length&&T.spawn[0].t<=T.st){tdSpawn(T.spawn.shift())}
-    if(!T.spawn.length){const alive=T.en.some(e=>e.hp>0);T.gap+=dt;if((!alive&&T.gap>3)||T.gap>22){if(T.mode!=='endless'&&T.wave>=TDW){if(!alive)return tdEnd(true)}else{T.energy+=12+T.wave;tdNextWave()}}}}
+    if(!T.spawn.length){const alive=T.en.some(e=>e.hp>0);T.gap+=dt;if((!alive&&T.gap>3)||T.gap>22){if(!T.inf&&T.wave>=TDW){if(!alive)return tdEnd(true)}else{T.energy+=12+T.wave;tdNextWave()}}}}
   for(const e of T.en){if(e.hp<=0)continue;e.anim+=dt;if(e.hitT>0)e.hitT-=dt;
     if(e.poiT>0){e.poiT-=dt;e.hp-=e.poi*dt*100/(100+e.E.def*3);if(e.hp<=0){tdKill(e);continue}}
     if(e.slowT>0){e.slowT-=dt;if(e.slowT<=0)e.slow=0}
@@ -3617,12 +3620,12 @@ function tdDrawEnemy(e,x,y){const s=TDV.s,im=img(e.E.img);if(!im||!im.naturalWid
 // ---- HUD (DOM)
 function tdHudBuild(){const T=TD;if(!T)return;const cm=CMDS.filter(c=>c.k!=='hold').map(c=>c.k==='rock'?{...c,n:'雷霆',ic:'🌩️'}:c);
   $('tdTop').innerHTML=`<button class="tdb" data-td="pause">${T.paused?'▶':'❚❚'}</button><button class="tdb" data-td="spd">×${T.speed}</button>
-    <div class="tdst"><b id="tdWave"></b><small>${T.mode==='endless'?'無盡模式':T.mode==='practice'?'練習 · '+TDDIFF[T.diff].n:TDDIFF[T.diff].n}</small></div>
+    <div class="tdst"><b id="tdWave"></b><small>${T.inf?'無盡模式':T.mode==='practice'?'練習 · '+TDDIFF[T.diff].n:TDDIFF[T.diff].n}</small></div>
     <div class="tdst hp"><b id="tdHp"></b><small>城門</small></div><div class="tdst en"><b id="tdEn"></b><small>✦ ${T.coop?(T.side==='A'?'右路':'左路'):'能量'}</small></div><button class="tdb" data-td="info" id="tdInfoBtn" hidden>👾<small style="display:block;font-size:10px">本波怪物</small></button>${T.coop&&!T.bot&&!T.net?`<button class="tdb" data-td="swap">🎮${T.side==='A'?'右':'左'}</button>`:''}<button class="tdb go2" data-td="next" id="tdNext">出怪</button>`;
   $('tdBot').innerHTML=cm.map(c=>`<button class="tdc" data-td="cmd:${c.k}" id="tdc_${c.k}"><i>${c.ic}</i><small>${c.n}</small><span class="cdm"></span></button>`).join('')+(T.coop?`<button class="tdc" data-td="sup"><i>🤝</i><small>支援50</small></button><button class="tdc" data-td="help"><i>🆘</i><small>求救</small></button>`:'')+`<button class="tdc quit" data-td="quit"><i>🏳</i><small>撤退</small></button>`;
   document.querySelectorAll('#tdHud [data-td]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();tdAct(b.dataset.td)});tdHudTick()}
-function tdHudTick(){const T=TD;if(!T)return;const inf=$('tdInfo');if(inf&&!inf.hidden&&(!T._it||T.t-T._it>.5||T._iw!==T.wave)){T._it=T.t;T._iw=T.wave;inf.innerHTML=tdInfoHtml();iconize(inf)}const w=$('tdWave');if(!w)return;w.textContent=T.prep>0?`準備 ${Math.ceil(T.prep)}`:T.mode==='endless'?`第 ${T.wave} 波`:`${T.wave} / ${TDW}`;$('tdHp').textContent=`${T.hp}/${T.hpMax}`;$('tdEn').textContent=Math.floor(T.energy);
-  const nx=$('tdNext');nx.hidden=!(T.prep>0||(!T.spawn.length&&T.wave<(T.mode==='endless'?1e9:TDW)));nx.textContent=T.prep>0?'開始':'下一波';
+function tdHudTick(){const T=TD;if(!T)return;const inf=$('tdInfo');if(inf&&!inf.hidden&&(!T._it||T.t-T._it>.5||T._iw!==T.wave)){T._it=T.t;T._iw=T.wave;inf.innerHTML=tdInfoHtml();iconize(inf)}const w=$('tdWave');if(!w)return;w.textContent=T.prep>0?`準備 ${Math.ceil(T.prep)}`:T.inf?`第 ${T.wave} 波`:`${T.wave} / ${TDW}`;$('tdHp').textContent=`${T.hp}/${T.hpMax}`;$('tdEn').textContent=Math.floor(T.energy);
+  const nx=$('tdNext');nx.hidden=!(T.prep>0||(!T.spawn.length&&T.wave<(T.inf?1e9:TDW)));nx.textContent=T.prep>0?'開始':'下一波';
   for(const c of CMDS){const b=$('tdc_'+c.k);if(!b)continue;const cd=T.cmd[T.coop?c.k+T.side:c.k]||0;b.classList.toggle('cd',cd>0);b.querySelector('.cdm').textContent=cd>1e6?'已用':cd>0?Math.ceil(cd):'';b.classList.toggle('aim',T.aim&&c.k==='rock')}}
 const TDCMD={guard:{cd:1e9,f:()=>{TD.shield=15;tdTxt(668,60,'🛡 城門護盾 15 秒:撞到的怪物彈回起點','#9adfff',1.6)}},heal:{cd:1e9,f:()=>{const g=Math.min(6,TD.hpMax-TD.hp);TD.hp+=g;tdTxt(668,60,'💚 城門 +'+g,'#7aff9a',1.4)}},rock:{cd:1e9,f:()=>tdThunder()}};
 function tdThunder(){if(TD.net&&TD.net.host)TD.net.ev.push(['th']);const T=TD,best=Math.max(...Object.values(T.tw).map(w=>tdAtk(w)),(SV.castle||1)*120);T.flash={t:0,life:1,a:.6,c:'12,12,40'};T.shake=.4;sfx('thunder');tdTxt(668,60,'🌩️ 雷霆天罰!','#fff27a',1.8,true);
@@ -3664,7 +3667,7 @@ function tdPick(i){const T=TD,P=$('tdPick'),w=T.tw[i];P.hidden=false;
     if(a==='putw'){const c=tdWCost(k);if(T.energy<c)return;T.energy-=c;T.tw[i]=tdWTower(k,i);T.tw[i].side=T.coop?(TDSIDE2[i]==='C'?T.side:TDSIDE2[i]):'A';T.sel=null;P.hidden=true;const [x,y]=TD.slots[i];tdPart(x,y-30,18,[EL[TOWERS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
     if(a==='up'){const c=tdUpW(w);if(T.energy<c||w.lv>=3)return;T.energy-=c;w.spent+=c;w.lv++;w.rgT=1.2;const [x,y]=TD.slots[i];tdPart(x,y-40,20,['#ffe066','#fff'],180,.6,5);tdTxt(x,y-100,'升級!','#ffe066');sfx('up');tdPick(i);return}
     if(a==='sell'){T.energy+=Math.floor(w.spent*.5);delete T.tw[i];T.sel=null;P.hidden=true}})}
-function tdInfoHtml(){const T=TD,n=tdNP(),nw=T.prep>0?1:T.wave+1,fin=T.mode!=='endless'&&nw>TDW;const ks=fin?[]:[...new Set((T.spawn.length&&T.wave?T.spawn:tdPeek(nw)).map(x=>x.k))].slice(0,6);
+function tdInfoHtml(){const T=TD,n=tdNP(),nw=T.prep>0?1:T.wave+1,fin=!T.inf&&nw>TDW;const ks=fin?[]:[...new Set((T.spawn.length&&T.wave?T.spawn:tdPeek(nw)).map(x=>x.k))].slice(0,6);
   if(T.coop&&T.net)return `<div class="tdih"><b>👥 和「${esc(T.net.peer||'隊友')}」連線守塔</b> ${tdBonHtml()}<small>你守${T.side==='A'?'右路(紅色石台)':'左路(藍色石台)'}。按「🆘求救」請隊友支援;兩人 2 秒內都放出大招會觸發「💞 友情合擊」!${T.net.lost?' 隊友斷線,電腦代打中。':''}</small></div><div class="tdih"><small>你的能量 ✦${Math.floor(T.energy)} · 隊友能量 ✦${Math.floor(T.side==='A'?T.store.B:T.store.A)} · 城門 ${T.hp}/${T.hpMax}</small></div>`;
   if(T.coop&&T.bot)return `<div class="tdih"><b>🤖 和電腦隊友「${T.bot.n}」共同守塔</b> ${tdBonHtml()}<small>你守右路(紅色石台),隊友守左路。按「🆘求救」隊友有能量會送你 ✦50;你放大招時隊友會跟著放,觸發「💞 友情合擊」!</small></div><div class="tdih"><small>你的能量 ✦${Math.floor(T.energy)} · 隊友能量 ✦${Math.floor(T.store.B)} · 隊友已放 ${Object.values(T.tw).filter(w=>w.side==='B').length}/9 · 城門 ${T.hp}/${T.hpMax}</small></div>`;
   if(T.coop)return `<div class="tdih"><b>👥 好友共同守塔(試玩)</b> ${tdBonHtml()}<small>按上方「🎮」切換右路／左路玩家;右、左路玩家各有 9 座石台,各自守自己那一路。兩人 2 秒內都放出大招會觸發「💞 友情合擊」!</small></div><div class="tdih"><small>右路能量 ✦${Math.floor(T.side==='A'?T.energy:T.store.A)} · 左路能量 ✦${Math.floor(T.side==='B'?T.energy:T.store.B)} · 城門 ${T.hp}/${T.hpMax}</small></div>`;
@@ -3676,6 +3679,7 @@ const TDSP={fire:'範圍爆炸',water:'機率擊退',grass:'中毒持續傷害',
 // ---- 副本頁:守塔挑戰分頁
 function tdFetch(){if(!SRV.on()||Date.now()-TDNET.t<60e3)return;TDNET.t=Date.now();
   SRV.rpc('td_top',{p_limit:50}).then(r=>{TDNET.top=r||[];if(sheetK==='boss'&&sheetTab==='td')renderSheet(1)}).catch(e=>{TDNET.err=e.message});
+  SRV.rpc('td_top2',{p_limit:50}).then(r=>{TDNET.duo=r||[];if(sheetK==='boss'&&sheetTab==='td')renderSheet(1)}).catch(()=>{TDNET.duo=[]});
   SRV.rpc('td_claim',{}).then(r=>{if(r&&r.gem>0){toast(`上週守塔排行第 ${r.rank} 名,獎勵 💎${r.gem} 已寄到信箱`);if(r.rank<=3){SV.cos=[...new Set([...(SV.cos||[]),'sp_td'])];SV.tdTiW=weekId();save();toast('獲得一週限定稱號「🛡️守塔英雄」,到守護員頁面換上!')}}}).catch(()=>{})}
 function tdBtnPos(){const b=$('tdBtn'),mq=$('marq');if(!b||!mq)return;const r=mq.getBoundingClientRect(),top=(r.height?r.bottom:parseFloat(getComputedStyle(mq).top)+30)+8;if(Math.abs((b._t||0)-top)>1){b._t=top;b.style.top=Math.round(top)+'px'}}
 function tdBtnUpd(){const b=$('tdBtn');if(!b)return;const op=tdOpen();b.classList.toggle('lock',!op);const n=op?tdTix():0;$('tdBtnN').hidden=!(n>0);$('tdBtnN').textContent=n;let s='';if(!op)s='擁有萌獸就能玩';else{tdFetch();const r=(TDNET.top||[]).findIndex(x=>x.me);if(r>=0)s=`本週第 ${r+1} 名`;else if(n>0)s='今日券 '+n}$('tdBtnS').textContent=s}
@@ -3694,14 +3698,18 @@ function pTD(){const t=tdSV(),n=tdTix();tdFetch();
     <div class="card ladme"><div class="lm"><b>今日守塔券</b><small>普通/困難/地獄、無盡模式都會用 1 張</small></div><div class="tix"><b>🎫 ${n}</b><small>剩餘</small><button class="blue" data-act="tdBuy" ${t.buy>=TDBUY.length?'disabled':''}>${t.buy<TDBUY.length?'💎'+TDBUY[t.buy]+' +1':'今日已買滿'}</button></div></div>`;
   const mxl=Math.max(0,...owned().map(k=>SV.pets[k].lv||1)),TDNEED=[0,20,30];
   h+=`<div class="tdtip">💡 第一次玩建議先按「練習」熟悉玩法(不耗守塔券、沒有獎勵),熟悉後再正式挑戰,避免浪費券。</div><div class="card"><h3>挑戰關卡 <small class="dim" style="font-size:12px;font-weight:400">3★＝滿血守住 · 2★＝剩一半以上</small></h3><div class="tdds">${TDDIFF.map((D,i)=>{const lv0=mxl<TDNEED[i],cl0=i>0&&!(t.clr[i-1]>0),lock=lv0||cl0,st=t.clr[i]||0;return `<div class="tdd ${lock?'lock':''}" style="--c:${D.c}"><b>${D.n}</b><span class="tdstars sm">${[0,1,2].map(j=>`<span class="${j<st?'':'off'}">★</span>`).join('')}</span><small>${lock?[lv0?'需要一隻 Lv'+TDNEED[i]+' 萌獸':'',cl0?'先通關'+TDDIFF[i-1].n:''].filter(Boolean).join('、'):t.first[i]?'每日首勝 💎'+[20,40,80][i]:'首通 💎'+[100,200,400][i]}</small><button class="go" data-act="tdGo:normal:${i}" ${lock||n<1?'disabled':''}>挑戰</button><button class="mini" data-act="tdGo:practice:${i}" ${lock?'disabled':''}>練習</button></div>`}).join('')}</div></div>`;
-  h+=`<div class="card"><h3>👥 好友共同守塔 <small>試玩版</small></h3><p class="dim">兩條路線同時來襲,和好友共守一座主城!每人 9 座石台,可以互送能量、求救、觸發友情合擊。<b>開房間</b>把房號給朋友就能連線一起玩;也可以找電腦隊友,或用試玩自己切換兩路。不耗守塔券、沒有獎勵。</p><div class="bt tdnet"><button class="go" data-act="tdNetHost">👥 開房間</button><input id="tdCode" inputmode="numeric" maxlength="4" placeholder="輸入房號"><button class="blue" data-act="tdNetJoin">加入</button></div><div class="bt"><button class="go" data-act="tdGo:coop:0">開始試玩</button><button class="blue" data-act="tdBotList">🤖 找電腦隊友</button></div>${TDBP?`<div class="tdbots">${TDBP.map((c,i)=>`<div class="tdbot"><b>🤖 ${esc(c.n)} <small>${c.tag}</small></b><small>戰力 ${fmt(c.pw)} · 擅長 ${c.top.map(e=>`<span class="el el-${e}">${EL[e].n}</span>`).join('')}</small><button class="go" data-act="tdBotGo:${i}">一起守塔</button></div>`).join('')}<p class="dim" style="font-size:12px">你守右路、電腦隊友守左路。不耗守塔券、沒有獎勵。</p></div>`:''}</div>`;
+  {const cdn=['普通','困難','地獄','無盡'],cd=TDCD,duo=TDNET.duo;
+  h+=`<div class="card"><h3>👥 好友共同守塔</h3><p class="dim">兩條路線同時來襲,和好友共守一座主城!每人 9 座石台,可以互送能量、求救、觸發友情合擊。<b>開房間</b>把房號給朋友就能連線一起玩,也可以找電腦隊友。不耗守塔券、沒有獎勵。</p>
+  <div class="tdcd">${cdn.map((n,i)=>{const lk=tdCoopLock(i);return `<button class="${i===cd?'on':''} ${lk?'lock':''}" data-act="tdCD:${i}" style="--c:${i<3?TDDIFF[i].c:'#7a4ad0'}">${i===3?'♾️ ':''}${n}${lk?'<small>🔒</small>':''}</button>`}).join('')}</div>${tdCoopLock(cd)?`<p class="dim" style="font-size:12px">${tdCoopLock(cd)}</p>`:''}
+  <div class="bt tdnet"><button class="go" data-act="tdNetHost">👥 開房間</button><input id="tdCode" inputmode="numeric" maxlength="4" placeholder="輸入房號"><button class="blue" data-act="tdNetJoin">加入</button></div><div class="bt"><button class="blue" data-act="tdBotList">🤖 找電腦隊友</button></div>${TDBP?`<div class="tdbots">${TDBP.map((c,i)=>`<div class="tdbot"><b>🤖 ${esc(c.n)} <small>${c.tag}</small></b><small>戰力 ${fmt(c.pw)} · 擅長 ${c.top.map(e=>`<span class="el el-${e}">${EL[e].n}</span>`).join('')}</small><button class="go" data-act="tdBotGo:${i}">一起守塔</button></div>`).join('')}<p class="dim" style="font-size:12px">你守右路、電腦隊友守左路。不耗守塔券、沒有獎勵。</p></div>`:''}
+  <h3 style="margin-top:10px">♾️ 雙人無盡排行 <small>本週 · 和好友連線的無盡成績</small></h3>${SRV.on()?(duo?`<ol class="tdlb">${duo.slice(0,20).map((r,i)=>`<li class="${r.me?'me':''}"><b>${i+1}</b><span>${esc(r.a)} ＆ ${esc(r.b)}</span><i>${r.w} 波</i></li>`).join('')||'<p class="dim">本週還沒有隊伍上榜,找朋友一起來搶第一!</p>'}</ol>`:'<p class="dim">讀取中…</p>'):'<p class="dim">登入後才會顯示排行</p>'}</div>`}
   const top=TDNET.top||[],me=t.wbest||0;
   h+=`<div class="card"><h3>♾️ 無盡模式 <small>本週最佳 ${me} 波 · 歷史最佳 ${t.best||0} 波</small></h3><p class="dim">怪物無限湧出,看你能撐幾波!中途撤退也會依撐過的波數拿到獎勵。每撐過 1 波:上場萌獸各 +100 經驗、💎1。每週一重新計算,前 50 名有鑽石獎勵:第 1 名 💎600、2~3 名 💎400、4~10 名 💎200、11~50 名 💎60;前 3 名再送一週限定稱號「🛡️守塔英雄」。</p>
     <div class="bt"><button class="go" data-act="tdGo:endless:0" ${n<1?'disabled':''}>開始無盡模式</button></div>
     <h3 style="margin-top:10px">本週排行</h3>${SRV.on()?(TDNET.top?`<ol class="tdlb">${top.slice(0,50).map((r,i)=>`<li class="${r.me?'me':''}"><b>${i+1}</b><span>${esc(r.n||'守護員')}</span><i>${r.w} 波</i></li>`).join('')||'<p class="dim">本週還沒有人上榜,快來搶第一!</p>'}</ol>`:'<p class="dim">讀取中…</p>'):'<p class="dim">登入後才會顯示排行</p>'}</div>`;
   return h}
-Object.assign(ACT,{tdNetHost:()=>{if(!tdOpen())return;closeSheet();netHost()},tdNetJoin:()=>{if(!tdOpen())return;const v=($('tdCode')||{}).value;if(String(v||'').replace(/\D/g,'').length!==4)return toast('請輸入 4 位數房號');closeSheet();netJoin(v)},tdInv:id=>{if(!tdOpen())return;const d=FR.cache&&FR.cache[id];closeSheet();netInvite(id,d&&d.n)},
-  tdBotList:()=>{if(!tdOpen())return;TDBP=tdBotCands();openSheet('td');setTimeout(()=>{const el=document.querySelector('.tdbots');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},120)},tdBotGo:i=>{const c=TDBP&&TDBP[+i];if(!c)return;TDBOTSEL=c;TDBP=null;tdStart('coop',0)},tdGo:(m,d)=>{if(!tdOpen())return;d=+d||0;if(m!=='endless'&&m!=='coop'&&d>0){const mxl=Math.max(0,...owned().map(k=>SV.pets[k].lv||1));if(mxl<[0,20,30][d])return toast(`需要一隻 Lv${[0,20,30][d]} 以上的萌獸`);if(!(tdSV().clr[d-1]>0))return toast('先通關'+TDDIFF[d-1].n)}if(!SV.team.some(k=>k&&SV.pets[k])&&!owned().length)return;tdStart(m,+d||0)},
+Object.assign(ACT,{tdNetHost:()=>{if(!tdOpen())return;if(tdCoopLock(TDCD))return toast(tdCoopLock(TDCD));closeSheet();netHost()},tdNetJoin:()=>{if(!tdOpen())return;const v=($('tdCode')||{}).value;if(String(v||'').replace(/\D/g,'').length!==4)return toast('請輸入 4 位數房號');closeSheet();netJoin(v)},tdInv:id=>{if(!tdOpen())return;const d=FR.cache&&FR.cache[id];closeSheet();netInvite(id,d&&d.n)},
+  tdBotList:()=>{if(!tdOpen())return;TDBP=tdBotCands();const b=$('shBody'),y=b?b.scrollTop:0;renderSheet(1);if(b)b.scrollTop=y;setTimeout(()=>{const el=document.querySelector('.tdbots');if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'})},80)},tdBotGo:i=>{const c=TDBP&&TDBP[+i];if(!c)return;if(tdCoopLock(TDCD))return toast(tdCoopLock(TDCD));TDBOTSEL=c;TDBP=null;tdStart('coop',TDCD)},tdCD:i=>{i=+i;if(tdCoopLock(i))return toast(tdCoopLock(i));TDCD=i;const b=$('shBody'),y=b?b.scrollTop:0;renderSheet(1);if(b)b.scrollTop=y},tdGo:(m,d)=>{if(!tdOpen())return;d=+d||0;if(m!=='endless'&&m!=='coop'&&d>0){const mxl=Math.max(0,...owned().map(k=>SV.pets[k].lv||1));if(mxl<[0,20,30][d])return toast(`需要一隻 Lv${[0,20,30][d]} 以上的萌獸`);if(!(tdSV().clr[d-1]>0))return toast('先通關'+TDDIFF[d-1].n)}if(!SV.team.some(k=>k&&SV.pets[k])&&!owned().length)return;tdStart(m,+d||0)},
   tdBuy:()=>{const t=tdSV();if(t.buy>=TDBUY.length)return;const c=TDBUY[t.buy];if(SV.gem<c)return toast('鑽石不足');spendGem(c);t.buy++;toast('守塔券 +1');SRV.sync()}});
 // pointer
 (function(){const L=$('tdLayer');if(!L)return;L.addEventListener('pointerdown',e=>{if(!TD)return;e.preventDefault();tdTap(e.clientX,e.clientY)})})();
