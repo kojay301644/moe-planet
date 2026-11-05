@@ -1940,3 +1940,24 @@ begin x := coalesce(c->p_k, d->p_k); return ((x->>0)::bigint + (x->>1)::bigint *
 
 -- 新角色起始鑽石改為 0(只影響之後新建立的帳號)
 alter table public.wallet alter column gem set default 0;
+
+-- ============ 內測大禮包:每個帳號自動寄一次(settings 的 beta.gift 設成 false 就停止寄送) ============
+insert into settings(k, v) values ('beta', '{"gift": true}'::jsonb) on conflict (k) do nothing;
+create or replace function public.moe_beta_gift(u uuid) returns void language plpgsql security definer set search_path = public as $$
+begin
+  if u is null or not coalesce((select (v->>'gift')::boolean from settings where k = 'beta'), false) then return; end if;
+  if exists (select 1 from inbox where uid = u and kind = 'beta') then return; end if;
+  insert into inbox(uid, gem, note, credit, kind, title, bonus) values (u, 3000,
+    '感謝參加萌獸星球內測!這是給測試玩家的大禮包,領取後還可以「自選一隻傳說品質的萌獸」。正式上線前會刪檔,請盡量體驗各種功能,有問題到「設定 → 回報問題」告訴我們!',
+    true, 'beta', '🎁 內測大禮包', '{"coin":500000,"candy":500,"stones":100,"rtix":3,"lpick":1}'::jsonb);
+end $$;
+revoke execute on function public.moe_beta_gift(uuid) from public, anon, authenticated;
+create or replace function public.session_start(p_dev text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := auth.uid(); s uuid := gen_random_uuid();
+begin if u is null then raise exception 'not signed in'; end if;
+  if to_regprocedure('public.moe_cleanup_maybe()') is not null then perform moe_cleanup_maybe(); end if;
+  insert into sessions(uid, sid, dev, at, seen) values (u, s, left(coalesce(p_dev,''),60), now(), now())
+    on conflict (uid) do update set sid = excluded.sid, dev = excluded.dev, at = now(), seen = now();
+  begin perform moe_beta_gift(u); exception when others then null; end;
+  return jsonb_build_object('sid', s); end $$;
+grant execute on function public.session_start(text) to authenticated;
