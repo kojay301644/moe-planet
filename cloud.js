@@ -1,9 +1,9 @@
 // 萌獸星球 × Supabase:把遊戲原本用的雲端資料介面接到你自己的 Supabase 專案。
-// 每台裝置第一次開啟會自動建立一個匿名帳號,存檔、天梯、好友、聊天都會存到雲端。
+// 必須用帳號密碼登入才能遊玩(不再自動建立匿名帳號),存檔、天梯、好友、聊天都會存到雲端。
 (()=>{const C=window.MOE_CFG;if(!C||!C.url||!C.key||C.url.includes('請貼上')||!window.supabase){console.warn('MOE: 未設定雲端,使用離線模式');return}
 const sb=supabase.createClient(C.url,C.key,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'moe-auth'},realtime:{params:{eventsPerSecond:20}}});
 let uid=null;
-const ready=(async()=>{let {data:{session}}=await sb.auth.getSession();if(!session){const r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}uid=session.user.id;return uid})();
+const ready=(async()=>{const {data:{session}}=await sb.auth.getSession();uid=session?session.user.id:null;return uid})();
 const parent=p=>p.split('/').slice(0,-1).join('/');
 const snap=(id,data)=>({id,exists:data!=null,data:()=>data==null?undefined:JSON.parse(JSON.stringify(data))});
 const err=e=>{const x=new Error(e.message||String(e));x.code=e.code==='42501'?'permission_denied':'invalid_argument';return x};
@@ -19,14 +19,15 @@ function coll(cpath,f=[],o=null,n=100){const q={path:cpath,
   onSnapshot(cb,e){let stop=false;const tick=async()=>{if(stop)return;try{cb(await q.get())}catch(x){e&&e(x)}setTimeout(tick,10000)};tick();return()=>{stop=true}}};return q}
 const db={doc,collection:coll};
 const user={id:async()=>{await ready;return uid},me:async()=>({name:''}),can:async()=>true,isOwner:()=>false,canEdit:()=>false,profiles:async()=>({})};
-window.claude={use:async k=>{try{await ready}catch(e){console.warn('MOE: 雲端登入失敗',e);return null}return k==='db'?db:k==='user'?user:null}};
+window.claude={use:async k=>{try{await ready}catch(e){console.warn('MOE: 雲端連線失敗',e);return null}if(!uid)return null;return k==='db'?db:k==='user'?user:null}};
 window.MOE_SB=sb;
 // 帳號密碼:帳號會對應成內部用的信箱(不會寄信),第一次建立帳號時直接綁定目前的匿名帳號,進度不變
 const em=u=>String(u).trim().toLowerCase()+'@player.moe-planet.app';
 const msg=e=>{const m=(e&&(e.message||e.code))||'';return /already|exists|registered/i.test(m)?'這個帳號已經有人使用':/Invalid login/i.test(m)?'帳號或密碼錯誤':/Password should|weak/i.test(m)?'密碼太簡單,請至少 6 個字元並混合英數':/rate|too many/i.test(m)?'嘗試太多次,請稍後再試':/confirm/i.test(m)?'伺服器需要關閉「Confirm email」設定':m||'發生錯誤,請稍後再試'};
 window.MOE_AUTH={
-  async info(){await ready.catch(()=>{});const {data:{user}}=await sb.auth.getUser();if(!user)return {uid:null};const e=user.email||'';return {uid:user.id,anon:!e,name:e?e.split('@')[0]:null,pending:!!user.new_email&&!e}},
-  async register(u,p){const {data,error}=await sb.auth.updateUser({email:em(u),password:p});if(error)throw new Error(msg(error));if(!data.user.email)throw new Error('伺服器需要關閉「Confirm email」設定才能建立帳號')},
+  async info(){await ready.catch(()=>{});const {data:{session}}=await sb.auth.getSession();if(!session)return {uid:null,out:true};const {data:{user}}=await sb.auth.getUser();if(!user)return {uid:null,out:true};const e=user.email||'';return {uid:user.id,anon:!e,name:e?e.split('@')[0]:null,pending:!!user.new_email&&!e}},
+  async register(u,p){const {data:{session}}=await sb.auth.getSession();if(session){const {data,error}=await sb.auth.updateUser({email:em(u),password:p});if(error)throw new Error(msg(error));if(!data.user.email)throw new Error('伺服器需要關閉「Confirm email」設定才能建立帳號');return}
+    const {data,error}=await sb.auth.signUp({email:em(u),password:p});if(error)throw new Error(msg(error));if(!data.session)throw new Error(data.user&&data.user.identities&&!data.user.identities.length?'這個帳號已經有人使用':'伺服器需要關閉「Confirm email」設定才能建立帳號')},
   async login(u,p){const {error}=await sb.auth.signInWithPassword({email:em(u),password:p});if(error)throw new Error(msg(error))},
   async verify(p){const {data:{user}}=await sb.auth.getUser();if(!user||!user.email)throw new Error('訪客帳號沒有密碼');const {error}=await sb.auth.signInWithPassword({email:user.email,password:p});if(error)throw new Error(/Invalid login/i.test(error.message||'')?'密碼錯誤':msg(error))},
   async logout(){await sb.auth.signOut()},

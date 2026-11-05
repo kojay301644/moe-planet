@@ -394,7 +394,7 @@ button.red{background:linear-gradient(#ff8a8a,#e04a4a);color:#fff;box-shadow:0 4
 .a2steps{display:grid;gap:8px;margin:8px 0}.a2steps div{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;background:#fff6e6}.a2steps i{font-style:normal;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#ff8a3d;color:#fff;font-weight:900;flex-shrink:0}
 body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.standalone #tBot{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
 .accf{display:grid;gap:8px;margin:8px 0}.accf input,#loginPane input,#delPw{margin-bottom:8px;padding:10px 12px;border-radius:12px;border:2px solid #e6cfa8;font-size:16px;width:100%;box-sizing:border-box}#loginPane input{margin:6px 0}#loginPane{z-index:30}.accd summary{cursor:pointer;font-weight:700;margin:6px 0}
-#tLogin{margin-top:8px}
+#tLogin{margin-top:8px}.tlegal{font-size:11.5px;line-height:1.7;color:#9a7a5a;margin:10px 0 0}.tlegal a{color:#c8641e;font-weight:700;text-decoration:underline}.lglist{display:grid;grid-template-columns:1fr 1fr;gap:6px}.lglist a{display:block;text-align:center;padding:9px;border-radius:10px;background:#fff6e8;color:#c8641e;font-weight:800;text-decoration:none;border:2px solid #f1dcb8}
 /* gem + */
 .gemc{cursor:pointer}.gplus{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:4px;border-radius:50%;background:linear-gradient(#5ad65a,#2a9a3a);color:#fff;font-style:normal;font-weight:900;font-size:15px;line-height:1;box-shadow:0 2px 0 rgba(0,0,0,.25);animation:gpulse 1.6s ease-in-out infinite}
 @keyframes gpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
@@ -613,7 +613,7 @@ body.standalone #tTop{padding-top:max(8px,env(safe-area-inset-top,0px))}body.sta
 <div id="a2Pane" class="modal" hidden style="z-index:12"><div class="box" id="a2Body"></div></div>
 <div id="sumRes" class="modal" hidden><div class="box sumbox"><h3>召喚結果</h3><div id="sumGrid"></div><button class="go" id="sumOk">太好了!</button></div></div>
 <div id="hatch" class="modal" hidden><div class="box"><div class="hst"><img id="hEgg" alt=""><i class="hray"></i><img id="hImg" alt=""></div><h3 id="hName"></h3><span id="hRar"></span><p id="hTxt"></p><button class="go" id="hClose">太好了!</button></div></div>
-<div id="title" class="ov"><div class="tbox"><h1 class="logo">萌獸星球</h1><p class="sub">收集・進化・守護家園</p><button class="go big" id="tStart" disabled>連線中…</button><div id="tAuth" hidden><div class="tseg"><button data-m="reg" class="on">建立新帳號</button><button data-m="login">登入帳號</button></div><input id="taU" placeholder="帳號(4–16 個英文小寫、數字或底線)" autocomplete="username" autocapitalize="off" maxlength="16"><input id="taP" type="password" placeholder="密碼(至少 6 個字)" autocomplete="new-password"><input id="taP2" type="password" placeholder="再輸入一次密碼" autocomplete="new-password"><button class="go big" id="taGo">建立帳號並開始</button><p class="mut" id="taTip">建立帳號後,換手機或清除瀏覽器資料都能用帳號密碼找回進度。</p></div><button class="blue" id="tLogin" hidden>已有帳號?登入</button><button id="tCodeBtn" hidden>用轉移碼找回進度</button><p id="accInfo" class="acc">連線中…</p></div></div>
+<div id="title" class="ov"><div class="tbox"><h1 class="logo">萌獸星球</h1><p class="sub">收集・進化・守護家園</p><button class="go big" id="tStart" disabled>連線中…</button><div id="tAuth" hidden><div class="tseg"><button data-m="reg" class="on">建立新帳號</button><button data-m="login">登入帳號</button></div><input id="taU" placeholder="帳號(4–16 個英文小寫、數字或底線)" autocomplete="username" autocapitalize="off" maxlength="16"><input id="taP" type="password" placeholder="密碼(至少 6 個字)" autocomplete="new-password"><input id="taP2" type="password" placeholder="再輸入一次密碼" autocomplete="new-password"><button class="go big" id="taGo">建立帳號並開始</button><p class="mut" id="taTip">建立帳號後,換手機或清除瀏覽器資料都能用帳號密碼找回進度。</p></div><button class="blue" id="tLogin" hidden>已有帳號?登入</button><button id="tCodeBtn" hidden>用轉移碼找回進度</button><p id="accInfo" class="acc">連線中…</p><p id="tLegal" class="tlegal" hidden>建立帳號即表示同意<a href="legal.html#terms" target="_blank" rel="noopener">服務條款</a>與<a href="legal.html#privacy" target="_blank" rel="noopener">隱私權政策</a><br><a href="legal.html#refund" target="_blank" rel="noopener">退款政策</a>・<a href="legal.html#contact" target="_blank" rel="noopener">聯絡我們</a>・遊戲分級:普遍級</p></div></div>
 <div id="intro" class="ov dark" hidden><div class="ibg" id="introBg"></div><div class="ifog"></div><div class="iglow"></div><div class="icap"><small id="introCh">序章 · 1 / 3</small><p id="introTxt"></p><p id="introDots"></p><p class="hint">點畫面繼續 ▸</p></div><button id="introSkip">跳過</button></div>
 <div id="namePane" class="ov" hidden><div class="tbox"><h2>你好,守護員!</h2><p>你叫什麼名字?</p><input id="nameIn" maxlength="12" placeholder="最多 12 個字" autocomplete="off"><button class="go big" id="nameOk">決定</button></div></div>
 <div id="eggPane" class="ov" hidden><div class="tbox"><h2>選擇你的第一隻萌獸</h2><p id="eggTip"></p><div id="eggPick"></div><div id="eggBig" class="egg0"><span class="shell">🥚</span></div>
@@ -805,7 +805,7 @@ function sessKicked(dev){if(SES.kicked)return;SES.kicked=true;try{if(TD)TD.pause
   document.body.appendChild(d);$('kickGo').onclick=()=>location.reload()}
 setInterval(sessPing,30000);setInterval(()=>{if(SES.sid&&!SES.kicked&&curAct()!==SES.act)sessPing()},4000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sessPing()});
 setInterval(()=>cloudWrite(),10000);addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')cloudWrite()});
-function setAcc(){const el=$('accInfo');if(!el)return;el.textContent=!ACC.checked?'連線中…':ACC.cloud?`☁ 已登入${ACC.name?':'+ACC.name:''} · 進度雲端保存`:ACC.uid&&!ACC.canWrite?'👤 已登入,但沒有寫入權限:以遊客身分保存在這台裝置':'👤 遊客模式 · 進度只存在這台裝置'}
+function setAcc(){const el=$('accInfo');if(!el)return;el.textContent=!ACC.checked?'連線中…':ACC.cloud?`☁ 已登入${ACC.name?':'+ACC.name:''} · 進度雲端保存`:ACC.uid&&!ACC.canWrite?'⚠ 伺服器暫時無法寫入,請稍後再試':'⚠ 尚未連線到伺服器,請重新整理'}
 async function accInit(){const C=window.claude;let user=null,db=null;
   try{if(C&&C.use){[user,db]=await Promise.all([C.use('user'),C.use('db')])}}catch(e){}
   const id=user?await user.id():null;if(user){const me=await user.me();ACC.name=me.name||''}if(window.MOE_AUTH){try{ACC.auth=await MOE_AUTH.info();if(ACC.auth.name)ACC.name=ACC.auth.name}catch(e){}}
@@ -813,7 +813,8 @@ async function accInit(){const C=window.claude;let user=null,db=null;
   if(id&&db){await sessStart();const cloud=await cloudRead();ACC.cloud=true;
     let wantCloud=false;try{wantCloud=!!localStorage.getItem('moe.login');localStorage.removeItem('moe.login')}catch(e){}
     if(cloud&&(wantCloud||!SV.started||SV.uid===id&&(cloud.t||0)>=(SV.t||0))){SV=cloud;SV.uid=id;saveLocalOnly()}
-    else if(cloud&&SV.started&&SV.uid!==id){await chooseSave(cloud)}
+    else if(cloud&&SV.started&&SV.uid!==id){if(window.MOE_AUTH){SV=cloud;SV.uid=id;saveLocalOnly()}else await chooseSave(cloud)}
+    else if(SV.started&&window.MOE_AUTH&&SV.uid&&SV.uid!==id){SV=DEF();SV.uid=id;saveLocalOnly()}
     else if(SV.started){SV.uid=id;save();await cloudWrite(true);if(!cloud)toast('已把這台裝置的進度綁定到你的帳號')}}
   setAcc();titleReady();if(ACC.cloud){SRV.init();netPublish(true);netFetch(true);setTimeout(likeCheck,3000)}}
 /* ---------- 伺服器驗證:鑽石錢包、抽卡、天梯、玩家交易所(只有網頁版、而且伺服器 SQL 已安裝時才啟用) ---------- */
@@ -2837,7 +2838,7 @@ const ago=t=>{if(!t)return '';const m=Math.floor((Date.now()-t)/60000);return m<
 function lordDoc(L){const st=L.lv>=20?2:L.lv>=10?1:0,town=lordTown(L);return {town,pr:prosperity(town),n:L.name,gl:clamp(L.lv+3,1,50),lv:clamp(Math.ceil(L.lv/3),1,10),pw:L.power,team:L.team.map(k=>[k,L.lv,st,1,1+st].join(',')),pets:L.team.map(k=>`${k}:${st}:${L.lv}`),pi:L.team.map(k=>[k,L.lv,st,1+Math.floor(L.i%3),1+st,Math.round(L.power/3),''].join('|')),dt:L.team,skin:SKINS[(L.i*3)%SKINS.length].id,t:Date.now()-L.i*3600e3,ai:1}}
 function pFriends(){if(!unlocked('friends'))return `<div class="card"><h3>🔒 好友</h3><p>${lockMsg('friends')}。打冒險就能升級!</p></div>`;
   const t=sheetTab||'list';frFetch();netFetch();let h=tabs([['list','好友 '+((SV.friends||[]).length)],['add','加好友'],['near','附近的守護員']]);
-  if(t==='list'){h+=!ACC.cloud?`<p class="note">👤 遊客模式不能加真人好友。可以先到「附近的守護員」拜訪電腦玩家的城鎮、跟他們切磋。</p>`:'';
+  if(t==='list'){h+=!ACC.cloud?`<p class="note">⚠ 尚未連線到伺服器,暫時不能加好友。可以先到「附近的守護員」拜訪電腦玩家的城鎮。</p>`:'';
     const fs=SV.friends||[];h+=`<div class="card"><h3>我的好友 <small>拜訪對方的城鎮、跟對方的出戰隊伍切磋(不扣天梯分,每天前 5 場有獎勵 ${Math.min(5,SV.fb&&SV.fb.day===today()?SV.fb.n:0)}/5)</small></h3><div class="list">${fs.length?fs.map(f=>{const d=FR.cache[f.id];return d?frRow(d,f.id,1):d===null?`<div class="li"><div><b>${f.n}</b><small>找不到資料(對方可能沒有寫入權限)</small></div><button class="mini" data-act="unfr:${f.id}">✕</button></div>`:`<div class="li"><div><b>${f.n}</b><small>讀取中…</small></div></div>`}).join(''):'<p class="mut">還沒有好友。到「加好友」輸入對方的代碼,或從推薦名單加。</p>'}</div></div>`}
   else if(t==='add'){const code=myCode();h+=`<div class="card"><h3>我的好友代碼</h3>${code?`<p class="fcode big">${code}</p><button class="blue" data-act="copyCode">複製代碼</button><p class="mut">把代碼給朋友,對方輸入後就能加你。對方也要能打開這個遊戲(用分享選單邀請,權限設成「可參與」)。</p>`:'<p class="mut">連線到伺服器後才會有好友代碼。</p>'}</div>
     <div class="card"><h3>輸入好友代碼</h3><div class="row"><input id="frIn" maxlength="8" placeholder="例如 K7QX2M" autocomplete="off"><button class="go" data-act="frAdd">加好友</button></div></div>`;
@@ -2873,7 +2874,7 @@ setInterval(()=>{if(SV.started&&ACC.db&&ACC.uid)dmFetch()},60000);
 function pChat(){if(!unlocked('chat'))return `<div class="card"><h3>🔒 聊天</h3><p>${lockMsg('chat')}</p></div>`;const C=chatSV(),t=sheetTab||'world',me=ACC.uid;let h=tabs([['world','世界頻道'],['dm','好友私訊'+(dmUnread()?' ●':'')],['heart','送愛心']]);
   const canPost=ACC.cloud&&ACC.db&&ACC.uid;
   const bar=(to)=>canPost?`<div class="cbar"><input id="chatIn" maxlength="40" placeholder="說點什麼…(最多 40 字,不能貼網址)" autocomplete="off"><button class="go" data-act="csend:${to}">送出</button></div>
-    <details class="cqk"><summary>快捷句・萌獸貼圖</summary><div class="qph">${QPH.map((x,i)=>`<button data-act="cq:${to}:${i}">${x}</button>`).join('')}</div><div class="stks">${owned().map(k=>`<button data-act="cs:${to}:${k}"><img src="assets/${PETS[k].img}1.webp" alt=""></button>`).join('')}</div></details>`:`<p class="note">👤 遊客模式只能看,連線到伺服器後才能發言。</p>`;
+    <details class="cqk"><summary>快捷句・萌獸貼圖</summary><div class="qph">${QPH.map((x,i)=>`<button data-act="cq:${to}:${i}">${x}</button>`).join('')}</div><div class="stks">${owned().map(k=>`<button data-act="cs:${to}:${k}"><img src="assets/${PETS[k].img}1.webp" alt=""></button>`).join('')}</div></details>`:`<p class="note">⚠ 尚未連線到伺服器,連線後才能發言。</p>`;
   if(t==='world'){chatFetch();const now=Date.now();let L=[];for(const d of CHAT.docs){if(C.blk.includes(d.id))continue;modFetch();for(const m of (d.cw||[]))if(m&&typeof m.x==='string'&&now-m.t<864e5&&!modHidden(d.id,m.t))L.push({id:d.id,n:d.n,av:d.av,x:m.x,t:m.t,me:d.id===me})}
     if(me&&!CHAT.docs.some(d=>d.id===me))for(const m of C.cw)if(now-m.t<864e5)L.push({id:me,n:esc(SV.name||'我'),av:avSrc()?SV.avatar:'',x:m.x,t:m.t,me:1});
     L.sort((a,b)=>a.t-b.t);L=L.slice(-60);
@@ -2973,7 +2974,7 @@ const teamIcons=t=>`<span class="tic">${t.map(([k,lv,st])=>`<img src="assets/${P
 const badge=(p,big)=>{const t=tierOf(p);return `<span class="tier ${big?'big':''}" style="--tc:${t.T.c}"><i><img src="assets/t_${t.i}.webp" alt=""></i>${t.name}</span>`};
 function pRank(){const t=sheetTab||'ladder';netFetch();if(window.MOE_SB&&Date.now()-(BOTX.__t||0)>60e3){BOTX.__t=Date.now();botFetch().then(()=>{if(sheetK==='rank')renderSheet(1)})}if(SRV.on()&&Date.now()-(SRV.ladT||0)>30e3){SRV.ladT=Date.now();ladSync()}if(Date.now()-NET.pubT>120e3)netPublish();
   let h=tabs([['ladder','天梯'],['lshop','天梯商店'],['week','攻城週榜'],['power','戰力榜'],['pros','繁榮榜']]);
-  const note=!ACC.cloud?`<p class="note">👤 目前是遊客模式:只會和電腦玩家比,成績不會上雲端榜。連線到伺服器後就能和其他真人一起排名。</p>`:NET.noWrite?`<p class="note">你目前只有檢視權限,能看排行但成績無法上榜。</p>`:NET.err?`<p class="note">${NET.err}</p>`:'';
+  const note=!ACC.cloud?`<p class="note">⚠ 尚未連線到伺服器:目前只會和電腦玩家比,連線後就能和其他真人一起排名。</p>`:NET.noWrite?`<p class="note">你目前只有檢視權限,能看排行但成績無法上榜。</p>`:NET.err?`<p class="note">${NET.err}</p>`:'';
   if(t==='ladder'&&!unlocked('ladder'))h+=`<div class="card"><h3>🔒 天梯</h3><p>${lockMsg('ladder')}。先看看排行榜,打冒險升級吧!</p></div>`;
   else if(t==='ladder'){const L=lad(),tr=tierOf(L.pts),pct=tr.hi?Math.round((L.pts-tr.lo)/(tr.hi-tr.lo)*100):100;
     if(!L.opp.length&&!NET.oppBusy){NET.oppBusy=1;refreshOpp().finally(()=>NET.oppBusy=0)}
@@ -3054,15 +3055,16 @@ addEventListener('pointerdown',au,{passive:true});
 setInterval(()=>{if(!B){townHud();if(sheetK&&['summon','farm','train','castle'].includes(sheetK)&&!document.activeElement.closest?.('#shBody'))renderSheet(1)}save()},5000);
 
 /* =============== title, intro, first egg, tutorial =============== */
-let titleOk=false;
+let titleOk=false;if(window.MOE_CFG&&$('tLegal'))$('tLegal').hidden=false;
 function titleReady(){if(titleOk)return;titleOk=true;$('tCodeBtn').hidden=true;$('tLogin').hidden=true;
-  if(window.MOE_AUTH&&!(ACC.auth&&ACC.auth.name)){if(!(ACC.auth&&ACC.auth.uid)){$('tStart').textContent='連線中,請稍候…';titleOk=false;return}$('tStart').hidden=true;$('tAuth').hidden=false;$('accInfo').hidden=true;taMode('reg');return}
+  if(window.MOE_AUTH&&!(ACC.auth&&ACC.auth.name)){if(!(ACC.auth&&(ACC.auth.uid||ACC.auth.out))){$('tStart').textContent='連線中,請稍候…';titleOk=false;return}$('tStart').hidden=true;$('tAuth').hidden=false;$('accInfo').hidden=true;taMode('reg');return}
   $('tStart').hidden=false;$('tAuth').hidden=true;$('tStart').disabled=false;$('tStart').textContent=SV.started?'繼續遊戲':'開始遊戲'}
 let TAM='reg';function taMode(m){TAM=m;document.querySelectorAll('#tAuth .tseg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));$('taP2').hidden=m!=='reg';$('taP').autocomplete=m==='reg'?'new-password':'current-password';$('taGo').textContent=m==='reg'?'建立帳號並開始':'登入';$('taU').placeholder=m==='reg'?'帳號(4–16 個英文小寫或數字)':'帳號';$('taP').placeholder=m==='reg'?'密碼(至少 6 個字)':'密碼';$('taTip').textContent=m==='reg'?'建立帳號後,換手機或清除瀏覽器資料都能用帳號密碼找回進度。':'登入後會載入這個帳號的進度。'}
 document.querySelectorAll('#tAuth .tseg button').forEach(b=>b.onclick=()=>{sfx('click');taMode(b.dataset.m)});
 $('taGo').onclick=()=>{const u=$('taU').value.trim().toLowerCase(),p=$('taP').value;
   if(TAM==='login'){if(!u||!p)return toast('請輸入帳號和密碼');return accDo(()=>MOE_AUTH.login(u,p),'登入成功,正在載入你的進度…',true)}
   if(!/^[a-z0-9_]{4,16}$/.test(u))return toast('帳號要 4–16 個英文小寫、數字或底線');if(p.length<6)return toast('密碼至少 6 個字');if(p!==$('taP2').value)return toast('兩次密碼不一樣');
+  if(ACC.auth&&ACC.auth.out)return accDo(()=>MOE_AUTH.register(u,p),'帳號建立成功!正在進入遊戲…',true);
   accDo(()=>MOE_AUTH.register(u,p),'帳號建立成功!').then(()=>{if(ACC.auth&&ACC.auth.name){$('tAuth').hidden=true;$('tStart').hidden=false;$('tStart').disabled=false;$('tStart').textContent=SV.started?'繼續遊戲':'開始遊戲';$('tStart').click()}})};
 ['taP','taP2'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter')$('taGo').click()}));
 $('tStart').onclick=()=>{au();sfx('click');$('title').hidden=true;if(SV.started)enterGame();else startIntro()};
@@ -3142,12 +3144,13 @@ function ftCard(){const L=FTL.filter(x=>x.f&&unlocked(x.f));return L.length?`<di
 function accCard(){if(!window.MOE_AUTH)return window.MOE_CFG?`<div class="card"><h3>🔐 遊戲帳號</h3><p class="mut">雲端模組沒有載入成功(${window.supabase?'設定錯誤':'網路元件下載失敗'}),請重新整理頁面再試一次。</p></div>`:'';const A=ACC.auth||{};if(!A.uid)return `<div class="card"><h3>🔐 遊戲帳號</h3><p class="mut">連線中或無法連線到伺服器,請稍後再開啟這頁。</p></div>`;
   if(A.name)return `<div class="card"><h3>🔐 遊戲帳號</h3><p>已登入帳號 <b>${esc(A.name)}</b>,進度會自動存到雲端;在其他手機或電腦用同一組帳號密碼登入,就能接著玩。</p>
     <details class="accd"><summary>修改密碼</summary><div class="accf"><input id="accP" type="password" placeholder="新密碼(至少 6 個字)" autocomplete="new-password"><input id="accP2" type="password" placeholder="再輸入一次新密碼" autocomplete="new-password"><button class="go" data-act="accPw">確定修改</button></div></details>
-    <button data-act="accOut" style="color:#c03030">登出</button><p class="mut">登出後這台裝置會變回新的遊客,重新登入帳號就能找回進度。</p></div>`;
+    <button data-act="accOut" style="color:#c03030">登出</button><p class="mut">登出後需要重新登入才能繼續遊玩,進度都保存在帳號裡。</p></div>`;
   return `<div class="card hero"><div><h3>🔐 建立遊戲帳號 <small>強烈建議</small></h3><p>目前是<b>訪客帳號</b>:進度有存在雲端,但只認得這台裝置。清除瀏覽器資料或換手機就會找不到。建立帳號密碼後,任何裝置都能登入接著玩。</p>
     <div class="accf"><input id="accU" placeholder="帳號(4–16 個英文小寫、數字或底線)" autocomplete="username" autocapitalize="off" maxlength="16"><input id="accP" type="password" placeholder="密碼(至少 6 個字)" autocomplete="new-password"><input id="accP2" type="password" placeholder="再輸入一次密碼" autocomplete="new-password"><button class="go" data-act="accReg">建立帳號(保留目前進度)</button></div>
     <p class="mut">已經有帳號?<button class="blue" data-act="accGoLogin">登入其他帳號</button></p></div></div>`}
 function sndCard(){return `<div class="card"><h3>🔊 音效與音樂</h3><div class="sndrow"><b>音效</b><button class="${SND.on?'go':''}" data-act="snd">${SND.on?'開':'關'}</button><span class="sndv">${[25,50,75,100].map(v=>`<button class="mini ${Math.round(SND.sv*100)===v?'on':''}" data-act="vol:sv:${v}">${v}%</button>`).join('')}</span></div><div class="sndrow"><b>音樂</b><button class="${SND.mu?'go':''}" data-act="mus">${SND.mu?'開':'關'}</button><span class="sndv">${[25,50,75,100].map(v=>`<button class="mini ${Math.round(SND.mv*100)===v?'on':''}" data-act="vol:mv:${v}">${v}%</button>`).join('')}</span></div></div>`}
-function pSet(){return sndCard()+accCard()+((NET.notice||[]).length?`<div class="card"><h3>📢 公告</h3><div class="list">${NET.notice.map(n=>`<div class="li"><div><b>${esc(n.title)}</b><small>${new Date(n.created).toLocaleDateString('zh-TW')}</small></div><button class="mini" data-act="ntc:${n.id}">查看</button></div>`).join('')}</div></div>`:'')+a2hsCard()+(window.MOE_SB&&SRV.on()?redeemCard()+ticketCard():'')+`${ftCard()}<div class="card"><h3>守護員</h3><p>守護員名稱:<b>${SV.name||'-'}</b> <button data-act="rename">改名</button></p></div>
+function legalCard(){if(!window.MOE_CFG)return '';const L=[['terms','📜 服務條款'],['privacy','🔒 隱私權政策'],['refund','💰 退款政策'],['contact','✉️ 聯絡我們']];return `<div class="card"><h3>📄 條款與客服</h3><div class="lglist">${L.map(([h,n])=>`<a href="legal.html#${h}" target="_blank" rel="noopener">${n}</a>`).join('')}</div><p class="mut" style="margin-top:8px">遊戲分級:普遍級 · 營運者:蔡承燁</p></div>`}
+function pSet(){return sndCard()+accCard()+legalCard()+((NET.notice||[]).length?`<div class="card"><h3>📢 公告</h3><div class="list">${NET.notice.map(n=>`<div class="li"><div><b>${esc(n.title)}</b><small>${new Date(n.created).toLocaleDateString('zh-TW')}</small></div><button class="mini" data-act="ntc:${n.id}">查看</button></div>`).join('')}</div></div>`:'')+a2hsCard()+(window.MOE_SB&&SRV.on()?redeemCard()+ticketCard():'')+`${ftCard()}<div class="card"><h3>守護員</h3><p>守護員名稱:<b>${SV.name||'-'}</b> <button data-act="rename">改名</button></p></div>
   <div class="card"><h3>其他</h3><div class="row"><button data-act="replay">重看開場</button></div></div>
   <div class="card"><h3>刪除帳號</h3><p class="mut">${window.MOE_SB?'刪除後這個帳號的所有進度、鑽石、天梯紀錄和交易所上架的裝備都會永久消失,無法復原。':'刪除後所有進度都會清除,無法復原。'}</p>${window.MOE_SB?(ACC.auth&&ACC.auth.name?`<input id="delPw" type="password" placeholder="輸入密碼確認刪除" autocomplete="current-password">`:`<input id="delPw" placeholder="訪客帳號請輸入「刪除」兩個字確認" autocomplete="off">`):''}<button class="red" data-act="reset">${resetArm?'⚠ 確定要刪除?再按一次':'刪除帳號'}</button></div>`}
 let resetArm=0;
