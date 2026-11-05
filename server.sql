@@ -1990,3 +1990,6 @@ begin
   insert into inbox(uid, gem, note, credit, kind, title) values (u, 1000, '內測大禮包第 ' || (n + 2) || ' 天:💎1,000!謝謝你持續幫忙測試。', true, case when n = 0 then 'beta2' else 'beta3' end, '🎁 內測大禮包(第 ' || (n + 2) || ' 天)');
 end $$;
 revoke execute on function public.moe_beta_gift(uuid) from public, anon, authenticated;
+
+-- 全服重置編號:玩家的遊戲要讀得到
+drop policy if exists settings_read on public.settings; create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint','wipe'));
