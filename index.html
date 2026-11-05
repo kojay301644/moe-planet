@@ -3237,7 +3237,7 @@ function tdBotCands(){const ow=owned().sort((a,b)=>power(b)-power(a)).slice(0,3)
 function tdBotInit(c){const T=TD,R=TDR[1],cov=[];T.slots.forEach(([x,y],i)=>{if(TDSIDE2[i]!=='B')return;let n=0,far=0;for(let j=0;j<R.P.length;j++){const [px,py]=R.P[j],d=Math.hypot(px-x,(py-y)*1.3);if(d<205)n++;far=Math.min(far||999,d)}cov.push({i,n,near:far})});cov.sort((a,b)=>b.n-a.n);
   return {...c,order:cov,t:2,said:{},pu:-9,hlpT:-99,lw:0}}
 function tdBotTower(p,slot){const P=PETS[p.k],S=stat(p.k,p);return {k:p.k,slot,lv:1,spent:40+20*p.q,cd:.5,skT:P.sk.cd*.8,atk:S.atk,crit:S.crit||.05,rate:P.rate,el:P.el,far:P.range!=='melee',img:imgName(p.k,p.st,''),face:1,anim:rnd()*9,hit:0,stun:0,q:p.q,side:'B',bot:1}}
-function tdBotSay(t,c){const T=TD;tdTxt(430,150,'🤖 '+T.bot.n+':'+t,c||'#bfe8ff',2.6,true)}
+function tdBotSay(t,c){const T=TD;tdTxt(668,170,'🤖 '+T.bot.n+':'+t,c||'#bfe8ff',2.6,true)}
 function tdBotAI(dt){const T=TD,b=T.bot;if(!b||T.over)return;b.t-=dt;
   if(!b.said.hi&&T.t>1.2){b.said.hi=1;tdBotSay('我守左路,一起加油 💪')}
   if(T.boss&&!b.said['b'+T.wave]){b.said['b'+T.wave]=1;tdBotSay('頭目來了!大招一起放!','#ffd27a')}
@@ -3535,7 +3535,7 @@ function tdDraw(){const T=TD;tdLayout();const s=TDV.s,TO=T.S,SK=T.SK,sh=T.shake>
   TDBARS.forEach(f=>f());TDBARS=[];
   ctx.setTransform(dpr,0,0,dpr,0,0);drawSkinFx(SK);ctx.setTransform(dpr,0,0,dpr,dpr*(rnd()-.5)*sh,dpr*(rnd()-.5)*sh);
   if(T.ping){T.ping.t+=1/60;const pk=T.ping,a=Math.max(0,1-pk.t/3);if(a>0){ctx.save();ctx.globalAlpha=a;ctx.strokeStyle='#ff5a5a';ctx.lineWidth=4;const rr2=(30+20*Math.abs(Math.sin(pk.t*6)))*s;ctx.beginPath();ctx.ellipse(tdX(pk.x),tdY(pk.y),rr2*1.3,rr2*.8,0,0,7);ctx.stroke();ctx.restore()}else T.ping=null}
-  if(T.coop){const cpm=T.bot||T.net,nm=sd=>{if(!cpm)return sd==='A'?'右路玩家':'左路玩家';if(sd===T.side)return '你';const n=T.net?(T.net.lost&&T.bot?T.bot.n:T.net.peer):T.bot.n;n=n||'隊友';return n.length>4?n.slice(0,4)+'…':n};ctx.save();ctx.font=`900 ${Math.round(10*s+7)}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.55)';
+  if(T.coop){const cpm=T.bot||T.net,nm=sd=>{if(!cpm)return sd==='A'?'右路玩家':'左路玩家';if(sd===T.side)return '你';let n=T.net?(T.net.lost&&T.bot?T.bot.n:T.net.peer):T.bot.n;n=n||'隊友';return n.length>4?n.slice(0,4)+'…':n};ctx.save();ctx.font=`900 ${Math.round(10*s+7)}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.55)';
     T.slots.forEach(([x,y],i)=>{const sd=TDSIDE2[i];ctx.fillStyle=sd==='A'?'#ffb0b0':'#b0d8ff';const t2=nm(sd);ctx.strokeText(t2,tdX(x),tdY(y)+42*s);ctx.fillText(t2,tdX(x),tdY(y)+42*s)});ctx.restore()}
   // range of selected tower
   for(const s2 in T.tw){const w=T.tw[s2];if(w.rgT>0&&+s2!==T.sel){w.rgT-=1/60;const [x,y]=TD.slots[s2],R=tdRange(w);ctx.save();ctx.globalAlpha=Math.min(1,w.rgT);ctx.strokeStyle='#ffe066';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(tdX(x),tdY(y),R*s,R*s/1.3,0,0,7);ctx.stroke();ctx.restore()}}
@@ -3583,7 +3583,9 @@ function tdDraw(){const T=TD;tdLayout();const s=TDV.s,TO=T.S,SK=T.SK,sh=T.shake>
   // aim
   if(T.aim){ctx.save();ctx.strokeStyle='rgba(255,90,60,.9)';ctx.lineWidth=3;ctx.setLineDash([8,6]);ctx.beginPath();ctx.ellipse(T.aim.x,T.aim.y,80*s,62*s,0,0,7);ctx.stroke();ctx.restore()}
   // boss bar
-  if(T.boss&&T.boss.hp>0){const b=T.boss,tb=$('tdTop').getBoundingClientRect(),bw=Math.min(W*.8,460),bx=(W-bw)/2,by=Math.round((tb.height?tb.bottom:56)+8);ctx.fillStyle='rgba(30,10,30,.8)';tdRR(bx-4,by-4,bw+8,26,12);ctx.fill();ctx.fillStyle='#ff4a5a';tdRR(bx,by,Math.max(0,bw*b.hp/b.max),18,9);ctx.fill();ctx.fillStyle='#fff';ctx.font='900 13px sans-serif';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.strokeText('👹 '+b.E.n+'  '+fmt(b.hp),W/2,by+9);ctx.fillText('👹 '+b.E.n+'  '+fmt(b.hp),W/2,by+9)}
+  {const bl=T.coop?[0,1].map(r=>T.en.filter(e=>e.boss&&e.hp>0&&e.r===r).sort((p,q)=>q.d-p.d)[0]).filter(Boolean).map(e=>[e,e.r===0?'🔴 右路頭目 · ':'🔵 左路頭目 · ']):(T.boss&&T.boss.hp>0?[[T.boss,'👹 ']]:[]);
+    if(bl.length){const tb=$('tdTop').getBoundingClientRect(),bw=Math.min(W*.8,460),bx=(W-bw)/2;let by=Math.round((tb.height?tb.bottom:56)+8);
+      for(const [b,lb] of bl){ctx.fillStyle='rgba(30,10,30,.8)';tdRR(bx-4,by-4,bw+8,26,12);ctx.fill();ctx.fillStyle=T.coop&&b.r===1?'#4aa8ff':'#ff4a5a';tdRR(bx,by,Math.max(0,bw*b.hp/b.max),18,9);ctx.fill();ctx.fillStyle='#fff';ctx.font='900 13px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.6)';const tx3=lb+b.E.n+'  '+fmt(b.hp);ctx.strokeText(tx3,W/2,by+9);ctx.fillText(tx3,W/2,by+9);by+=32}}}
   // banners
   if(T.banner>0){const a=Math.min(1,T.banner,(8-T.banner)*3);ctx.globalAlpha=a;ctx.fillStyle='rgba(30,15,60,.8)';tdRR(W/2-180,H*.32,360,140,22);ctx.fill();ctx.fillStyle='#ffe066';ctx.font='900 30px sans-serif';ctx.fillText(`${TO.ic} ${SK.n}`,W/2,H*.32+32);ctx.fillStyle='#fff';ctx.font='700 14px sans-serif';
     ctx.fillText(tdBonTxt(),W/2,H*.32+62);if(!(SV.skins||['spring']).includes(TO.id)){ctx.fillStyle='#ffd0f0';ctx.font='700 12px sans-serif';ctx.fillText('商店可以購買這個城鎮樣式',W/2,H*.32+84)}ctx.fillStyle='#9affb0';ctx.font='800 15px sans-serif';ctx.fillText(tdRecTxt(),W/2,H*.32+108);ctx.fillStyle='rgba(255,255,255,.6)';ctx.font='600 11px sans-serif';ctx.fillText('點畫面關閉',W/2,H*.32+128);ctx.globalAlpha=1}
