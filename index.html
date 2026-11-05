@@ -979,7 +979,7 @@ function sfxSkill(k,st){if(!SND.ac||lim('sk'+k,200))return;const P=PETS[k];if(!P
   if(SIG[k])SIG[k](p*1.3)}
 function sfx(k){if(!SND.ac||lim(k,55))return;
   ({hit:()=>{noise(.07,.08,1800,0,{ft:'bandpass',q:1.5});tone(220+rnd()*60,110,.08,.07,'triangle')},crit:()=>{tone(1800,2400,.08,.06,'square',0,{lp:5000});noise(.15,.12,4000,0,{ft:'highpass',rv:1});tone(150,60,.15,.15,'sine')},
-    fire:()=>SFXEL.fire(1,.4),bubble:()=>SFXEL.bubble(1,0),zap:()=>SFXEL.zap(1,0),ice:()=>SFXEL.ice(1,0),leaf:()=>SFXEL.leaf(1,0),rock:()=>SFXEL.rock(1,.5),star:()=>SFXEL.star(1,0),
+    fire:()=>SFXEL.fire(1,.4),bubble:()=>SFXEL.bubble(1,0),zap:()=>SFXEL.zap(1,0),ice:()=>SFXEL.ice(1,0),leaf:()=>SFXEL.leaf(1,0),rock:()=>SFXEL.rock(1,.5),thunder:()=>{noise(.1,.3,7000,0,{ft:'highpass'});noise(1.6,.38,900,.05,{f2:70,rv:1});tone(70,28,1.4,.32,'sawtooth',.04,{lp:380});tone(42,24,1.6,.3,'sine',.08)},star:()=>SFXEL.star(1,0),
     die:()=>{tone(700,160,.22,.07,'triangle');noise(.15,.06,2500,.03,{ft:'bandpass',f2:600});tone(1400,2200,.06,.025,'sine',.12,{rv:1})},
     skill:()=>{tone(300,1400,.28,.06,'sawtooth',0,{lp:3000});chord([784,988,1175,1568],.35,.04,'triangle',.22,{arp:.04,rv:1})},
     boss:()=>{tone(110,55,.9,.22,'sawtooth',0,{vib:7,vd:12,lp:900});tone(82,40,1,.2,'sawtooth',.05,{vib:6,vd:8,lp:600});noise(.9,.25,600,0,{f2:120,rv:1});tone(45,30,.8,.3,'sine',.1)},
@@ -3315,7 +3315,7 @@ function tdTips(ttl){const T=TD,L=[],ow=owned(),mx=ow.reduce((a,k)=>SV.pets[k].l
   else L.push({ic:'⬆️',t:`把萌獸練強:主力萌獸只有 Lv${mx.lv},餵糖果升級、到進化之泉進化,攻擊會大幅提升`,go:'pets'});
   if(typeof shardRdy==='function'&&shardRdy())L.push({ic:'⭐',t:'有萌獸碎片夠升星了,升星攻擊更高',go:'bag:shard'});
   const tw=Object.keys(SV.twLv||{});if(!tw.length)L.push({ic:'🏰',t:'到主城蓋城牆砲塔,守塔時也能放上場幫忙',go:'castle:wall'});else if(tw.every(k=>towerLv(k)<3))L.push({ic:'🏰',t:'升級城牆砲塔,守塔時砲塔也會變強',go:'castle:wall'});
-  const lk=T.lk||{boss:0,fly:0,n:0};L.push({ic:'💡',t:lk.boss>=lk.n*.4&&lk.boss?'頭目會震暈附近的萌獸,分散擺放,把落石和守護留給頭目':lk.fly>=lk.n*.4&&lk.fly?'飛行怪只有遠程萌獸打得到,多放遠程萌獸':'先把主力萌獸升到 3 級:射程 +30%、攻擊 ×2'});
+  const lk=T.lk||{boss:0,fly:0,n:0};L.push({ic:'💡',t:lk.boss>=lk.n*.4&&lk.boss?'頭目會震暈附近的萌獸,分散擺放,把雷霆天罰和守護留給頭目':lk.fly>=lk.n*.4&&lk.fly?'飛行怪只有遠程萌獸打得到,多放遠程萌獸':'先把主力萌獸升到 3 級:射程 +30%、攻擊 ×2'});
   const tip=L.pop(),pick=[...L.slice(0,2),tip];
   return `<div class="tdtips"><b>${ttl||'💪 變強建議'}</b>${pick.map(x=>`<div class="tdtipr"><span>${x.ic} ${x.t}</span>${x.go?`<button class="mini go" data-tgo="${x.go}">前往</button>`:''}</div>`).join('')}</div>`}
 // ---- towers / enemies
@@ -3526,7 +3526,7 @@ function tdDrawEnemy(e,x,y){const s=TDV.s,im=img(e.E.img);if(!im||!im.naturalWid
   if(e.stun>0){ctx.font=`${Math.round(14*s+6)}px sans-serif`;ctx.fillText('💫',X,Y-h-fly-2)}
   if(!e.boss&&e.hp<e.max){const bw=w*.7;ctx.fillStyle='rgba(30,10,30,.7)';ctx.fillRect(X-bw/2,Y-h-fly-6*s,bw,5*s+1);ctx.fillStyle=e.elite?'#ffb03a':'#ff5a5a';ctx.fillRect(X-bw/2,Y-h-fly-6*s,bw*e.hp/e.max,5*s+1)}}
 // ---- HUD (DOM)
-function tdHudBuild(){const T=TD;if(!T)return;const cm=CMDS.filter(c=>c.k!=='hold');
+function tdHudBuild(){const T=TD;if(!T)return;const cm=CMDS.filter(c=>c.k!=='hold').map(c=>c.k==='rock'?{...c,n:'雷霆',ic:'🌩️'}:c);
   $('tdTop').innerHTML=`<button class="tdb" data-td="pause">${T.paused?'▶':'❚❚'}</button><button class="tdb" data-td="spd">×${T.speed}</button>
     <div class="tdst"><b id="tdWave"></b><small>${T.mode==='endless'?'無盡模式':T.mode==='practice'?'練習 · '+TDDIFF[T.diff].n:TDDIFF[T.diff].n}</small></div>
     <div class="tdst hp"><b id="tdHp"></b><small>城門</small></div><div class="tdst en"><b id="tdEn"></b><small>✦ ${T.coop?(T.side==='A'?'右路':'左路'):'能量'}</small></div>${T.coop&&!T.bot?`<button class="tdb" data-td="swap">🎮${T.side==='A'?'右':'左'}</button>`:''}<button class="tdb go2" data-td="next" id="tdNext">出怪</button>`;
@@ -3535,14 +3535,18 @@ function tdHudBuild(){const T=TD;if(!T)return;const cm=CMDS.filter(c=>c.k!=='hol
 function tdHudTick(){const T=TD;if(!T)return;const inf=$('tdInfo');if(inf&&!inf.hidden&&(!T._it||T.t-T._it>.5||T._iw!==T.wave)){T._it=T.t;T._iw=T.wave;inf.innerHTML=tdInfoHtml();iconize(inf)}const w=$('tdWave');if(!w)return;w.textContent=T.prep>0?`準備 ${Math.ceil(T.prep)}`:T.mode==='endless'?`第 ${T.wave} 波`:`${T.wave} / ${TDW}`;$('tdHp').textContent=`${T.hp}/${T.hpMax}`;$('tdEn').textContent=Math.floor(T.energy);
   const nx=$('tdNext');nx.hidden=!(T.prep>0||(!T.spawn.length&&T.wave<(T.mode==='endless'?1e9:TDW)));nx.textContent=T.prep>0?'開始':'下一波';
   for(const c of CMDS){const b=$('tdc_'+c.k);if(!b)continue;const cd=T.cmd[T.coop?c.k+T.side:c.k]||0;b.classList.toggle('cd',cd>0);b.querySelector('.cdm').textContent=cd>1e6?'已用':cd>0?Math.ceil(cd):'';b.classList.toggle('aim',T.aim&&c.k==='rock')}}
-const TDCMD={guard:{cd:1e9,f:()=>{TD.shield=15;tdTxt(668,60,'🛡 城門護盾 15 秒:撞到的怪物彈回起點','#9adfff',1.6)}},heal:{cd:1e9,f:()=>{const g=Math.min(6,TD.hpMax-TD.hp);TD.hp+=g;tdTxt(668,60,'💚 城門 +'+g,'#7aff9a',1.4)}},rock:{cd:1e9,aim:1}};
+const TDCMD={guard:{cd:1e9,f:()=>{TD.shield=15;tdTxt(668,60,'🛡 城門護盾 15 秒:撞到的怪物彈回起點','#9adfff',1.6)}},heal:{cd:1e9,f:()=>{const g=Math.min(6,TD.hpMax-TD.hp);TD.hp+=g;tdTxt(668,60,'💚 城門 +'+g,'#7aff9a',1.4)}},rock:{cd:1e9,f:()=>tdThunder()}};
+function tdThunder(){const T=TD,best=Math.max(...Object.values(T.tw).map(w=>tdAtk(w)),(SV.castle||1)*120);T.flash={t:0,life:1,a:.6,c:'12,12,40'};T.shake=.4;sfx('thunder');tdTxt(668,60,'🌩️ 雷霆天罰!','#fff27a',1.8,true);
+  tdLater(.35,()=>{if(!TD)return;let prev=null,n=0;for(const e of T.en){if(e.hp<=0)continue;const [x,y]=tdPos(e.d,e.r),ty=y-30-(e.fly?30:0);T.parts.push({bolt:1,x:x+(rnd()-.5)*90,y:-160,x2:x,y2:ty,t:0,life:.45,w:6,seed:rnd()*99});if(prev&&n<40)T.parts.push({bolt:1,x:prev[0],y:prev[1],x2:x,y2:ty,t:0,life:.35,w:2.5,seed:rnd()*99});prev=[x,ty];n++;tdImpact('elec',x,ty,1);
+    const pct=e.max*(e.boss?.05:.15)*(100+(e.E.def||0)*3)/100/Math.max(.5,elemMul('elec',e.E.el));tdDmg(e,best*5+pct,'elec',null);e.stun=Math.max(e.stun||0,e.boss?1:2)}
+    T.flash={t:0,life:.55,a:.85,c:'255,255,235'};T.shake=1;sfx('zap')})}
 function tdAct(a){const T=TD;if(!T||T.over)return;sfx('click');const [k,arg]=a.split(':');
   if(k==='swap')return tdSwap();if(k==='sup')return tdSupport();if(k==='help')return tdPingHelp();
   if(k==='pause'){T.paused=!T.paused;tdHudBuild()}else if(k==='spd'){T.speed=T.speed===1?2:1;tdHudBuild()}
   else if(k==='next'){if(T.prep>0){T.prep=0;tdNextWave()}else if(!T.spawn.length){const b=8+T.wave;T.energy+=b;tdTxt(1100,560,'提前出怪 ⚡+'+b,'#ffe066',1.2);tdNextWave()}}
   else if(k==='quit'){if(T.quitAsk&&Date.now()-T.quitAsk<2500){tdEnd(false)}else{T.quitAsk=Date.now();toast(T.mode==='endless'?'再按一次「撤退」結束,獎勵照已撐過的波數計算':'再按一次「撤退」結束這場')}}
   else if(k==='cmd'){const C=CMDS.find(c=>c.k===arg),D=TDCMD[arg];if(!C||!D)return;if((SV.castle||1)<C.lv)return toast(`主城 Lv.${C.lv} 解鎖「${C.n}」`);const ck=T.coop?arg+T.side:arg;if((T.cmd[ck]||0)>0)return toast('這一場已經用過了');
-    if(D.aim){T.aim=T.aim?null:{x:W/2,y:H/2};if(T.aim)toast('點地圖選擇落石位置');tdHudTick();return}T.cmd[ck]=D.cd;D.f();sfx('skill')}}
+    T.cmd[ck]=D.cd;D.f();sfx('skill')}}
 function tdTap(px,py){const T=TD;if(!T||T.over)return;if(T.banner>.4){T.banner=.35;return}const mx=(px-TDV.ox)/TDV.s,my=(py-TDV.oy)/TDV.sy;
   if(T.aim){T.aim=null;T.cmd[T.coop?'rock'+T.side:'rock']=TDCMD.rock.cd;const best=Math.max(...Object.values(T.tw).map(w=>tdAtk(w)),SV.castle*120);let n=0;for(const e of T.en){const [x,y]=tdPos(e.d,e.r);if(Math.hypot(x-mx,(y-my)*1.3)<95){tdDmg(e,best*7,'rock',null);e.stun=Math.max(e.stun,e.boss?.8:2);n++}}
     T.parts.push({ring:1,x:mx,y:my,r:95,t:0,life:.6,c:'#c8a070'});tdPart(mx,my,30,['#a07850','#d8b890','#fff'],260,.8,7);T.shake=.6;sfx('rock');tdHudTick();return}
@@ -3589,7 +3593,7 @@ function pTD(){const t=tdSV(),n=tdTix();tdFetch();
     <li>每場隨機一種商店的城鎮樣式(春日、秋楓、黃昏、雪國、櫻花祭、星夜、糖果王國),每種樣式對應一個屬性:同屬性萌獸攻擊 +25%,怪物多為剋制它的屬性;糖果王國是彩虹場,所有萌獸 +12%、怪物屬性隨機。</li>
     <li>點路邊的石台放萌獸,同一隻萌獸可以重複放在不同石台,只要能量夠就能放滿;萌獸等級、星數、品質、裝備越好,守得越穩。</li><li>主城蓋好的城牆砲塔也能放(一樣可以重複),強度依你的砲塔等級和主城等級。</li><li>困難要擁有一隻 Lv20 以上的萌獸、地獄要 Lv30 以上,並且通關前一個難度。</li>
     <li>擊倒怪物得「✦能量」,用來放萌獸、場內升級(最高 3 級)或收回萌獸(退一半)。</li>
-    <li>屬性招式:🔥範圍爆炸、💧擊退、🌿中毒、⚡連鎖閃電、❄️減速、🪨暈眩;近戰萌獸傷害 +30%,但打不到飛行怪。</li><li>守護、治癒雨、落石每場各能用 1 次,留到關鍵時刻再用!</li>
+    <li>屬性招式:🔥範圍爆炸、💧擊退、🌿中毒、⚡連鎖閃電、❄️減速、🪨暈眩;近戰萌獸傷害 +30%,但打不到飛行怪。</li><li>守護、治癒雨、雷霆天罰每場各能用 1 次,留到關鍵時刻再用!</li>
     <li>怪物闖進城門扣耐久,${TDHP} 點扣光就失敗;撐過 ${TDW} 波(第 10、20 波有頭目)就勝利,城門完全沒被打到(${TDHP}/${TDHP})= 3 星、剩 ${TDHP/2} 以上 = 2 星、守住 = 1 星。</li>
     <li>每天 ${3} 張守塔券。打贏有星星幣、進化石、糖果,上場的萌獸都能拿碎片和品質精華;每個難度每天第一次勝利再送鑽石,困難、地獄還會掉裝備。</li><li>無盡模式每撐過 1 波,上場萌獸各 +300 經驗、💎1;每週排行前 50 名有鑽石獎勵(寄到信箱)。</li>
     <li>練習模式不耗券、沒有獎勵,可以自己練功。</li></ol></details></div>
