@@ -1554,3 +1554,341 @@ create or replace function public.market_buy(p_id bigint) returns jsonb language
 begin raise exception '交易所已關閉'; end $$;
 create or replace function public.market_tick(u uuid) returns void language plpgsql security definer set search_path = public as $$
 begin return; end $$;
+
+-- ============ 公會系統(第一階段) ============
+create table if not exists public.guilds(id bigserial primary key, name text not null, emb text not null default 'fox', intro text not null default '', notice text not null default '',
+  mode text not null default 'open' check (mode in ('open','apply')), minlv int not null default 15, owner uuid, lv int not null default 1, exp bigint not null default 0, created timestamptz not null default now());
+create unique index if not exists guilds_name_uq on public.guilds(lower(name));
+create table if not exists public.guild_mem(uid uuid primary key references auth.users(id) on delete cascade, gid bigint not null references public.guilds(id) on delete cascade,
+  role text not null default 'member' check (role in ('leader','vice','member')), joined timestamptz not null default now(), contrib bigint not null default 0, wk int not null default 0, wk_contrib bigint not null default 0,
+  gc int not null default 0, don_d date, don jsonb not null default '[]'::jsonb, shop_d date, shop jsonb not null default '{}'::jsonb, chat_t timestamptz);
+create index if not exists guild_mem_gid on public.guild_mem(gid);
+create table if not exists public.guild_req(gid bigint not null references public.guilds(id) on delete cascade, uid uuid not null references auth.users(id) on delete cascade, at timestamptz not null default now(), primary key(gid, uid));
+create table if not exists public.guild_quit(uid uuid primary key, at timestamptz not null default now());
+create table if not exists public.guild_log(id bigserial primary key, gid bigint not null references public.guilds(id) on delete cascade, txt text not null, at timestamptz not null default now());
+create index if not exists guild_log_gid on public.guild_log(gid, id);
+create table if not exists public.guild_chat(id bigserial primary key, gid bigint not null references public.guilds(id) on delete cascade, uid uuid not null, x text not null, t bigint not null, at timestamptz not null default now());
+create index if not exists guild_chat_gid on public.guild_chat(gid, id);
+alter table public.guilds enable row level security; alter table public.guild_mem enable row level security; alter table public.guild_req enable row level security;
+alter table public.guild_quit enable row level security; alter table public.guild_log enable row level security; alter table public.guild_chat enable row level security;
+
+-- 等級:升到 lv 需要的累積經驗、人數上限、商店
+create or replace function public.moe_gneed(lv int) returns bigint language sql immutable as $$
+  select (array[0,3000,9000,20000,40000,70000,110000,160000,230000,320000])[greatest(1, least(lv, 10))]::bigint $$;
+create or replace function public.moe_gcap(lv int) returns int language sql immutable as $$
+  select (array[20,22,24,26,28,30,32,34,37,40])[greatest(1, least(lv, 10))] $$;
+create or replace function public.moe_gshop() returns jsonb language sql immutable as $$ select '{
+  "coin":   {"n":"星星幣 ×30,000","gc":30,"lim":3,"lv":1,"b":{"coin":30000}},
+  "candy":  {"n":"經驗糖果 ×50","gc":40,"lim":3,"lv":1,"b":{"candy":50}},
+  "stones": {"n":"進化石 ×5","gc":60,"lim":3,"lv":1,"b":{"stones":5}},
+  "ore":    {"n":"鍛造礦石 ×10","gc":50,"lim":2,"lv":2,"b":{"ore":10}},
+  "enh":    {"n":"強化石 ×5","gc":60,"lim":2,"lv":3,"b":{"enh":5}},
+  "reroll": {"n":"洗練石 ×3","gc":80,"lim":1,"lv":4,"b":{"reroll":3}},
+  "rtix":   {"n":"稀有召喚券 ×1","gc":150,"lim":1,"lv":6,"b":{"rtix":1}}}'::jsonb $$;
+create or replace function public.moe_gdon() returns jsonb language sql immutable as $$ select '[
+  {"n":"小額捐獻","coin":20000,"gem":0,"exp":20,"gc":20},
+  {"n":"大額捐獻","coin":100000,"gem":0,"exp":80,"gc":80},
+  {"n":"豪華捐獻","coin":0,"gem":50,"exp":150,"gc":150}]'::jsonb $$;
+create or replace function public.moe_pname(u uuid) returns text language sql stable security definer set search_path = public as $$
+  select coalesce(nullif(d.data->>'n',''), '萌獸守護員') from (select 1) x left join docs d on d.path = 'arena/' || u::text $$;
+create or replace function public.moe_glog(g bigint, t text) returns void language sql security definer set search_path = public as $$
+  insert into guild_log(gid, txt) values (g, left(t, 120)) $$;
+-- 會長不在了(刪帳號)或 14 天沒上線:交給最活躍的副會長/成員;沒人了就解散
+create or replace function public.moe_gfix(g bigint) returns void language plpgsql security definer set search_path = public as $$
+declare L uuid; n uuid; lseen timestamptz;
+begin
+  if not exists (select 1 from guild_mem where gid = g) then delete from guilds where id = g; return; end if;
+  select uid into L from guild_mem where gid = g and role = 'leader' limit 1;
+  if L is not null then
+    select coalesce(s.seen, s.at) into lseen from sessions s where s.uid = L;
+    if lseen is null or lseen > now() - interval '14 days' then update guilds set owner = L where id = g and owner is distinct from L; return; end if;
+  end if;
+  select m.uid into n from guild_mem m left join sessions s on s.uid = m.uid where m.gid = g and m.uid is distinct from L and coalesce(s.seen, s.at, m.joined) > now() - interval '3 days'
+    order by (m.role = 'vice') desc, m.contrib desc, m.joined limit 1;
+  if n is null and L is null then select uid into n from guild_mem where gid = g order by (role = 'vice') desc, contrib desc, joined limit 1; end if;
+  if n is null then return; end if;
+  update guild_mem set role = 'vice' where uid = L; update guild_mem set role = 'leader' where uid = n; update guilds set owner = n where id = g;
+  perform moe_glog(g, moe_pname(n) || ' 接任會長(原會長太久沒上線)');
+end $$;
+-- 公會資訊(我在公會裡)/ 沒加入時回傳冷卻與申請中的公會
+create or replace function public.guild_me() returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem; g guilds; w int := moe_week(); r jsonb;
+begin
+  select * into m from guild_mem where uid = u;
+  if m.uid is null then
+    return jsonb_build_object('g', null, 'cd', (select greatest(0, extract(epoch from (at + interval '24 hours' - now())))::int from guild_quit where uid = u),
+      'reqs', (select coalesce(jsonb_agg(gid), '[]'::jsonb) from guild_req where uid = u));
+  end if;
+  perform moe_gfix(m.gid);
+  select * into m from guild_mem where uid = u; if m.uid is null then return guild_me(); end if;
+  select * into g from guilds where id = m.gid;
+  if m.wk <> w then update guild_mem set wk = w, wk_contrib = 0 where uid = u; m.wk_contrib := 0; end if;
+  r := jsonb_build_object('g', jsonb_build_object('id', g.id, 'name', g.name, 'emb', g.emb, 'intro', g.intro, 'notice', g.notice, 'mode', g.mode, 'minlv', g.minlv, 'lv', g.lv, 'exp', g.exp,
+      'need', case when g.lv >= 10 then null else moe_gneed(g.lv + 1) end, 'base', moe_gneed(g.lv), 'cap', moe_gcap(g.lv), 'n', (select count(*) from guild_mem where gid = g.id), 'created', g.created),
+    'me', jsonb_build_object('role', m.role, 'gc', m.gc, 'contrib', m.contrib, 'wk_contrib', m.wk_contrib, 'don', case when m.don_d = moe_today() then m.don else '[]'::jsonb end,
+      'shop', case when m.shop_d = moe_today() then m.shop else '{}'::jsonb end, 'joined', m.joined),
+    'mem', (select coalesce(jsonb_agg(jsonb_build_object('uid', x.uid, 'role', x.role, 'contrib', x.contrib, 'wk', case when x.wk = w then x.wk_contrib else 0 end, 'n', coalesce(nullif(d.data->>'n',''),'萌獸守護員'),
+        'av', d.data->>'av', 'gl', (d.data->>'gl')::int, 'pw', (d.data->>'pw')::int, 'seen', coalesce(s.seen, s.at)) order by case x.role when 'leader' then 0 when 'vice' then 1 else 2 end, x.contrib desc), '[]'::jsonb)
+      from guild_mem x left join docs d on d.path = 'arena/' || x.uid::text left join sessions s on s.uid = x.uid where x.gid = g.id),
+    'log', (select coalesce(jsonb_agg(jsonb_build_object('t', txt, 'at', at) order by id desc), '[]'::jsonb) from (select * from guild_log where gid = g.id order by id desc limit 20) l),
+    'don', moe_gdon(), 'shop', moe_gshop());
+  if m.role in ('leader','vice') then
+    r := r || jsonb_build_object('reqs', (select coalesce(jsonb_agg(jsonb_build_object('uid', q.uid, 'at', q.at, 'n', coalesce(nullif(d.data->>'n',''),'萌獸守護員'), 'av', d.data->>'av', 'gl', (d.data->>'gl')::int, 'pw', (d.data->>'pw')::int) order by q.at), '[]'::jsonb)
+      from guild_req q left join docs d on d.path = 'arena/' || q.uid::text where q.gid = g.id));
+  end if;
+  return r;
+end $$;
+-- 公會列表 / 搜尋
+create or replace function public.guild_list(p_q text default '') returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid();
+begin
+  return (select coalesce(jsonb_agg(x order by x.full, x.lv desc, x.act desc), '[]'::jsonb) from (
+    select g.id, g.name, g.emb, g.intro, g.mode, g.minlv, g.lv, moe_gcap(g.lv) cap, c.n, (c.n >= moe_gcap(g.lv)) full, c.act, moe_pname(g.owner) leader,
+      exists (select 1 from guild_req q where q.gid = g.id and q.uid = u) applied
+    from guilds g join lateral (select count(*) n, count(*) filter (where coalesce(s.seen, s.at) > now() - interval '3 days') act from guild_mem m left join sessions s on s.uid = m.uid where m.gid = g.id) c on true
+    where coalesce(trim(p_q),'') = '' or g.name ilike '%' || trim(p_q) || '%' or g.id::text = trim(p_q)
+    order by (c.n >= moe_gcap(g.lv)), g.lv desc, c.act desc limit 30) x);
+end $$;
+create or replace function public.moe_gname_ok(p text) returns text language plpgsql immutable as $$
+declare n text := regexp_replace(trim(coalesce(p,'')), '\s+', ' ', 'g');
+begin
+  if char_length(n) < 2 or char_length(n) > 10 then raise exception '公會名稱要 2~10 個字'; end if;
+  if n ~* '(https?:|www\.|\.com|\.tw|line\.me|@)' then raise exception '公會名稱不能有網址'; end if;
+  return n; end $$;
+create or replace function public.moe_gtext_ok(p text, mx int) returns text language plpgsql immutable as $$
+declare n text := left(trim(coalesce(p,'')), mx);
+begin if n ~* '(https?:|www\.|line\.me)' then raise exception '不能貼網址'; end if; return n; end $$;
+create or replace function public.moe_gcd(u uuid) returns void language plpgsql stable security definer set search_path = public as $$
+begin
+  if exists (select 1 from guild_mem where uid = u) then raise exception '你已經在公會裡了'; end if;
+  if exists (select 1 from guild_quit where uid = u and at > now() - interval '24 hours') then raise exception '退出公會後 24 小時內不能加入新公會'; end if;
+end $$;
+-- 建立公會:花 50 萬星星幣(伺服器帳本扣款)
+create or replace function public.guild_create(p_name text, p_emb text, p_intro text, p_mode text, p_lv int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); n text := moe_gname_ok(p_name); w wallet; gid bigint; cost int := 500000;
+begin
+  perform moe_gcd(u);
+  if coalesce(p_lv, 0) < 15 then raise exception '守護員 Lv.15 才能建立公會'; end if;
+  if exists (select 1 from guilds where lower(name) = lower(n)) then raise exception '這個公會名稱已經有人用了'; end if;
+  select * into w from wallet where uid = u for update;
+  if w.uid is null then raise exception '還沒連上伺服器,請重新整理'; end if;
+  if not w.r_on then perform moe_res_from_save(u); select * into w from wallet where uid = u for update; end if;
+  if w.r_coin < cost then raise exception '星星幣不足(需要 500,000)'; end if;
+  update wallet set r_coin = r_coin - cost, updated_at = now() where uid = u;
+  insert into guilds(name, emb, intro, mode, owner) values (n, coalesce(nullif(left(p_emb,20),''),'fox'), moe_gtext_ok(p_intro, 80), case when p_mode = 'apply' then 'apply' else 'open' end, u) returning id into gid;
+  insert into guild_mem(uid, gid, role, wk) values (u, gid, 'leader', moe_week());
+  delete from guild_req where uid = u;
+  perform moe_glog(gid, moe_pname(u) || ' 建立了公會');
+  return guild_me() || jsonb_build_object('res', (select moe_res_json(x) from wallet x where uid = u));
+end $$;
+-- 加入(自由加入)或送出申請(需要審核)
+create or replace function public.guild_join(p_gid bigint, p_lv int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); g guilds; c int;
+begin
+  perform moe_gcd(u);
+  select * into g from guilds where id = p_gid for update; if g.id is null then raise exception '找不到這個公會'; end if;
+  if coalesce(p_lv, 0) < greatest(15, g.minlv) then raise exception '這個公會要守護員 Lv.% 以上才能加入', greatest(15, g.minlv); end if;
+  select count(*) into c from guild_mem where gid = g.id;
+  if c >= moe_gcap(g.lv) then raise exception '這個公會人數已滿'; end if;
+  if g.mode = 'apply' then
+    if (select count(*) from guild_req where uid = u) >= 5 then raise exception '最多同時申請 5 個公會'; end if;
+    insert into guild_req(gid, uid) values (g.id, u) on conflict do nothing;
+    return guild_me() || jsonb_build_object('applied', true);
+  end if;
+  insert into guild_mem(uid, gid, wk) values (u, g.id, moe_week()); delete from guild_req where uid = u;
+  perform moe_glog(g.id, moe_pname(u) || ' 加入了公會');
+  return guild_me();
+end $$;
+create or replace function public.guild_unapply(p_gid bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+begin delete from guild_req where uid = moe_uid() and gid = p_gid; return guild_me(); end $$;
+create or replace function public.moe_grole(u uuid) returns guild_mem language plpgsql stable security definer set search_path = public as $$
+declare m guild_mem; begin select * into m from guild_mem where uid = u; if m.uid is null then raise exception '你不在公會裡'; end if; return m; end $$;
+-- 審核申請
+create or replace function public.guild_review(p_uid uuid, p_ok boolean) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem := moe_grole(u); g guilds;
+begin
+  if m.role not in ('leader','vice') then raise exception '只有會長、副會長可以審核'; end if;
+  if not exists (select 1 from guild_req where gid = m.gid and uid = p_uid) then raise exception '這個申請已經不在了'; end if;
+  delete from guild_req where gid = m.gid and uid = p_uid;
+  if p_ok then
+    select * into g from guilds where id = m.gid for update;
+    if exists (select 1 from guild_mem where uid = p_uid) then raise exception '對方已經加入別的公會了'; end if;
+    if (select count(*) from guild_mem where gid = g.id) >= moe_gcap(g.lv) then raise exception '公會人數已滿'; end if;
+    insert into guild_mem(uid, gid, wk) values (p_uid, g.id, moe_week()); delete from guild_req where uid = p_uid;
+    perform moe_glog(g.id, moe_pname(p_uid) || ' 加入了公會(' || moe_pname(u) || ' 核准)');
+  end if;
+  return guild_me();
+end $$;
+-- 退出:會長要先轉讓;只剩自己就解散
+create or replace function public.guild_leave() returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem := moe_grole(u); c int;
+begin
+  select count(*) into c from guild_mem where gid = m.gid;
+  if m.role = 'leader' and c > 1 then raise exception '會長要先把會長轉讓給別人才能退出'; end if;
+  delete from guild_mem where uid = u;
+  insert into guild_quit(uid, at) values (u, now()) on conflict (uid) do update set at = now();
+  if c <= 1 then delete from guilds where id = m.gid; else perform moe_glog(m.gid, moe_pname(u) || ' 退出了公會'); end if;
+  return guild_me();
+end $$;
+create or replace function public.guild_kick(p_uid uuid) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem := moe_grole(u); t guild_mem;
+begin
+  select * into t from guild_mem where uid = p_uid and gid = m.gid; if t.uid is null then raise exception '對方不在公會裡'; end if;
+  if p_uid = u then raise exception '不能踢自己'; end if;
+  if not (m.role = 'leader' or (m.role = 'vice' and t.role = 'member')) then raise exception '你沒有權限踢這位成員'; end if;
+  delete from guild_mem where uid = p_uid;
+  perform moe_glog(m.gid, moe_pname(p_uid) || ' 被 ' || moe_pname(u) || ' 請出公會');
+  return guild_me();
+end $$;
+-- 職位:vice / member;leader = 轉讓會長(自己變副會長)
+create or replace function public.guild_role(p_uid uuid, p_role text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem := moe_grole(u); t guild_mem;
+begin
+  if m.role <> 'leader' then raise exception '只有會長可以調整職位'; end if;
+  select * into t from guild_mem where uid = p_uid and gid = m.gid; if t.uid is null or p_uid = u then raise exception '對方不在公會裡'; end if;
+  if p_role = 'leader' then
+    update guild_mem set role = 'vice' where uid = u; update guild_mem set role = 'leader' where uid = p_uid; update guilds set owner = p_uid where id = m.gid;
+    perform moe_glog(m.gid, moe_pname(u) || ' 把會長轉讓給 ' || moe_pname(p_uid));
+  elsif p_role = 'vice' then
+    if (select count(*) from guild_mem where gid = m.gid and role = 'vice') >= 2 then raise exception '副會長最多 2 位'; end if;
+    update guild_mem set role = 'vice' where uid = p_uid; perform moe_glog(m.gid, moe_pname(p_uid) || ' 升為副會長');
+  else update guild_mem set role = 'member' where uid = p_uid; perform moe_glog(m.gid, moe_pname(p_uid) || ' 改為一般成員'); end if;
+  return guild_me();
+end $$;
+create or replace function public.guild_edit(p_intro text, p_notice text, p_mode text, p_emb text, p_minlv int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem := moe_grole(u);
+begin
+  if m.role not in ('leader','vice') then raise exception '只有會長、副會長可以修改'; end if;
+  update guilds set intro = moe_gtext_ok(p_intro, 80), notice = moe_gtext_ok(p_notice, 120), mode = case when p_mode = 'apply' then 'apply' else 'open' end,
+    emb = coalesce(nullif(left(p_emb,20),''), emb), minlv = greatest(15, least(coalesce(p_minlv, 15), 99)) where id = m.gid;
+  return guild_me();
+end $$;
+-- 每日捐獻(3 種各一次):伺服器扣星星幣/鑽石,加公會經驗、個人貢獻與公會幣
+create or replace function public.guild_donate(p_tier int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem := moe_grole(u); d jsonb := moe_gdon() -> p_tier; w wallet; g guilds; dn jsonb; up boolean := false;
+begin
+  if d is null then raise exception '沒有這種捐獻'; end if;
+  dn := case when m.don_d = moe_today() then m.don else '[]'::jsonb end;
+  if dn @> to_jsonb(p_tier) then raise exception '今天已經捐過這一種了'; end if;
+  select * into w from wallet where uid = u for update;
+  if w.uid is null then raise exception '還沒連上伺服器,請重新整理'; end if;
+  if (d->>'coin')::int > 0 then
+    if not w.r_on then perform moe_res_from_save(u); select * into w from wallet where uid = u for update; end if;
+    if w.r_coin < (d->>'coin')::int then raise exception '星星幣不足'; end if;
+    update wallet set r_coin = r_coin - (d->>'coin')::int, updated_at = now() where uid = u;
+  end if;
+  if (d->>'gem')::int > 0 then
+    if w.gem < (d->>'gem')::int then raise exception 'not enough gem'; end if;
+    update wallet set gem = gem - (d->>'gem')::int, updated_at = now() where uid = u; insert into gem_log(uid, delta, reason) values (u, -(d->>'gem')::int, 'guild_donate');
+  end if;
+  update guild_mem set don_d = moe_today(), don = dn || to_jsonb(p_tier), gc = gc + (d->>'gc')::int, contrib = contrib + (d->>'exp')::int,
+    wk_contrib = case when wk = moe_week() then wk_contrib else 0 end + (d->>'exp')::int, wk = moe_week() where uid = u;
+  select * into g from guilds where id = m.gid for update;
+  g.exp := g.exp + (d->>'exp')::int;
+  while g.lv < 10 and g.exp >= moe_gneed(g.lv + 1) loop g.lv := g.lv + 1; up := true; end loop;
+  update guilds set exp = g.exp, lv = g.lv where id = g.id;
+  perform moe_glog(g.id, moe_pname(u) || ' ' || (d->>'n') || ',公會經驗 +' || (d->>'exp'));
+  if up then perform moe_glog(g.id, '🎉 公會升到 Lv.' || g.lv || '!'); end if;
+  return guild_me() || jsonb_build_object('gem', (select gem from wallet where uid = u), 'res', (select moe_res_json(x) from wallet x where uid = u and r_on), 'up', up);
+end $$;
+-- 公會商店:扣公會幣,商品寄到信箱
+create or replace function public.guild_buy(p_item text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem := moe_grole(u); it jsonb := moe_gshop() -> p_item; g guilds; sh jsonb; c int;
+begin
+  if it is null then raise exception '沒有這個商品'; end if;
+  select * into g from guilds where id = m.gid;
+  if g.lv < (it->>'lv')::int then raise exception '公會 Lv.% 才能買', it->>'lv'; end if;
+  select * into m from guild_mem where uid = u for update;
+  sh := case when m.shop_d = moe_today() then m.shop else '{}'::jsonb end; c := coalesce((sh->>p_item)::int, 0);
+  if c >= (it->>'lim')::int then raise exception '今天已經買滿了'; end if;
+  if m.gc < (it->>'gc')::int then raise exception '公會幣不足'; end if;
+  update guild_mem set gc = gc - (it->>'gc')::int, shop_d = moe_today(), shop = sh || jsonb_build_object(p_item, c + 1) where uid = u;
+  insert into inbox(uid, gem, note, credit, kind, title, bonus) values (u, 0, '你在公會商店買了「' || (it->>'n') || '」,領取後入帳。', false, 'guild', '公會商店', it->'b');
+  return guild_me() || jsonb_build_object('mail', true);
+end $$;
+-- 公會聊天
+create or replace function public.guild_chat_send(p_x text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); m guild_mem := moe_grole(u); x text := trim(coalesce(p_x,''));
+begin
+  if x = '' then raise exception '請輸入內容'; end if;
+  if char_length(x) > 40 then raise exception '最多 40 個字'; end if;
+  if x ~* '(https?:|www\.|line\.me|\.com|\.tw)' then raise exception '不能貼網址'; end if;
+  if exists (select 1 from mutes where uid = u and (until is null or until > now())) then raise exception '你目前被禁言'; end if;
+  if m.chat_t is not null and m.chat_t > now() - interval '2 seconds' then raise exception 'too fast'; end if;
+  update guild_mem set chat_t = now() where uid = u;
+  insert into guild_chat(gid, uid, x, t) values (m.gid, u, x, (extract(epoch from now()) * 1000)::bigint);
+  delete from guild_chat where gid = m.gid and id < (select min(id) from (select id from guild_chat where gid = m.gid order by id desc limit 100) z);
+  return guild_chat_list(0);
+end $$;
+create or replace function public.guild_chat_list(p_after bigint default 0) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); g bigint;
+begin
+  select gid into g from guild_mem where uid = u; if g is null then return '[]'::jsonb; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'uid', c.uid, 'x', c.x, 't', c.t, 'n', coalesce(nullif(d.data->>'n',''),'萌獸守護員'), 'av', d.data->>'av', 'me', c.uid = u) order by c.id), '[]'::jsonb)
+    from (select * from guild_chat where gid = g and id > coalesce(p_after, 0) order by id desc limit 50) c left join docs d on d.path = 'arena/' || c.uid::text
+    where not exists (select 1 from chat_hide h where h.uid = c.uid and h.t = c.t));
+end $$;
+-- 後台
+create or replace function public.admin_guilds(p_q text default '') returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  return (select coalesce(jsonb_agg(x order by x.lv desc, x.exp desc), '[]'::jsonb) from (
+    select g.id, g.name, g.emb, g.intro, g.notice, g.mode, g.lv, g.exp, g.created, moe_gcap(g.lv) cap, moe_pname(g.owner) leader, g.owner,
+      (select count(*) from guild_mem m where m.gid = g.id) n
+    from guilds g where coalesce(trim(p_q),'') = '' or g.name ilike '%' || trim(p_q) || '%' or g.id::text = trim(p_q) order by g.lv desc, g.exp desc limit 200) x);
+end $$;
+create or replace function public.admin_guild(p_gid bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  return jsonb_build_object('mem', (select coalesce(jsonb_agg(jsonb_build_object('uid', m.uid, 'role', m.role, 'contrib', m.contrib, 'gc', m.gc, 'joined', m.joined, 'n', moe_pname(m.uid)) order by m.contrib desc), '[]'::jsonb) from guild_mem m where m.gid = p_gid),
+    'log', (select coalesce(jsonb_agg(jsonb_build_object('t', txt, 'at', at) order by id desc), '[]'::jsonb) from (select * from guild_log where gid = p_gid order by id desc limit 50) l),
+    'chat', (select coalesce(jsonb_agg(jsonb_build_object('uid', c.uid, 'x', c.x, 't', c.t, 'n', moe_pname(c.uid)) order by c.id desc), '[]'::jsonb) from (select * from guild_chat where gid = p_gid order by id desc limit 50) c));
+end $$;
+create or replace function public.admin_guild_set(p_gid bigint, p_name text, p_intro text, p_notice text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); n text := moe_gname_ok(p_name);
+begin
+  if exists (select 1 from guilds where lower(name) = lower(n) and id <> p_gid) then raise exception '這個公會名稱已經有人用了'; end if;
+  update guilds set name = n, intro = left(coalesce(p_intro,''), 80), notice = left(coalesce(p_notice,''), 120) where id = p_gid;
+  perform moe_glog(p_gid, '營運團隊修改了公會資料'); perform alog('guild_set', null, jsonb_build_object('gid', p_gid, 'name', n));
+  return jsonb_build_object('ok', true);
+end $$;
+create or replace function public.admin_guild_disband(p_gid bigint, p_reason text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); gn text;
+begin
+  select name into gn from guilds where id = p_gid; if gn is null then raise exception '找不到公會'; end if;
+  insert into inbox(uid, gem, note, credit, kind, title) select uid, 0, '你所在的公會「' || gn || '」已被營運團隊解散。原因:' || coalesce(nullif(trim(p_reason),''), '違反遊戲規範'), false, 'ops', '公會解散通知' from guild_mem where gid = p_gid;
+  delete from guilds where id = p_gid;
+  perform alog('guild_disband', null, jsonb_build_object('gid', p_gid, 'name', gn, 'reason', p_reason));
+  return jsonb_build_object('ok', true);
+end $$;
+create or replace function public.admin_guild_kick(p_uid uuid) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); g bigint;
+begin
+  select gid into g from guild_mem where uid = p_uid; if g is null then raise exception '對方不在公會裡'; end if;
+  delete from guild_mem where uid = p_uid; perform moe_glog(g, moe_pname(p_uid) || ' 被營運團隊移出公會'); perform moe_gfix(g);
+  perform alog('guild_kick', p_uid, jsonb_build_object('gid', g)); return jsonb_build_object('ok', true);
+end $$;
+revoke execute on function public.moe_gfix(bigint), public.moe_glog(bigint,text), public.moe_gcd(uuid), public.moe_grole(uuid), public.moe_pname(uuid) from public, anon, authenticated;
+grant execute on function public.guild_me(), public.guild_list(text), public.guild_create(text,text,text,text,int), public.guild_join(bigint,int), public.guild_unapply(bigint), public.guild_review(uuid,boolean),
+  public.guild_leave(), public.guild_kick(uuid), public.guild_role(uuid,text), public.guild_edit(text,text,text,text,int), public.guild_donate(int), public.guild_buy(text),
+  public.guild_chat_send(text), public.guild_chat_list(bigint), public.admin_guilds(text), public.admin_guild(bigint), public.admin_guild_set(bigint,text,text,text), public.admin_guild_disband(bigint,text), public.admin_guild_kick(uuid) to authenticated;
+-- 清理:公會聊天 7 天、公會紀錄 60 天、退會冷卻 2 天
+create or replace function public.moe_cleanup() returns void language plpgsql security definer set search_path = public as $$
+begin
+  delete from gem_log where reason not like 'topup%' and at < now() - interval '365 days';
+  delete from player_day where d < moe_today() - 180;
+  delete from admin_log where at < now() - interval '180 days';
+  delete from market where status <> 'open' and created < now() - interval '90 days';
+  delete from save_flags where status <> 'open' and at < now() - interval '180 days';
+  delete from gem_cnt where (pid ~ '^\d{4}-' and pid < (moe_today() - 30)::text) or (pid ~ '^\d+$' and pid::int < moe_week() - 5);
+  delete from gem_once where k like '%@%' and at < now() - interval '30 days';
+  delete from guild_chat where at < now() - interval '7 days';
+  delete from guild_log where at < now() - interval '60 days';
+  delete from guild_quit where at < now() - interval '2 days';
+  insert into settings(k, v) values ('cleanup', jsonb_build_object('at', now())) on conflict (k) do update set v = excluded.v;
+end $$;
+revoke execute on function public.moe_cleanup() from public, anon, authenticated;
+-- 備份清單加入公會資料表
+create or replace function public.moe_backup_list() returns text[] language sql stable set search_path = public as $$
+  select coalesce(array_agg(t order by t), '{}') from unnest(array['docs','wallet','admins','notice','admin_log','bans','bots','chat_hide','code_use','codes','game_event','gem_log','inbox','ladder','ladder_def','market','mint_quota','mutes','pay_first','player_day','save_flags','settings','td_duo','td_week','tickets','guilds','guild_mem','guild_req','guild_quit','guild_log','guild_chat']) t
+  where to_regclass('public.' || t) is not null $$;
