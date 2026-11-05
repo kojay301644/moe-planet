@@ -336,7 +336,13 @@ begin
   with c as (update inbox set claimed = true where uid = u and not claimed and (p_id is null or id = p_id) returning id, item, gem, note, title, credit, bonus)
   select coalesce(jsonb_agg(jsonb_build_object('id', id, 'item', item, 'gem', gem, 'note', note, 'title', title, 'credit', credit, 'bonus', bonus) order by id), '[]'::jsonb), coalesce(sum(gem) filter (where credit), 0) into out, cr from c;
   if cr > 0 then insert into wallet(uid) values (u) on conflict do nothing; update wallet set gem = gem + cr, updated_at = now() where uid = u; insert into gem_log(uid,delta,reason) values (u, cr, 'mail'); end if;
-  return jsonb_build_object('items', out, 'gem', (select gem from wallet where uid = u));
+  -- 資源帳本:信箱附帶的星星幣、進化石、糖果、碎片由伺服器直接入帳
+  if to_regprocedure('public.moe_res_add(uuid,text,bigint)') is not null then
+    perform moe_res_add(u, x.k, x.n::bigint) from (
+      select b.key k, sum(coalesce((b.value #>> '{}')::bigint, 0)) n from jsonb_array_elements(out) it, jsonb_each(coalesce(it->'bonus', '{}'::jsonb)) b where b.key in ('coin','stones','candy') group by b.key
+      union all select it->'item'->>'mat', sum(coalesce((it->'item'->>'n')::bigint, 0)) from jsonb_array_elements(out) it where it->'item'->>'mat' in ('stones','candy','shard') group by it->'item'->>'mat') x;
+  end if;
+  return jsonb_build_object('items', out, 'gem', (select gem from wallet where uid = u), 'res', (select moe_res_json(w) from wallet w where uid = u and r_on));
 end $$;
 -- 舊版相容
 create or replace function public.inbox_claim() returns jsonb language sql security definer set search_path = public as $$ select inbox_take(null) $$;
@@ -805,9 +811,13 @@ begin
   f := moe_fair(it);
   if p_price < ceil(f * .5) or p_price > floor(f * 2) then raise exception '價格要在 % ~ % 鑽石之間', ceil(f*.5), floor(f*2); end if;
   if (select count(*) from market where seller = u and status = 'open' and created > now() - interval '48 hours') >= 10 then raise exception '最多同時上架 10 件'; end if;
+  if p_mat in ('stones','candy') and to_regprocedure('public.moe_res_add(uuid,text,bigint)') is not null and exists (select 1 from wallet where uid = u and r_on) then
+    if (select case p_mat when 'stones' then r_stones else r_candy end from wallet where uid = u) < p_n then raise exception '數量不足'; end if;
+  end if;
   select data->>'n' into nm from docs where path = 'arena/' || u::text;
   insert into market(seller, seller_name, item, price) values (u, coalesce(nm,'守護員'), it, p_price);
-  return jsonb_build_object('ok', true, 'fair', f);
+  if to_regprocedure('public.moe_res_add(uuid,text,bigint)') is not null then perform moe_res_add(u, p_mat, -p_n); end if;
+  return jsonb_build_object('ok', true, 'fair', f, 'res', (select moe_res_json(w) from wallet w where uid = u and r_on));
 end $$;
 grant execute on function public.market_list_mat(text,text,int,int) to authenticated;
 
@@ -1047,13 +1057,13 @@ begin
       if coalesce((v->>'shards')::numeric,0) < 0 or coalesce((v->>'lv')::numeric,1) < 0 then neg := true; end if;
     end loop;
   end if;
-  return jsonb_build_object('coin', coalesce((s->>'coin')::numeric,0), 'stones', coalesce((s->>'stones')::numeric,0), 'candy', coalesce((s->>'candy')::numeric,0), 'shards', sh, 'pets', np,
+  return jsonb_build_object('coin', coalesce((s->>'coin')::numeric,0), 'stones', coalesce((s->>'stones')::numeric,0), 'candy', coalesce((s->>'candy')::numeric,0), 'shards', sh, 'pets', np, 'eqs', case when jsonb_typeof(s->'equips') = 'array' then jsonb_array_length(s->'equips') else 0 end,
     'neg', neg or coalesce((s->>'coin')::numeric,0) < 0 or coalesce((s->>'stones')::numeric,0) < 0 or coalesce((s->>'candy')::numeric,0) < 0);
 exception when others then return null;
 end $$;
 
 create or replace function public.moe_save_guard() returns trigger language plpgsql security definer set search_path = public as $$
-declare u uuid; o jsonb; n jsonb; h numeric; r numeric := 0; d jsonb := '{}'::jsonb; lim numeric; dv numeric; f text; bad boolean := false; lv text; last timestamptz;
+declare u uuid; o jsonb; n jsonb; h numeric; r numeric := 0; d jsonb := '{}'::jsonb; lim numeric; dv numeric; f text; bad boolean := false; lv text; last timestamptz; ni text[];
 begin
   if NEW.path not like 'data/users/%/save' or current_setting('moe.skip', true) = '1' then return NEW; end if;
   begin u := split_part(NEW.path, '/', 3)::uuid; exception when others then return NEW; end;
@@ -1067,11 +1077,17 @@ begin
     o := moe_save_stats(OLD.data); n := moe_save_stats(NEW.data);
     if o is null or n is null then return NEW; end if;
     h := greatest(.25, least(48, extract(epoch from now() - coalesce(OLD.updated_at, now() - interval '1 hour')) / 3600));
-    foreach f in array array['coin','stones','candy','shards','pets'] loop
-      lim := case f when 'coin' then greatest(2000000 + 3000000 * h, (o->>'coin')::numeric * .5) when 'stones' then 300 + 400 * h when 'candy' then 1000 + 1500 * h when 'shards' then 300 + 400 * h else 12 + 20 * h end;
-      dv := (n->>f)::numeric - (o->>f)::numeric;
+    foreach f in array array['coin','stones','candy','shards','pets','eqs'] loop
+      lim := case f when 'coin' then greatest(2000000 + 3000000 * h, (o->>'coin')::numeric * .5) when 'stones' then 300 + 400 * h when 'candy' then 1000 + 1500 * h when 'shards' then 300 + 400 * h when 'eqs' then 30 + 40 * h else 12 + 20 * h end;
+      dv := coalesce((n->>f)::numeric, 0) - coalesce((o->>f)::numeric, 0);
       if dv > lim then r := greatest(r, dv / lim); d := d || jsonb_build_object(f, jsonb_build_object('from', o->f, 'to', n->f, 'limit', round(lim))); end if;
     end loop;
+    -- 萌獸、裝備數值超出遊戲規則(只看這次新出現的問題)
+    if to_regprocedure('public.moe_save_issues(jsonb)') is not null then
+      begin ni := array(select unnest(moe_save_issues((NEW.data->>'json')::jsonb)) except select unnest(moe_save_issues((OLD.data->>'json')::jsonb)));
+      exception when others then ni := '{}'; end;
+      if coalesce(array_length(ni, 1), 0) > 0 then bad := true; d := d || jsonb_build_object('bad', to_jsonb(ni[1:12])); end if;
+    end if;
     if (n->>'neg')::boolean or (n->>'coin')::numeric > 2000000000 or (n->>'stones')::numeric > 50000000 or (n->>'candy')::numeric > 50000000 then bad := true; d := d || jsonb_build_object('invalid', true); end if;
     if bad or r > 5 then lv := 'block'; elsif r > 1 then lv := 'warn'; else return NEW; end if;
     d := d || jsonb_build_object('hours', round(h, 2), 'ratio', round(r, 1));
@@ -1102,12 +1118,14 @@ declare a uuid := moe_admin(); dd jsonb; begin
   perform set_config('moe.skip', '1', true);
   update docs set data = jsonb_set(dd, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint)), updated_at = now() where path = 'data/users/' || p_uid::text || '/save';
   update save_flags set status = 'restored' where uid = p_uid and status = 'open';
+  if to_regprocedure('public.moe_res_from_save(uuid)') is not null then perform moe_res_from_save(p_uid); end if;
   perform alog('save_restore', p_uid, jsonb_build_object('hist', p_hist)); return jsonb_build_object('ok', true); end $$;
 create or replace function public.admin_save_accept(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); f save_flags; begin
   select * into f from save_flags where id = p_id; if f.id is null then raise exception '找不到'; end if;
   if f.attempted is not null then perform set_config('moe.skip', '1', true);
     update docs set data = jsonb_set(f.attempted, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint)), updated_at = now() where path = 'data/users/' || f.uid::text || '/save'; end if;
+  if to_regprocedure('public.moe_res_from_save(uuid)') is not null then perform moe_res_from_save(f.uid); end if;
   update save_flags set status = 'ok' where id = p_id; perform alog('save_accept', f.uid, jsonb_build_object('flag', p_id)); return jsonb_build_object('ok', true); end $$;
 create or replace function public.admin_save_close(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); begin update save_flags set status = 'closed' where id = p_id; return jsonb_build_object('ok', true); end $$;
@@ -1172,6 +1190,7 @@ declare a uuid := moe_admin(); pth text := 'data/users/' || p_uid::text || '/sav
   if p_wallet is not null and p_wallet ? 'gem' then
     update wallet set gem = greatest(0, (p_wallet->>'gem')::int), pity = coalesce((p_wallet->>'pity')::int, pity), dpity = coalesce((p_wallet->>'dpity')::int, dpity), updated_at = now() where uid = p_uid;
   end if;
+  if to_regprocedure('public.moe_res_from_save(uuid)') is not null then perform moe_res_from_save(p_uid); end if;
   update sessions set sid = gen_random_uuid(), dev = '管理員還原存檔', seen = now() where uid = p_uid;
   perform alog('backup_restore', p_uid, jsonb_build_object('from', p_from, 'gem', p_wallet->'gem'));
   return jsonb_build_object('ok', true); end $$;
@@ -1180,3 +1199,153 @@ grant execute on function public.admin_backup_tables(), public.admin_backup_page
 create or replace function public.admin_backup_last() returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); begin return (select v from settings where k = 'backup'); end $$;
 grant execute on function public.admin_backup_last() to authenticated;
+
+-- ============ 防作弊第二階段 A:主要資源改由伺服器記帳(星星幣、進化石、糖果;碎片只監控) ============
+alter table public.wallet add column if not exists r_on boolean not null default false;
+alter table public.wallet add column if not exists r_coin bigint not null default 3000;
+alter table public.wallet add column if not exists r_stones int not null default 5;
+alter table public.wallet add column if not exists r_candy int not null default 30;
+alter table public.wallet add column if not exists r_shards int not null default 0;
+alter table public.wallet add column if not exists r_day date;
+alter table public.wallet add column if not exists r_today jsonb not null default '{}'::jsonb;
+alter table public.wallet add column if not exists r_bank jsonb not null default '{}'::jsonb;
+alter table public.wallet add column if not exists r_flag date;
+-- 每日收入上限 = 基本 + 每級主城 × 主城等級(可在 settings 表的 res_caps 調整,不用改程式)
+drop function if exists public.moe_res_cap(text,int);
+create or replace function public.moe_res_cap(p_k text, p_castle int) returns bigint language plpgsql stable set search_path = public as $$
+declare c jsonb := coalesce((select st.v from settings st where st.k = 'res_caps'), '{}'::jsonb); d jsonb := '{"coin":[2000000,1000000],"stones":[300,40],"candy":[2000,250],"shards":[300,30]}'::jsonb; x jsonb;
+begin x := coalesce(c->p_k, d->p_k); return ((x->>0)::bigint + (x->>1)::bigint * greatest(1, least(coalesce(p_castle, 1), 50))); end $$;
+create or replace function public.moe_castle(u uuid) returns int language plpgsql stable set search_path = public as $$
+declare c int; begin
+  begin select ((data->>'json')::jsonb->>'castle')::int into c from docs where path = 'data/users/' || u::text || '/save'; exception when others then c := 1; end;
+  return coalesce(c, 1); end $$;
+-- 依存檔內容設定帳本(第一次啟用,或管理員還原存檔後)
+create or replace function public.moe_res_from_save(u uuid) returns void language plpgsql security definer set search_path = public as $$
+declare s jsonb; begin
+  select moe_save_stats(data) into s from docs where path = 'data/users/' || u::text || '/save';
+  insert into wallet(uid) values (u) on conflict do nothing;
+  update wallet set r_on = true, r_coin = greatest(0, coalesce((s->>'coin')::bigint, 3000)), r_stones = greatest(0, coalesce((s->>'stones')::int, 5)),
+    r_candy = greatest(0, coalesce((s->>'candy')::int, 30)), r_shards = greatest(0, coalesce((s->>'shards')::int, 0)), r_bank = '{}'::jsonb, updated_at = now() where uid = u; end $$;
+create or replace function public.moe_res_json(w wallet) returns jsonb language sql immutable as $$
+  select jsonb_build_object('coin', w.r_coin, 'stones', w.r_stones, 'candy', w.r_candy, 'shards', w.r_shards, 'bank', w.r_bank) $$;
+-- 伺服器直接入帳(信箱、兌換碼、交易所這類伺服器知道內容的獎勵,不算每日上限)
+create or replace function public.moe_res_add(u uuid, k text, n bigint) returns void language plpgsql security definer set search_path = public as $$
+begin
+  if n = 0 or k not in ('coin','stones','candy','shard','shards') then return; end if;
+  update wallet set r_coin = case when k = 'coin' then greatest(0, r_coin + n) else r_coin end, r_stones = case when k = 'stones' then greatest(0, r_stones + n) else r_stones end,
+    r_candy = case when k = 'candy' then greatest(0, r_candy + n) else r_candy end, r_shards = case when k in ('shard','shards') then greatest(0, r_shards + n) else r_shards end, updated_at = now()
+  where uid = u and r_on; end $$;
+
+-- 同步:鑽石 + 資源一次處理(取代單獨的 gem_sync)
+create or replace function public.wallet_sync(p_earn int, p_spend int, p_re jsonb default '{}'::jsonb, p_rs jsonb default '{}'::jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); g jsonb; w wallet; cs int; k text; e bigint; s bigint; cap bigint; today bigint; ok bigint; bal bigint; bad jsonb := '{}'::jsonb;
+begin
+  g := gem_sync(p_earn, p_spend);
+  select * into w from wallet where uid = u for update;
+  if not w.r_on then perform moe_res_from_save(u); select * into w from wallet where uid = u for update; end if;
+  if w.r_day is distinct from moe_today() then w.r_day := moe_today(); w.r_today := '{}'::jsonb; end if;
+  cs := moe_castle(u);
+  foreach k in array array['coin','stones','candy','shards'] loop
+    e := greatest(0, least(coalesce((p_re->>k)::bigint, 0), 1000000000)); s := greatest(0, least(coalesce((p_rs->>k)::bigint, 0), 1000000000));
+    e := e + coalesce((w.r_bank->>k)::bigint, 0);
+    cap := moe_res_cap(k, cs); today := coalesce((w.r_today->>k)::bigint, 0);
+    if k = 'shards' then ok := e;  -- 碎片只監控,超過上限記一筆異常
+      if today + e > cap and w.r_flag is distinct from moe_today() then bad := bad || jsonb_build_object('shards', jsonb_build_object('today', today + e, 'cap', cap)); end if;
+    else ok := least(e, greatest(0, cap - today)); end if;
+    w.r_bank := case when e - ok > 0 then w.r_bank || jsonb_build_object(k, e - ok) else w.r_bank - k end;
+    w.r_today := w.r_today || jsonb_build_object(k, today + ok);
+    bal := case k when 'coin' then w.r_coin when 'stones' then w.r_stones when 'candy' then w.r_candy else w.r_shards end + ok;
+    if s > bal then if k <> 'shards' then w.flags := w.flags + 1; bad := bad || jsonb_build_object(k || '_spend', jsonb_build_object('spend', s, 'have', bal)); end if; s := bal; end if;
+    bal := bal - s;
+    if k = 'coin' then w.r_coin := bal; elsif k = 'stones' then w.r_stones := bal; elsif k = 'candy' then w.r_candy := bal; else w.r_shards := bal; end if;
+    if e - ok > cap and w.r_flag is distinct from moe_today() then bad := bad || jsonb_build_object(k, jsonb_build_object('bank', e - ok, 'cap', cap)); end if;
+  end loop;
+  if bad <> '{}'::jsonb then w.r_flag := moe_today(); insert into save_flags(uid, lvl, detail) values (u, 'warn', jsonb_build_object('res', bad, 'castle', cs)); end if;
+  update wallet set r_coin = w.r_coin, r_stones = w.r_stones, r_candy = w.r_candy, r_shards = w.r_shards, r_day = w.r_day, r_today = w.r_today, r_bank = w.r_bank, r_flag = w.r_flag, flags = w.flags, updated_at = now() where uid = u;
+  return g || jsonb_build_object('res', moe_res_json(w));
+end $$;
+grant execute on function public.wallet_sync(int,int,jsonb,jsonb) to authenticated;
+revoke execute on function public.moe_res_from_save(uuid), public.moe_res_add(uuid,text,bigint), public.moe_castle(uuid) from public, anon, authenticated;
+
+-- 登入時:回傳伺服器帳本(第一次啟用時以目前存檔為起始值)
+create or replace function public.wallet_init(p_local int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); w wallet;
+begin
+  insert into wallet(uid) values (u) on conflict (uid) do nothing;
+  insert into player_day values (u, moe_today()) on conflict do nothing;
+  select * into w from wallet where uid = u;
+  if not w.r_on then perform moe_res_from_save(u); select * into w from wallet where uid = u; end if;
+  return jsonb_build_object('gem',w.gem,'topup',w.topup,'pity',w.pity,'dpity',w.dpity,'bank',w.bank,'free_at',w.free_at,'res',moe_res_json(w));
+end $$;
+
+-- 存檔寫入時:星星幣、進化石、糖果一律改成伺服器帳本的數字;碎片總數超過帳本太多就記異常
+create or replace function public.moe_save_ledger() returns trigger language plpgsql security definer set search_path = public as $$
+declare u uuid; w wallet; j jsonb; sh numeric := 0; v jsonb;
+begin
+  if NEW.path not like 'data/users/%/save' or current_setting('moe.skip', true) = '1' then return NEW; end if;
+  begin u := split_part(NEW.path, '/', 3)::uuid; exception when others then return NEW; end;
+  select * into w from wallet where uid = u; if not found or not w.r_on then return NEW; end if;
+  begin j := (NEW.data->>'json')::jsonb; exception when others then return NEW; end;
+  if j is null then return NEW; end if;
+  j := j || jsonb_build_object('coin', w.r_coin, 'stones', w.r_stones, 'candy', w.r_candy);
+  NEW.data := jsonb_set(NEW.data, '{json}', to_jsonb(j::text));
+  if jsonb_typeof(j->'pets') = 'object' then for v in select value from jsonb_each(j->'pets') loop sh := sh + coalesce((v->>'shards')::numeric, 0); end loop; end if;
+  if jsonb_typeof(j->'xs') = 'object' then for v in select value from jsonb_each(j->'xs') loop sh := sh + coalesce((v #>> '{}')::numeric, 0); end loop; end if;
+  if sh > w.r_shards + 200 and not exists (select 1 from save_flags where uid = u and status = 'open' and detail ? 'shards_over' and at > now() - interval '1 day') then
+    insert into save_flags(uid, lvl, detail) values (u, 'warn', jsonb_build_object('shards_over', jsonb_build_object('save', sh, 'ledger', w.r_shards)));
+  end if;
+  return NEW;
+end $$;
+drop trigger if exists docs_save_ledger on public.docs;
+create trigger docs_save_ledger before insert or update on public.docs for each row execute function public.moe_save_ledger();
+revoke execute on function public.moe_save_ledger() from public, anon, authenticated;
+
+-- ============ 防作弊第二階段 B:萌獸與裝備合理性檢查 ============
+-- 回傳存檔裡不合理的地方(只有「這次存檔新出現」的問題才會擋下,舊資料不會卡住)
+create or replace function public.moe_save_issues(s jsonb) returns text[] language plpgsql immutable as $$
+declare r text[] := '{}'; k text; v jsonb; t text; x jsonb; st int; lv int; bt int; cap int; e jsonb; sb jsonb; mx numeric; i int := 0;
+  pk text[] := array['fox','otter','penguin','pango','ferret','whale','bear','dragon','bunny','mouse','mole','puffer','owl','lizard','deer','moth','armad','seal','marten','phoenix'];
+  sm jsonb := '{"atk":4,"hp":4,"def":4,"crit":4,"critd":12,"cdr":3,"boss":8,"siege":10,"heal":10}'::jsonb;
+begin
+  if s is null then return r; end if;
+  begin
+    if jsonb_typeof(s->'pets') = 'object' then
+      for k, v in select * from jsonb_each(s->'pets') loop
+        if not (k = any(pk)) then r := r || ('pet:' || k); continue; end if;
+        st := coalesce((v->>'st')::numeric, 0)::int; lv := coalesce((v->>'lv')::numeric, 1)::int; bt := coalesce((v->>'bt')::numeric, 0)::int;
+        if st < 0 or st > 2 then r := r || (k || '.st'); end if;
+        if bt < 0 or bt > 2 or (bt > 0 and st < 2) then r := r || (k || '.bt'); end if;
+        cap := case when st = 0 then 10 when st = 1 then 20 else 30 + 10 * least(greatest(bt, 0), 2) end;
+        if lv < 1 or lv > cap then r := r || (k || '.lv'); end if;
+        if coalesce((v->>'stars')::numeric, 1) not between 1 and 5 then r := r || (k || '.stars'); end if;
+        if coalesce((v->>'q')::numeric, 0) not between 0 and 3 then r := r || (k || '.q'); end if;
+        if coalesce((v->>'sk')::numeric, 1) not between 0 and 5 then r := r || (k || '.sk'); end if;
+      end loop;
+    end if;
+    if jsonb_typeof(s->'pot') = 'object' then
+      for k, v in select * from jsonb_each(s->'pot') loop
+        if jsonb_typeof(v) = 'object' then for t, x in select * from jsonb_each(v) loop
+          if coalesce((x #>> '{}')::numeric, 0) not between 0 and 20 then r := r || (k || '.pot.' || t); end if; end loop; end if;
+      end loop;
+    end if;
+    if jsonb_typeof(s->'equips') = 'array' then
+      for e in select value from jsonb_array_elements(s->'equips') loop
+        i := i + 1; exit when i > 2000;
+        k := 'eq' || coalesce(e->>'id', '?');
+        if coalesce(e->>'type', '') not in ('collar','hat','charm','bell') then r := r || (k || '.type'); continue; end if;
+        if coalesce((e->>'rar')::numeric, 0) not between 0 and 4 then r := r || (k || '.rar'); end if;
+        if coalesce((e->>'lv')::numeric, 0) not between 0 and 15 then r := r || (k || '.lv'); end if;
+        if jsonb_typeof(e->'subs') = 'array' then
+          if jsonb_array_length(e->'subs') > 4 then r := r || (k || '.subs'); end if;
+          for sb in select value from jsonb_array_elements(e->'subs') loop
+            mx := (sm->>(sb->>0))::numeric;
+            if mx is null then r := r || (k || '.sub.' || coalesce(sb->>0, '?'));
+            elsif coalesce((sb->>1)::numeric, 0) < 0 or (sb->>1)::numeric > mx * 6 + .05 then r := r || (k || '.sub.' || (sb->>0)); end if;
+          end loop;
+        end if;
+      end loop;
+    end if;
+  exception when others then return r || 'parse'::text; end;
+  return r;
+end $$;
+revoke execute on function public.moe_save_issues(jsonb) from public, anon, authenticated;
