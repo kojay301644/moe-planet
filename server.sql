@@ -956,9 +956,14 @@ begin
   return jsonb_build_object('gem',g,'rank',r);
 end $$;
 -- 電腦玩家每週也會挑戰無盡模式(依戰力決定撐幾波)
+-- 戰力→波數對照表(來自實際模擬:第 20 波後怪物血量每波 ×1.12)
+create or replace function public.bot_td_waves(p int) returns float language sql immutable as $$
+  with t(pw, w) as (values (0,18.0),(1000,20.0),(5500,25.0),(24000,34.0),(38000,36.0),(72000,39.0),(117000,42.0),(183000,48.0),(400000,55.0)),
+  s as (select pw, w, lead(pw) over (order by pw) pw2, lead(w) over (order by pw) w2 from t)
+  select coalesce((select w + (w2 - w) * (greatest(p,0) - pw)::float / (pw2 - pw) from s where pw2 is not null and greatest(p,0) >= pw and greatest(p,0) < pw2), 55.0) $$;
 create or replace function public.bot_td() returns void language sql security definer set search_path = public as $$
   update bots set td_wk = moe_week(), td_best = case when td_wk <> moe_week() then 0 else td_best end where active and td_wk <> moe_week();
-  update bots set td_best = greatest(td_best, floor(8 + power / 900.0 + random() * 10)::int) where active and random() < .08;
+  update bots set td_best = greatest(td_best, round(bot_td_waves(power) * (.85 + random() * .25))::int) where active and random() < .08;
 $$;
 revoke execute on function public.bot_td(), public.td_board(int) from public, anon, authenticated;
 grant execute on function public.td_report(int,int), public.td_top(int), public.td_claim() to authenticated;
