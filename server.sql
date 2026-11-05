@@ -1892,3 +1892,7 @@ revoke execute on function public.moe_cleanup() from public, anon, authenticated
 create or replace function public.moe_backup_list() returns text[] language sql stable set search_path = public as $$
   select coalesce(array_agg(t order by t), '{}') from unnest(array['docs','wallet','admins','notice','admin_log','bans','bots','chat_hide','code_use','codes','game_event','gem_log','inbox','ladder','ladder_def','market','mint_quota','mutes','pay_first','player_day','save_flags','settings','td_duo','td_week','tickets','guilds','guild_mem','guild_req','guild_quit','guild_log','guild_chat']) t
   where to_regclass('public.' || t) is not null $$;
+
+-- 新手教學完成禮物(一次)
+insert into gem_rule(p, per, lim, maxn, cap, re, need, note) values ('tut','once',1,100,null,null,null,'新手教學完成')
+on conflict (p) do update set per = excluded.per, lim = excluded.lim, maxn = excluded.maxn, cap = excluded.cap, re = excluded.re, need = excluded.need, note = excluded.note;
