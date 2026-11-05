@@ -941,6 +941,7 @@ declare u uuid := moe_uid(); w int := moe_week(); b int;
 begin
   if p_wave is null or p_wave < 1 or p_wave > 500 then return jsonb_build_object('ok',false); end if;
   if p_secs < p_wave * 6 then return jsonb_build_object('ok',false,'err','too fast'); end if;
+  if not moe_td_ok(u, p_wave) then return jsonb_build_object('ok',false,'err','review'); end if;
   insert into td_week(uid, wk, best, secs) values (u, w, p_wave, p_secs)
     on conflict (uid, wk) do update set best = greatest(td_week.best, excluded.best), secs = case when excluded.best > td_week.best then excluded.secs else td_week.secs end, at = case when excluded.best > td_week.best then now() else td_week.at end;
   select best into b from td_week where uid = u and wk = w;
@@ -985,6 +986,7 @@ grant execute on function public.td_report(int,int), public.td_top(int), public.
 create or replace function public.session_start(p_dev text) returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := auth.uid(); s uuid := gen_random_uuid();
 begin if u is null then raise exception 'not signed in'; end if;
+  if to_regprocedure('public.moe_cleanup_maybe()') is not null then perform moe_cleanup_maybe(); end if;
   insert into sessions(uid, sid, dev, at, seen) values (u, s, left(coalesce(p_dev,''),60), now(), now())
     on conflict (uid) do update set sid = excluded.sid, dev = excluded.dev, at = now(), seen = now();
   return jsonb_build_object('sid', s); end $$;
@@ -1027,6 +1029,7 @@ create or replace function public.td_report2(p_mate uuid, p_mate_n text, p_my_n 
 declare u uuid := moe_uid(); w int := moe_week(); xa uuid; xb uuid; xan text; xbn text; mn text := left(coalesce(nullif(trim(p_my_n),''),'守護員'),20); on2 text := left(coalesce(nullif(trim(p_mate_n),''),'守護員'),20); r int;
 begin
   if p_mate is null or p_mate = u or p_wave is null or p_wave < 1 or p_wave > 500 or coalesce(p_secs,0) < p_wave * 6 then return jsonb_build_object('ok',false); end if;
+  if not moe_td_ok(u, p_wave) then return jsonb_build_object('ok',false,'err','review'); end if;
   if u < p_mate then xa := u; xb := p_mate; xan := mn; xbn := on2; else xa := p_mate; xb := u; xan := on2; xbn := mn; end if;
   insert into td_duo(wk, a, b, an, bn, best, secs) values (w, xa, xb, xan, xbn, p_wave, p_secs)
   on conflict (wk, a, b) do update set best = greatest(td_duo.best, excluded.best), an = excluded.an, bn = excluded.bn,
@@ -1352,3 +1355,185 @@ begin
   return r;
 end $$;
 revoke execute on function public.moe_save_issues(jsonb) from public, anon, authenticated;
+
+
+-- ============ 防作弊:鑽石依來源驗證(A 方案) ============
+-- 遊戲每次給鑽石都附上來源;伺服器依規則表核對:一次性獎勵只能領一次、每日/每週有次數上限、重複獎勵有每日總量上限
+create table if not exists public.gem_rule(p text primary key, per text not null, lim int not null default 1, maxn int not null, cap int, re text, need text, note text);
+create table if not exists public.gem_once(uid uuid not null, k text not null, n int not null, at timestamptz not null default now(), primary key(uid, k));
+create table if not exists public.gem_cnt(uid uuid not null, p text not null, pid text not null, cnt int not null default 0, sum int not null default 0, primary key(uid, p, pid));
+alter table public.gem_rule enable row level security;
+alter table public.gem_once enable row level security;
+alter table public.gem_cnt enable row level security;
+alter table public.wallet add column if not exists g_flag date;
+-- per: once = 同一個來源一輩子一次;day / week = 每天/每週的次數上限 lim;re = 來源編號必須符合的格式;cap = 每段期間的鑽石總量上限
+insert into gem_rule(p, per, lim, maxn, cap, re, need, note) values
+ ('ach','once',1,400,null,'^(w5|w20|w100|w500|st60|st150|ch3|ch6|s10|s100|e1|e5|e15|q2|q2x5|q3|div|all8|all14|all20|c3|c5|c10|g10|g30|g50|sg3|sg50|df3|df30|lg|ld|tr10|tr30|tr50|pb5|pb10|rk5|eq2|eq3|eq4|eq15|mk1|mk10|fr5|ht30)$',null,'成就'),
+ ('stage','once',1,80,null,'^([0-9]|[1-5][0-9])$',null,'冒險關卡首通'),
+ ('hard','once',1,40,null,'^([0-9]|[1-5][0-9])$',null,'困難首通'),
+ ('trial','once',1,30,null,'^[0-9]{1,3}$',null,'試煉塔首通'),
+ ('pboss','once',1,450,null,'^(rhino|turtle|eagle|octo|treant|wolf):([1-9]|1[0-5])$',null,'個人副本首通'),
+ ('chest','once',1,100,null,'^[0-5]:[0-2]$',null,'章節星數寶箱'),
+ ('gl','once',1,160,null,'^([1-9]|[1-9][0-9]|1[0-9][0-9])$',null,'守護員升級'),
+ ('tdfirst','once',1,400,null,'^[0-2]$',null,'守塔首次通關'),
+ ('fund','once',1,500,null,'^(10|20|30|40|50)$','fund','成長基金'),
+ ('vip','once',1,900,null,'^([1-9]|1[0-5])$','viplv','VIP 等級禮'),
+ ('q','day',6,30,null,'^(adv|farm|up|heart|battle|all)$',null,'每日任務'),
+ ('sign','day',1,110,null,null,null,'每日簽到'),
+ ('play','day',1,10,null,null,null,'樂園禮物'),
+ ('event','day',1,30,null,null,null,'每日活動'),
+ ('tdday','day',3,80,null,'^[0-2]$',null,'守塔每日首勝'),
+ ('card','day',1,50,null,null,'card','月卡'),
+ ('vipday','day',1,64,null,null,'vip','VIP 每日'),
+ ('siege','day',150,22,400,null,null,'攻城勝利'),
+ ('ladwin','day',40,4,160,null,null,'天梯勝利'),
+ ('endless','day',30,150,500,null,null,'守塔無盡'),
+ ('wish','day',200,20,600,null,null,'星辰祈願'),
+ ('mksell','day',50,5000,1000,null,null,'舊版交易所售出'),
+ ('wq','week',6,100,null,'^(adv|siege|pvp|raid|trial|all)$',null,'每週任務'),
+ ('trialwk','week',1,300,null,null,null,'試煉塔週結算'),
+ ('siegewk','week',1,190,null,null,null,'攻城週排行'),
+ ('season','week',1,400,null,null,null,'天梯賽季結算'),
+ ('raidrank','week',3,225,null,null,null,'團隊 Boss 排名'),
+ ('raidkill','week',3,100,null,null,null,'團隊 Boss 擊殺'),
+ ('misc','day',1000000,1000000,100,null,null,'未標示來源(每日上限,超過暫緩)')
+on conflict (p) do update set per = excluded.per, lim = excluded.lim, maxn = excluded.maxn, cap = excluded.cap, re = excluded.re, need = excluded.need, note = excluded.note;
+
+-- 核對一批來源,回傳通過的鑽石總數與被拒絕的來源
+create or replace function public.moe_gem_src(u uuid, src jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare x jsonb; k text; n int; pp text; suf text; r gem_rule; ok int := 0; rej jsonb := '[]'::jsonb; v_pid text; c gem_cnt; tp int; why text; i int := 0;
+begin
+  if src is null or jsonb_typeof(src) <> 'array' then return jsonb_build_object('ok', 0, 'rej', rej); end if;
+  select topup into tp from wallet where uid = u; tp := coalesce(tp, 0);
+  for x in select value from jsonb_array_elements(src) loop
+    i := i + 1; exit when i > 300; why := null;
+    k := left(coalesce(x->>0, ''), 80); n := coalesce((x->>1)::numeric, 0)::int;
+    pp := split_part(k, ':', 1); suf := substr(k, length(pp) + 2);
+    select * into r from gem_rule where p = pp and p <> 'misc';
+    if not found then why := 'unknown';
+    elsif n <= 0 or n > r.maxn then why := 'amount';
+    elsif r.re is not null and suf !~ r.re then why := 'id';
+    elsif r.need = 'vip' and moe_vip(tp) < 1 then why := 'need';
+    elsif r.need = 'viplv' and (suf !~ '^[0-9]+$' or suf::int > moe_vip(tp)) then why := 'need';
+    elsif r.need = 'card' and not exists (select 1 from gem_log where uid = u and reason = 'topup:card' and at > now() - interval '31 days') then why := 'need';
+    elsif r.need = 'fund' and not exists (select 1 from gem_log where uid = u and reason = 'topup:fund') then why := 'need';
+    end if;
+    if why is null and r.per = 'once' then
+      insert into gem_once(uid, k, n) values (u, k, n) on conflict do nothing; if not found then why := 'dup'; end if;
+    elsif why is null then
+      v_pid := case r.per when 'week' then moe_week()::text else moe_today()::text end;
+      if r.re is not null then insert into gem_once(uid, k, n) values (u, k || '@' || v_pid, n) on conflict do nothing; if not found then why := 'dup'; end if; end if;
+      if why is null then
+        insert into gem_cnt(uid, p, pid) values (u, pp, v_pid) on conflict do nothing;
+        select * into c from gem_cnt where uid = u and gem_cnt.p = pp and gem_cnt.pid = v_pid for update;
+        if c.cnt >= r.lim then why := 'limit'; elsif r.cap is not null and c.sum + n > r.cap then n := greatest(0, r.cap - c.sum); if n = 0 then why := 'cap'; end if; end if;
+        if why is null then update gem_cnt set cnt = cnt + 1, sum = sum + n where uid = u and gem_cnt.p = pp and gem_cnt.pid = v_pid; end if;
+      end if;
+    end if;
+    if why is null then ok := ok + n; else rej := rej || jsonb_build_array(jsonb_build_object('k', k, 'n', n, 'why', why)); end if;
+  end loop;
+  return jsonb_build_object('ok', ok, 'rej', rej);
+end $$;
+
+-- 鑽石入帳:通過驗證的來源直接入帳;未標示來源的收入每天最多 misc 上限,超過暫緩之後陸續入帳
+create or replace function public.moe_gem_apply(u uuid, p_ok int, p_misc int, p_spend int, p_rej jsonb default '[]'::jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare w wallet; m int; cap int; used int; mo int; s int; e int;
+begin
+  select * into w from wallet where uid = u for update;
+  if not found then insert into wallet(uid) values (u) returning * into w; end if;
+  if w.earn_day is distinct from moe_today() then w.earn_day := moe_today(); w.earn_today := 0; end if;
+  insert into player_day values (u, moe_today()) on conflict do nothing;
+  select coalesce(r.cap, 100) into cap from gem_rule r where r.p = 'misc'; cap := coalesce(cap, 100);
+  insert into gem_cnt(uid, p, pid) values (u, 'misc', moe_today()::text) on conflict do nothing;
+  select sum into used from gem_cnt where uid = u and p = 'misc' and pid = moe_today()::text;
+  m := w.bank + greatest(coalesce(p_misc, 0), 0);
+  mo := least(m, greatest(0, cap - coalesce(used, 0)));
+  w.bank := m - mo;
+  update gem_cnt set sum = sum + mo where uid = u and p = 'misc' and pid = moe_today()::text;
+  e := greatest(coalesce(p_ok, 0), 0) + mo;
+  s := greatest(coalesce(p_spend, 0), 0);
+  w.gem := w.gem + e; w.earn_today := w.earn_today + e;
+  if s > w.gem then w.flags := w.flags + 1; s := w.gem; end if;
+  w.gem := w.gem - s;
+  if (jsonb_array_length(coalesce(p_rej, '[]'::jsonb)) > 0 or w.bank > cap * 3) and w.g_flag is distinct from moe_today() then
+    w.g_flag := moe_today();
+    insert into save_flags(uid, lvl, detail) values (u, 'warn', jsonb_build_object('gem', jsonb_build_object('rej', coalesce(p_rej, '[]'::jsonb), 'bank', w.bank)));
+  end if;
+  update wallet set gem = w.gem, bank = w.bank, earn_day = w.earn_day, earn_today = w.earn_today, flags = w.flags, g_flag = w.g_flag, updated_at = now() where uid = u;
+  if e > 0 then insert into gem_log(uid, delta, reason) values (u, e, 'earn'); end if;
+  if s > 0 then insert into gem_log(uid, delta, reason) values (u, -s, 'spend'); end if;
+  return jsonb_build_object('gem', w.gem, 'topup', w.topup, 'earned', e, 'spent', s, 'bank', w.bank, 'rej', coalesce(p_rej, '[]'::jsonb));
+end $$;
+
+-- 舊版同步(只剩相容用途):沒有來源的鑽石一律當作「未標示來源」,受每日上限限制
+create or replace function public.gem_sync(p_earn int, p_spend int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); begin return moe_gem_apply(u, 0, p_earn, p_spend); end $$;
+
+-- 同步:鑽石(含來源)+ 資源一次處理
+drop function if exists public.wallet_sync(int,int,jsonb,jsonb);
+create or replace function public.wallet_sync(p_earn int, p_spend int, p_re jsonb default '{}'::jsonb, p_rs jsonb default '{}'::jsonb, p_src jsonb default '[]'::jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); v jsonb; g jsonb; w wallet; cs int; k text; e bigint; s bigint; cap bigint; today bigint; ok bigint; bal bigint; bad jsonb := '{}'::jsonb;
+begin
+  v := moe_gem_src(u, p_src);
+  g := moe_gem_apply(u, (v->>'ok')::int, p_earn, p_spend, v->'rej');
+  select * into w from wallet where uid = u for update;
+  if not w.r_on then perform moe_res_from_save(u); select * into w from wallet where uid = u for update; end if;
+  if w.r_day is distinct from moe_today() then w.r_day := moe_today(); w.r_today := '{}'::jsonb; end if;
+  cs := moe_castle(u);
+  foreach k in array array['coin','stones','candy','shards'] loop
+    e := greatest(0, least(coalesce((p_re->>k)::bigint, 0), 1000000000)); s := greatest(0, least(coalesce((p_rs->>k)::bigint, 0), 1000000000));
+    e := e + coalesce((w.r_bank->>k)::bigint, 0);
+    cap := moe_res_cap(k, cs); today := coalesce((w.r_today->>k)::bigint, 0);
+    if k = 'shards' then ok := e;
+      if today + e > cap and w.r_flag is distinct from moe_today() then bad := bad || jsonb_build_object('shards', jsonb_build_object('today', today + e, 'cap', cap)); end if;
+    else ok := least(e, greatest(0, cap - today)); end if;
+    w.r_bank := case when e - ok > 0 then w.r_bank || jsonb_build_object(k, e - ok) else w.r_bank - k end;
+    w.r_today := w.r_today || jsonb_build_object(k, today + ok);
+    bal := case k when 'coin' then w.r_coin when 'stones' then w.r_stones when 'candy' then w.r_candy else w.r_shards end + ok;
+    if s > bal then if k <> 'shards' then w.flags := w.flags + 1; bad := bad || jsonb_build_object(k || '_spend', jsonb_build_object('spend', s, 'have', bal)); end if; s := bal; end if;
+    bal := bal - s;
+    if k = 'coin' then w.r_coin := bal; elsif k = 'stones' then w.r_stones := bal; elsif k = 'candy' then w.r_candy := bal; else w.r_shards := bal; end if;
+    if e - ok > cap and w.r_flag is distinct from moe_today() then bad := bad || jsonb_build_object(k, jsonb_build_object('bank', e - ok, 'cap', cap)); end if;
+  end loop;
+  if bad <> '{}'::jsonb then w.r_flag := moe_today(); insert into save_flags(uid, lvl, detail) values (u, 'warn', jsonb_build_object('res', bad, 'castle', cs)); end if;
+  update wallet set r_coin = w.r_coin, r_stones = w.r_stones, r_candy = w.r_candy, r_shards = w.r_shards, r_day = w.r_day, r_today = w.r_today, r_bank = w.r_bank, r_flag = w.r_flag, flags = w.flags, updated_at = now() where uid = u;
+  return g || jsonb_build_object('res', moe_res_json(w));
+end $$;
+grant execute on function public.wallet_sync(int,int,jsonb,jsonb,jsonb) to authenticated;
+revoke execute on function public.moe_gem_src(uuid,jsonb), public.moe_gem_apply(uuid,int,int,int,jsonb) from public, anon, authenticated;
+
+
+-- ============ 守塔排行:回報的波數要合理(依隊伍戰力推算的波數 ×1.3 + 15),太高不列入排行並記異常 ============
+create or replace function public.moe_td_ok(u uuid, p_wave int) returns boolean language plpgsql security definer set search_path = public as $$
+declare pw int; lim int; begin
+  begin select coalesce((data->>'pw')::numeric, 0)::int into pw from docs where path = 'arena/' || u::text; exception when others then pw := 0; end;
+  lim := floor(bot_td_waves(greatest(coalesce(pw, 0), 5500)) * 1.3 + 15)::int;
+  if p_wave <= lim then return true; end if;
+  if not exists (select 1 from save_flags where uid = u and status = 'open' and detail ? 'td' and at > now() - interval '1 day') then
+    insert into save_flags(uid, lvl, detail) values (u, 'warn', jsonb_build_object('td', jsonb_build_object('wave', p_wave, 'limit', lim, 'pw', pw)));
+  end if;
+  return false; end $$;
+revoke execute on function public.moe_td_ok(uuid,int) from public, anon, authenticated;
+
+-- ============ 管理員:不再開放「設定第一位管理員」,只能由現有管理員在後台新增 ============
+create or replace function public.admin_claim() returns jsonb language plpgsql security definer set search_path = public, auth as $$
+begin raise exception '新增管理員請由現有管理員在後台「維護 / 管理員」頁操作'; end $$;
+
+-- ============ 自動清理舊紀錄(玩家登入時偶爾執行一次,不影響遊戲) ============
+create or replace function public.moe_cleanup() returns void language plpgsql security definer set search_path = public as $$
+begin
+  delete from gem_log where reason not like 'topup%' and at < now() - interval '365 days';
+  delete from player_day where d < moe_today() - 180;
+  delete from admin_log where at < now() - interval '180 days';
+  delete from market where status <> 'open' and created < now() - interval '90 days';
+  delete from save_flags where status <> 'open' and at < now() - interval '180 days';
+  delete from gem_cnt where (pid ~ '^\d{4}-' and pid < (moe_today() - 30)::text) or (pid ~ '^\d+$' and pid::int < moe_week() - 5);
+  delete from gem_once where k like '%@%' and at < now() - interval '30 days';
+  insert into settings(k, v) values ('cleanup', jsonb_build_object('at', now())) on conflict (k) do update set v = excluded.v;
+end $$;
+revoke execute on function public.moe_cleanup() from public, anon, authenticated;
+create or replace function public.moe_cleanup_maybe() returns void language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce((select (v->>'at')::timestamptz from settings where k = 'cleanup'), now() - interval '2 days') < now() - interval '1 day' then perform moe_cleanup(); end if;
+exception when others then null; end $$;
+revoke execute on function public.moe_cleanup_maybe() from public, anon, authenticated;
