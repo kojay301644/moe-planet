@@ -3285,7 +3285,7 @@ function netMsg(m){const R=NETR;if(!R||!m)return;const T=TD;
   if(m.t==='bye'){if(T&&T.net&&!T.over){if(R.host)netLost();else{toast('房主離開了,這場結束');tdEnd(false)}}else if(R.host){R.peer=null;netLobby()}else{toast('房主取消了房間');netLeave()}return}
   if(m.t==='go'&&!R.host){tdStart('coop',+m.d||0,m.cfg);const T2=TD;if(!T2)return;T2.guest=1;T2.side='B';T2.net={host:0,last:T2.t,hbT:0,peer:m.n,tv:'',mate:m.u};T2.prep=30;netLobby();tdHudBuild();return}
   if(!T||!T.net)return;
-  if(R.host){T.net.hb=T.t;if(m.t==='a')netApply(m)}
+  if(R.host){T.net.hb=T.t;if(m.t==='a'){netApply(m);if(m.n>(T.net.ak||0))T.net.ak=m.n}}
   else{if(m.t==='s')netSnap(m);else if(m.t==='end'){if(!T.over)tdEnd(!!m.win)}}}
 function netLost(){const T=TD;if(!T||!T.net||T.net.lost)return;T.net.lost=1;const c=tdBotCands()[1];T.bot=tdBotInit({...c,n:(T.net.peer||'隊友')+'(電腦代打)'});toast('隊友斷線了,電腦先幫他守左路');tdHudBuild()}
 // 房主:把隊友的操作套用到左路
@@ -3298,18 +3298,18 @@ function netApply(m){const T=TD;if(T.over||T.net.lost)return;const a=m.a,i=m.i,w
   else if(a==='help'){const e=T.en.filter(e=>e.hp>0&&e.r===1).sort((p,q)=>q.d-p.d)[0];const [x,y]=e?tdPos(e.d,1):T.slots[13];T.ping={x,y,t:0,side:'B'};tdTxt(x,y-90,'🆘 左路需要幫忙!','#ff8a8a',2,true);sfx('boss')}
   else if(a==='next'){if(T.prep>0){T.prep=0;tdNextWave()}else if(!T.spawn.length){T.store.B+=8+T.wave;tdNextWave()}}
   else if(a==='ult')T.ults.push({side:'B',t:T.t,x:m.x,y:m.y})}
-function netAct(a,o){const R=NETR;if(!R||!TD||!TD.guest)return;R.ch.send(Object.assign({t:'a',a},o||{}))}
+function netAct(a,o,spend){const R=NETR,T=TD;if(!R||!T||!T.guest)return;R.sq=(R.sq||0)+1;if(spend>0){T.pend=T.pend||[];T.pend.push({n:R.sq,c:spend,t:T.t});T.energy-=spend}R.ch.send(Object.assign({t:'a',a,n:R.sq},o||{}))}
 // 房主每 0.125 秒送一次畫面
 function netTick(dt){const T=TD,N=T.net;if(!N)return;
-  if(N.host){if(!N.lost&&T.t-N.hb>8)netLost();N.acc+=dt;if(N.acc<.125)return;N.acc=0;
+  if(N.host){if(!N.lost&&T.t-N.hb>8)netLost();N.acc+=dt;if(N.acc<.1)return;N.acc=0;
     const sig=Object.keys(T.tw).map(s=>s+':'+T.tw[s].k+T.tw[s].lv).join(','),tw=sig!==N.sig?(N.sig=sig,Object.fromEntries(Object.entries(T.tw).map(([s,w])=>[s,Object.assign({},w,{tx:undefined})]))):null;
-    NETR&&NETR.ch.send({t:'s',w:T.wave,p:T.prep,hp:T.hp,hm:T.hpMax,sp:T.spawn.length,sh:T.shield,eA:T.energy,eB:T.store.B,spT:T.spT,cmd:T.cmd,bn:T.banner,ks:T.kills,sk:T.shake,
+    NETR&&NETR.ch.send({t:'s',ak:N.ak||0,w:T.wave,p:T.prep,hp:T.hp,hm:T.hpMax,sp:T.spawn.length,sh:T.shield,eA:T.energy,eB:T.store.B,spT:T.spT,cmd:T.cmd,bn:T.banner,ks:T.kills,sk:T.shake,
       fl:T.flash&&T.flash.t<.05?[T.flash.c,T.flash.a,T.flash.life]:null,ping:T.ping&&T.ping.t<.2?T.ping:null,bid:T.boss?T.boss.id:0,
       en:T.en.filter(e=>e.hp>0).map(e=>[e.id,e.k,Math.round(e.d*10)/10,e.r,Math.round(e.hp),Math.round(e.max),(e.boss?1:0)|(e.elite?2:0)|(e.fly?4:0),e.stun>0?1:0]),
       tw,st:Object.fromEntries(Object.entries(T.tw).map(([s,w])=>[s,[w.stun>0?1:0,w.face]])),ev:N.ev.splice(0,80)});N.ev.length=0}
   else{N.hbT-=dt;if(N.hbT<=0){N.hbT=1;NETR&&NETR.ch.send({t:'hb'})}if(T.t-N.last>7&&!T.over){toast('和房主的連線中斷了');tdEnd(false)}}}
 // 隊友:套用房主送來的畫面
-function netSnap(s){const T=TD,N=T.net;N.last=T.t;T.wave=s.w;T.prep=s.p;T.hp=s.hp;T.hpMax=s.hm;T.shield=s.sh;T.energy=s.eB;T.store.A=s.eA;T.spT=s.spT||T.spT;T.cmd=s.cmd||{};T.kills=s.ks;if(s.bn<T.banner)T.banner=s.bn;
+function netSnap(s){const T=TD,N=T.net;N.last=T.t;T.wave=s.w;T.prep=s.p;T.hp=s.hp;T.hpMax=s.hm;T.shield=s.sh;T.pend=(T.pend||[]).filter(p=>p.n>(s.ak||0)&&T.t-p.t<5);T.energy=s.eB-T.pend.reduce((a,p)=>a+p.c,0);T.store.A=s.eA;T.spT=s.spT||T.spT;T.cmd=s.cmd||{};T.kills=s.ks;if(s.bn<T.banner)T.banner=s.bn;
   T.spawn=Array(s.sp||0).fill(0);if(s.sk>T.shake)T.shake=s.sk;if(s.fl)T.flash={t:0,c:s.fl[0],a:s.fl[1],life:s.fl[2]};if(s.ping)T.ping=Object.assign({},s.ping);
   if(s.tw){const old=T.tw;T.tw={};for(const k in s.tw){const w=s.tw[k];T.tw[k]=Object.assign(w,{anim:old[k]?old[k].anim:rnd()*9,hit:0})}}
   if(s.st)for(const k in s.st){const w=T.tw[k];if(w){w.stun=s.st[k][0]?.5:0;w.face=s.st[k][1]}}
@@ -3640,7 +3640,7 @@ function tdThunder(){if(TD.net&&TD.net.host)TD.net.ev.push(['th']);const T=TD,be
     const pct=e.max*(e.boss?.05:.15)*(100+(e.E.def||0)*3)/100/Math.max(.5,elemMul('elec',e.E.el));tdDmg(e,best*5+pct,'elec',null);e.stun=Math.max(e.stun||0,e.boss?1:2)}
     T.flash={t:0,life:.55,a:.85,c:'255,255,235'};T.shake=1;sfx('zap')})}
 function tdAct(a){const T=TD;if(!T||T.over)return;sfx('click');const [k,arg]=a.split(':');
-  if(T.guest&&k!=='quit'&&k!=='info'){if(k==='swap')return;if(k==='sup'){if(T.t<(T.spT.B||0))return toast('支援冷卻中');if(T.energy<50)return toast('能量不足 50');netAct('sup');return toast('已送出支援 ✦50')}
+  if(T.guest&&k!=='quit'&&k!=='info'){if(k==='swap')return;if(k==='sup'){if(T.t<(T.spT.B||0))return toast('支援冷卻中');if(T.energy<50)return toast('能量不足 50');netAct('sup',{},50);return toast('已送出支援 ✦50')}
     if(k==='help'){netAct('help');return toast('已向隊友求救')}if(k==='next'){netAct('next');return}if(k==='pause'||k==='spd')return toast('只有房主可以暫停或加速');
     if(k==='cmd'){const C=CMDS.find(c=>c.k===arg);if(!C)return;if((SV.castle||1)<C.lv)return toast(`主城 Lv.${C.lv} 解鎖「${C.n}」`);if((T.cmd[arg+'B']||0)>0)return toast('這一場已經用過了');netAct('cmd',{k:arg});T.cmd[arg+'B']=1e9;tdHudTick();return}return}
   if(k==='swap')return tdSwap();if(k==='info'){T.infOn=!T.infOn;T._it=0;tdLayout();tdHudTick();return}if(k==='sup')return tdSupport();if(k==='help')return tdPingHelp();
@@ -3669,7 +3669,7 @@ function tdPick(i){const T=TD,P=$('tdPick'),w=T.tw[i];P.hidden=false;
   iconize(P);P.querySelectorAll('[data-tp]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();sfx('click');const [a,k]=b.dataset.tp.split(':');
     if(a==='x'){T.sel=null;P.hidden=true;return}
     if(a==='tab'){T.pkTab=k;tdPick(i);return}
-    if(T.guest&&(a==='put'||a==='putw'||a==='up'||a==='sell')){if(a==='put'){const c=tdCost(k);if(T.energy<c)return;const nw=tdTower(k,i);nw.side='B';netAct('put',{i,w:nw,c});T.energy-=c}else if(a==='putw'){const c=tdWCost(k);if(T.energy<c)return;netAct('putw',{i,w:tdWTower(k,i),c});T.energy-=c}else if(a==='up'){if(T.energy<tdUpW(w))return;netAct('up',{i})}else netAct('sell',{i});T.sel=null;P.hidden=true;sfx('up');return}
+    if(T.guest&&(a==='put'||a==='putw'||a==='up'||a==='sell')){if(a==='put'){const c=tdCost(k);if(T.energy<c)return;const nw=tdTower(k,i);nw.side='B';netAct('put',{i,w:nw,c},c)}else if(a==='putw'){const c=tdWCost(k);if(T.energy<c)return;netAct('putw',{i,w:tdWTower(k,i),c},c)}else if(a==='up'){const c=tdUpW(w);if(T.energy<c)return;netAct('up',{i},c)}else netAct('sell',{i});T.sel=null;P.hidden=true;sfx('up');return}
     if(a==='put'){const c=tdCost(k);if(T.energy<c)return;T.energy-=c;if(!T.used.includes(k))T.used.push(k);T.tw[i]=tdTower(k,i);T.tw[i].side=T.coop?(TDSIDE2[i]==='C'?T.side:TDSIDE2[i]):'A';T.sel=null;P.hidden=true;const [x,y]=TD.slots[i];tdPart(x,y-30,18,[EL[PETS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
     if(a==='putw'){const c=tdWCost(k);if(T.energy<c)return;T.energy-=c;T.tw[i]=tdWTower(k,i);T.tw[i].side=T.coop?(TDSIDE2[i]==='C'?T.side:TDSIDE2[i]):'A';T.sel=null;P.hidden=true;const [x,y]=TD.slots[i];tdPart(x,y-30,18,[EL[TOWERS[k].el].c,'#fff'],180,.6,5);sfx('up');return}
     if(a==='up'){const c=tdUpW(w);if(T.energy<c||w.lv>=3)return;T.energy-=c;w.spent+=c;w.lv++;w.rgT=1.2;const [x,y]=TD.slots[i];tdPart(x,y-40,20,['#ffe066','#fff'],180,.6,5);tdTxt(x,y-100,'升級!','#ffe066');sfx('up');tdPick(i);return}

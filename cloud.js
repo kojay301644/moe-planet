@@ -1,7 +1,7 @@
 // 萌獸星球 × Supabase:把遊戲原本用的雲端資料介面接到你自己的 Supabase 專案。
 // 每台裝置第一次開啟會自動建立一個匿名帳號,存檔、天梯、好友、聊天都會存到雲端。
 (()=>{const C=window.MOE_CFG;if(!C||!C.url||!C.key||C.url.includes('請貼上')||!window.supabase){console.warn('MOE: 未設定雲端,使用離線模式');return}
-const sb=supabase.createClient(C.url,C.key,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'moe-auth'}});
+const sb=supabase.createClient(C.url,C.key,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'moe-auth'},realtime:{params:{eventsPerSecond:20}}});
 let uid=null;
 const ready=(async()=>{let {data:{session}}=await sb.auth.getSession();if(!session){const r=await sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}uid=session.user.id;return uid})();
 const parent=p=>p.split('/').slice(0,-1).join('/');
