@@ -1937,3 +1937,6 @@ revoke execute on function public.moe_gem_src(uuid,jsonb) from public, anon, aut
 create or replace function public.moe_res_cap(p_k text, p_castle int) returns bigint language plpgsql stable set search_path = public as $$
 declare c jsonb := coalesce((select st.v from settings st where st.k = 'res_caps'), '{}'::jsonb); d jsonb := '{"coin":[300000,70000],"stones":[100,15],"candy":[800,80],"shards":[300,30]}'::jsonb; x jsonb;
 begin x := coalesce(c->p_k, d->p_k); return ((x->>0)::bigint + (x->>1)::bigint * greatest(1, least(coalesce(p_castle, 1), 50))); end $$;
+
+-- 新角色起始鑽石改為 0(只影響之後新建立的帳號)
+alter table public.wallet alter column gem set default 0;
