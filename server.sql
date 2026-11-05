@@ -1961,3 +1961,32 @@ begin if u is null then raise exception 'not signed in'; end if;
   begin perform moe_beta_gift(u); exception when others then null; end;
   return jsonb_build_object('sid', s); end $$;
 grant execute on function public.session_start(text) to authenticated;
+
+-- ============ 封測前調整:上限、預設值、內測禮包改為分 3 天寄 ============
+create or replace function public.moe_res_from_save(u uuid) returns void language plpgsql security definer set search_path = public as $$
+declare s jsonb; begin
+  select moe_save_stats(data) into s from docs where path = 'data/users/' || u::text || '/save';
+  insert into wallet(uid) values (u) on conflict do nothing;
+  update wallet set r_on = true, r_coin = greatest(0, coalesce((s->>'coin')::bigint, 3000)), r_stones = greatest(0, coalesce((s->>'stones')::int, 0)),
+    r_candy = greatest(0, coalesce((s->>'candy')::int, 0)), r_shards = greatest(0, coalesce((s->>'shards')::int, 0)), r_bank = '{}'::jsonb, updated_at = now() where uid = u; end $$;
+create or replace function public.moe_res_cap(p_k text, p_castle int) returns bigint language plpgsql stable set search_path = public as $$
+declare c jsonb := coalesce((select st.v from settings st where st.k = 'res_caps'), '{}'::jsonb); d jsonb := '{"coin":[300000,100000],"stones":[150,15],"candy":[800,80],"shards":[300,30]}'::jsonb; x jsonb;
+begin x := coalesce(c->p_k, d->p_k); return ((x->>0)::bigint + (x->>1)::bigint * greatest(1, least(coalesce(p_castle, 1), 50))); end $$;
+create or replace function public.moe_beta_gift(u uuid) returns void language plpgsql security definer set search_path = public as $$
+declare b inbox; n int;
+begin
+  if u is null or not coalesce((select (v->>'gift')::boolean from settings where k = 'beta'), false) then return; end if;
+  select * into b from inbox where uid = u and kind = 'beta' order by id limit 1;
+  if b.id is null then
+    insert into inbox(uid, gem, note, credit, kind, title, bonus) values (u, 1000,
+      '感謝參加萌獸星球內測!這是給測試玩家的大禮包,領取後還可以「自選一隻傳說品質的萌獸」。明天、後天登入還會再各收到 💎1,000。正式上線前會刪檔,請盡量體驗各種功能,有問題到「設定 → 回報問題」告訴我們!',
+      true, 'beta', '🎁 內測大禮包(第 1 天)', '{"coin":100000,"candy":500,"stones":100,"rtix":3,"lpick":1}'::jsonb);
+    return;
+  end if;
+  if b.gem <> 1000 then return; end if; -- 舊版一次給 3000 的不再補寄
+  select count(*) into n from inbox where uid = u and kind in ('beta2','beta3');
+  if n >= 2 then return; end if;
+  if exists (select 1 from inbox where uid = u and kind in ('beta','beta2','beta3') and (created at time zone 'Asia/Taipei')::date >= moe_today()) then return; end if;
+  insert into inbox(uid, gem, note, credit, kind, title) values (u, 1000, '內測大禮包第 ' || (n + 2) || ' 天:💎1,000!謝謝你持續幫忙測試。', true, case when n = 0 then 'beta2' else 'beta3' end, '🎁 內測大禮包(第 ' || (n + 2) || ' 天)');
+end $$;
+revoke execute on function public.moe_beta_gift(uuid) from public, anon, authenticated;
