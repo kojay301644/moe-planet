@@ -115,7 +115,7 @@ begin
 end $$;
 
 -- 測試用儲值(之後串金流時改成由金流通知呼叫)
-create or replace function public.topup_test(p_pkg text) returns jsonb language plpgsql security definer set search_path = public as $$
+create or replace function public.topup_test_impl(p_pkg text) returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); g int; b int; first boolean; w wallet;
 begin
   select v.g, v.b into g, b from (values ('p30',60,0),('p150',300,30),('p300',600,80),('p790',1580,300),('p1490',2980,700),('p3290',6580,1900),('card',300,0),('fund',600,0)) v(id,g,b) where v.id = p_pkg;
@@ -376,7 +376,7 @@ begin
 end $$;
 grant execute on function public.delete_account() to authenticated;
 
-grant execute on function public.wallet_init(int), public.gem_sync(int,int), public.summon(int,text,boolean), public.topup_test(text),
+grant execute on function public.wallet_init(int), public.gem_sync(int,int), public.summon(int,text,boolean), public.topup_test_impl(text),
   public.ladder_me(), public.ladder_report(boolean,int,int,int,real), public.ladder_buy(), public.ladder_top(int),
   public.market_list(jsonb,int), public.market_browse(), public.market_mine(), public.market_buy(bigint), public.market_cancel(bigint), public.inbox_claim() to authenticated;
 revoke execute on function public.ladder_row(), public.ladder_json(ladder,int) from public, anon, authenticated;
@@ -1026,3 +1026,100 @@ create or replace function public.td_top2(p_limit int default 50) returns jsonb 
   from (select * from td_duo where wk = moe_week() order by best desc, at limit least(greatest(p_limit,1),100)) q $$;
 revoke all on public.td_duo from anon, authenticated;
 grant execute on function public.td_report2(uuid,text,text,int,int), public.td_top2(int) to authenticated;
+
+-- ============ 防作弊第一階段:存檔成長檢查、存檔歷史、後台還原 ============
+create table if not exists public.save_hist(id bigserial primary key, uid uuid not null, at timestamptz not null default now(), data jsonb not null);
+create index if not exists save_hist_uid on public.save_hist(uid, at desc);
+create table if not exists public.save_flags(id bigserial primary key, uid uuid not null, at timestamptz not null default now(), lvl text not null, detail jsonb not null default '{}'::jsonb, attempted jsonb, status text not null default 'open');
+create index if not exists save_flags_st on public.save_flags(status, at desc);
+alter table public.save_hist enable row level security;
+alter table public.save_flags enable row level security;
+revoke all on public.save_hist, public.save_flags from anon, authenticated;
+
+create or replace function public.moe_save_stats(d jsonb) returns jsonb language plpgsql immutable as $$
+declare s jsonb; sh numeric := 0; np int := 0; neg boolean := false; k text; v jsonb;
+begin
+  begin s := (d->>'json')::jsonb; exception when others then return null; end;
+  if s is null then return null; end if;
+  if jsonb_typeof(s->'pets') = 'object' then
+    for k, v in select * from jsonb_each(s->'pets') loop
+      np := np + 1; sh := sh + coalesce((v->>'shards')::numeric, 0);
+      if coalesce((v->>'shards')::numeric,0) < 0 or coalesce((v->>'lv')::numeric,1) < 0 then neg := true; end if;
+    end loop;
+  end if;
+  return jsonb_build_object('coin', coalesce((s->>'coin')::numeric,0), 'stones', coalesce((s->>'stones')::numeric,0), 'candy', coalesce((s->>'candy')::numeric,0), 'shards', sh, 'pets', np,
+    'neg', neg or coalesce((s->>'coin')::numeric,0) < 0 or coalesce((s->>'stones')::numeric,0) < 0 or coalesce((s->>'candy')::numeric,0) < 0);
+exception when others then return null;
+end $$;
+
+create or replace function public.moe_save_guard() returns trigger language plpgsql security definer set search_path = public as $$
+declare u uuid; o jsonb; n jsonb; h numeric; r numeric := 0; d jsonb := '{}'::jsonb; lim numeric; dv numeric; f text; bad boolean := false; lv text; last timestamptz;
+begin
+  if NEW.path not like 'data/users/%/save' or current_setting('moe.skip', true) = '1' then return NEW; end if;
+  begin u := split_part(NEW.path, '/', 3)::uuid; exception when others then return NEW; end;
+  if TG_OP = 'UPDATE' then
+    -- 存檔歷史:每 10 分鐘最多一份,保留 10 份
+    select max(at) into last from save_hist where uid = u;
+    if last is null or now() - last > interval '10 minutes' then
+      insert into save_hist(uid, data) values (u, OLD.data);
+      delete from save_hist where uid = u and id not in (select id from save_hist where uid = u order by at desc limit 10);
+    end if;
+    o := moe_save_stats(OLD.data); n := moe_save_stats(NEW.data);
+    if o is null or n is null then return NEW; end if;
+    h := greatest(.25, least(48, extract(epoch from now() - coalesce(OLD.updated_at, now() - interval '1 hour')) / 3600));
+    foreach f in array array['coin','stones','candy','shards','pets'] loop
+      lim := case f when 'coin' then greatest(2000000 + 3000000 * h, (o->>'coin')::numeric * .5) when 'stones' then 300 + 400 * h when 'candy' then 1000 + 1500 * h when 'shards' then 300 + 400 * h else 12 + 20 * h end;
+      dv := (n->>f)::numeric - (o->>f)::numeric;
+      if dv > lim then r := greatest(r, dv / lim); d := d || jsonb_build_object(f, jsonb_build_object('from', o->f, 'to', n->f, 'limit', round(lim))); end if;
+    end loop;
+    if (n->>'neg')::boolean or (n->>'coin')::numeric > 2000000000 or (n->>'stones')::numeric > 50000000 or (n->>'candy')::numeric > 50000000 then bad := true; d := d || jsonb_build_object('invalid', true); end if;
+    if bad or r > 5 then lv := 'block'; elsif r > 1 then lv := 'warn'; else return NEW; end if;
+    d := d || jsonb_build_object('hours', round(h, 2), 'ratio', round(r, 1));
+    if not exists (select 1 from save_flags where uid = u and status = 'open' and lvl = lv and at > now() - interval '10 minutes') then
+      insert into save_flags(uid, lvl, detail, attempted) values (u, lv, d, case when lv = 'block' then NEW.data else null end);
+    else
+      update save_flags set detail = d, attempted = case when lv = 'block' then NEW.data else attempted end, at = now() where id = (select id from save_flags where uid = u and status = 'open' and lvl = lv order by at desc limit 1);
+    end if;
+    if lv = 'block' then
+      NEW.data := jsonb_set(OLD.data, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint));
+    end if;
+  end if;
+  return NEW;
+end $$;
+drop trigger if exists docs_save_guard on public.docs;
+create trigger docs_save_guard before update on public.docs for each row execute function public.moe_save_guard();
+
+create or replace function public.admin_save_flags(p_status text default 'open') returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); begin
+  return coalesce((select jsonb_agg(jsonb_build_object('id', f.id, 'uid', f.uid, 'at', f.at, 'lvl', f.lvl, 'detail', f.detail, 'status', f.status, 'has', f.attempted is not null, 'name', coalesce(d.data->>'n', '守護員')) order by f.at desc)
+    from (select * from save_flags where (p_status = 'all' or status = p_status) order by at desc limit 200) f left join docs d on d.path = 'arena/' || f.uid::text), '[]'::jsonb); end $$;
+create or replace function public.admin_save_hist(p_uid uuid) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); begin
+  return coalesce((select jsonb_agg(jsonb_build_object('id', id, 'at', at, 's', moe_save_stats(data)) order by at desc) from save_hist where uid = p_uid), '[]'::jsonb); end $$;
+create or replace function public.admin_save_restore(p_uid uuid, p_hist bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); dd jsonb; begin
+  select data into dd from save_hist where id = p_hist and uid = p_uid; if dd is null then raise exception '找不到這份存檔'; end if;
+  perform set_config('moe.skip', '1', true);
+  update docs set data = jsonb_set(dd, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint)), updated_at = now() where path = 'data/users/' || p_uid::text || '/save';
+  update save_flags set status = 'restored' where uid = p_uid and status = 'open';
+  perform alog('save_restore', p_uid, jsonb_build_object('hist', p_hist)); return jsonb_build_object('ok', true); end $$;
+create or replace function public.admin_save_accept(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); f save_flags; begin
+  select * into f from save_flags where id = p_id; if f.id is null then raise exception '找不到'; end if;
+  if f.attempted is not null then perform set_config('moe.skip', '1', true);
+    update docs set data = jsonb_set(f.attempted, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint)), updated_at = now() where path = 'data/users/' || f.uid::text || '/save'; end if;
+  update save_flags set status = 'ok' where id = p_id; perform alog('save_accept', f.uid, jsonb_build_object('flag', p_id)); return jsonb_build_object('ok', true); end $$;
+create or replace function public.admin_save_close(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); begin update save_flags set status = 'closed' where id = p_id; return jsonb_build_object('ok', true); end $$;
+revoke execute on function public.moe_save_stats(jsonb), public.moe_save_guard() from public, anon, authenticated;
+grant execute on function public.admin_save_flags(text), public.admin_save_hist(uuid), public.admin_save_restore(uuid,bigint), public.admin_save_accept(bigint), public.admin_save_close(bigint) to authenticated;
+
+-- 測試儲值:只有管理員能用(正式金流上線前)
+
+create or replace function public.topup_test(p_pkg text) returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null or not exists (select 1 from admins where uid = auth.uid()) then raise exception '儲值功能尚未開放'; end if;
+  return topup_test_impl(p_pkg);
+end $$;
+revoke execute on function public.topup_test_impl(text) from public, anon, authenticated;
+grant execute on function public.topup_test(text) to authenticated;

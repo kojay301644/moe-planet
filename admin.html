@@ -110,9 +110,9 @@ const MATN={stones:'進化石',enh:'強化石',ore:'礦石',reroll:'洗練石',c
 const itemName=e=>e&&e.mat?`<b>${e.mat==='shard'?(PET[e.pet]||e.pet)+'碎片':MATN[e.mat]||e.mat} ×${fmt(e.n)}</b> <span class="tag">${e.mat==='shard'?'碎片':'材料'}</span>`:e?`<span class="item r${e.rar}c"><b>${e.uq?UQ[e.uq]:SET[e.set||'basic']+EQT[e.type]}${e.lv?' +'+e.lv:''}</b></span> <span class="tag">${RAR[e.rar]||''}</span>`:'-';
 const itemSubs=e=>(e&&!e.mat&&e.subs||[]).map(s=>`${SUB[s[0]]||s[0]} +${s[1]}`).join('、');
 const REASON=r=>{r=r||'';return r==='earn'?'遊戲獲得':r==='spend'?'遊戲花費':r==='mail'?'信件領取':r.startsWith('summon')?'召喚 ×'+r.slice(6):r.startsWith('topup:')?'儲值 '+r.slice(6):r.startsWith('admin:')?'營運調整 '+r.slice(6):r.startsWith('market_buy')?'交易所購買':r.startsWith('market_sell_bot')?'交易所賣出(系統)':r.startsWith('market_sell')?'交易所賣出':r==='ladder_ticket'?'天梯挑戰券':r};
-const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',admin_remove:'移除管理員'};
+const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',save_restore:'還原存檔',save_accept:'接受存檔',admin_remove:'移除管理員'};
 let ME=null,TAB='home',PQ={q:'',sort:'recent'},MKS='open';
-const TABS=[['home','總覽'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['events','活動'],['codes','兌換碼'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['tickets','客服回報'],['market','交易所'],['system','維護 / 管理員'],['logs','操作紀錄']];
+const TABS=[['home','總覽'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['events','活動'],['codes','兌換碼'],['saves','存檔異常'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['tickets','客服回報'],['market','交易所'],['system','維護 / 管理員'],['logs','操作紀錄']];
 // ---------- login ----------
 const em=u=>String(u).trim().toLowerCase()+'@player.moe-planet.app';
 $('lgo').onclick=async()=>{const u=$('lu').value.trim(),p=$('lp').value;if(!u||!p)return toast('請輸入帳號和密碼');$('lgo').disabled=true;$('lmsg').textContent='登入中…';
@@ -256,6 +256,21 @@ A.csave=async()=>{const c=$('cc').value.trim(),n=id=>Math.max(0,Math.round(+$(id
 A.ctog=async code=>{const L=await rpc('admin_codes'),c=L.find(x=>x.code===code);if(!c)return;try{await rpc('admin_code_save',{p_code:c.code,p_reward:c.reward,p_max:c.max_uses,p_expires:c.expires,p_active:!c.active});render()}catch(e){toast(e.message)}};
 // ---------- 儲值紀錄 ----------
 let TPF=null,TPT=null;
+
+let SVST='open',SVH=null;
+const SVF={coin:'⭐ 星星幣',stones:'💠 進化石',candy:'🍬 糖果',shards:'碎片',pets:'萌獸數量'};
+V.saves=async()=>{const L=await rpc('admin_save_flags',{p_status:SVST}),tm=t=>new Date(t).toLocaleString('zh-TW',{hour12:false});
+  const det=d=>Object.keys(SVF).filter(k=>d[k]).map(k=>`${SVF[k]} ${fmt(d[k].from)} → <b style="color:var(--bad)">${fmt(d[k].to)}</b>(上限 +${fmt(d[k].limit)})`).concat(d.invalid?['<b style="color:var(--bad)">出現負數或不合理的數字</b>']:[]).join('<br>')+`<br><small>距離上次存檔 ${d.hours} 小時 · 超過上限 ${d.ratio} 倍</small>`;
+  let h=`<div class="card"><h2>⚠ 存檔異常 <small>伺服器自動檢查玩家存檔的成長速度。「警告」= 超過上限 1~5 倍,存檔照常接受;「已擋下」= 超過 5 倍或數字不合理,伺服器保留上一份正常存檔</small></h2>
+    <div class="row"><button class="${SVST==='open'?'p':'s'}" data-a="svst:open">待處理</button><button class="${SVST==='all'?'p':'s'}" data-a="svst:all">全部</button></div>
+    ${L.length?`<div class="tw"><table><thead><tr><th>時間</th><th>玩家</th><th>狀態</th><th>內容</th><th>處理</th></tr></thead><tbody>${L.map(x=>`<tr><td>${tm(x.at)}</td><td><a href="#" data-a="pdet:${x.uid}">${esc(x.name)}</a></td><td>${x.lvl==='block'?'<b style="color:var(--bad)">已擋下</b>':'<b style="color:#d08a00">警告</b>'}${x.status!=='open'?`<br><small>${{ok:'已接受',restored:'已還原',closed:'已關閉'}[x.status]||x.status}</small>`:''}</td><td style="font-size:13px">${det(x.detail||{})}</td>
+      <td>${x.status==='open'?`<button class="s mini" data-a="svhist:${x.uid}">還原…</button>${x.has?`<button class="s mini" data-a="svok:${x.id}">接受(誤判)</button>`:''}<button class="s mini" data-a="svcl:${x.id}">關閉</button><button class="d mini" data-a="pdet:${x.uid}">停權…</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">目前沒有異常 👍</div>'}</div>`;
+  if(SVH){const H=await rpc('admin_save_hist',{p_uid:SVH});h+=`<div class="card"><h2>📜 存檔歷史 <small>選一份還原,玩家下次開遊戲生效</small></h2>${H.length?`<div class="tw"><table><thead><tr><th>時間</th><th class="n">星星幣</th><th class="n">進化石</th><th class="n">糖果</th><th class="n">碎片</th><th class="n">萌獸</th><th></th></tr></thead><tbody>${H.map(x=>`<tr><td>${tm(x.at)}</td><td class="n">${fmt(x.s.coin)}</td><td class="n">${fmt(x.s.stones)}</td><td class="n">${fmt(x.s.candy)}</td><td class="n">${fmt(x.s.shards)}</td><td class="n">${x.s.pets}</td><td><button class="p mini" data-a="svres:${SVH}:${x.id}">還原這份</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">這位玩家還沒有存檔歷史(每 10 分鐘最多記一份)</div>'}<div class="row"><button class="s" data-a="svhist:">收起</button></div></div>`}
+  return h};
+A.svst=v=>{SVST=v;render()};A.svhist=u=>{SVH=u||null;render()};
+A.svok=async id=>{if(!sure('svok'+id,'接受玩家的這份存檔'))return;try{await rpc('admin_save_accept',{p_id:+id});toast('已接受');render()}catch(e){toast(e.message)}};
+A.svcl=async id=>{try{await rpc('admin_save_close',{p_id:+id});render()}catch(e){toast(e.message)}};
+A.svres=async(u,id)=>{if(!sure('svres'+id,'把玩家存檔還原到這份'))return;try{await rpc('admin_save_restore',{p_uid:u,p_hist:+id});toast('已還原,玩家下次開遊戲生效');SVH=null;render()}catch(e){toast(e.message)}};
 V.topups=async()=>{const today=new Date(Date.now()+8*3600e3).toISOString().slice(0,10),f=TPF||new Date(Date.now()+8*3600e3-30*864e5).toISOString().slice(0,10),t=TPT||today,L=await rpc('admin_topups',{p_from:f,p_to:t}),PK={p30:'💎60',p150:'💎300',p300:'💎600',p790:'💎1,580',p1490:'💎2,980',p3290:'💎6,580',card:'月卡',fund:'成長基金'};
   const sum=L.reduce((a,x)=>a+x.gem,0),payers=new Set(L.map(x=>x.uid)).size;
   return `<div class="card"><div class="row"><label class="mut">從</label><input type="date" id="tf" value="${f}"><label class="mut">到</label><input type="date" id="tt" value="${t}"><button class="p" data-a="tpq">查詢</button></div></div>
