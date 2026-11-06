@@ -30,8 +30,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-off
 .top img{width:30px;height:30px;border-radius:8px}
 .top h1{font-size:16px;margin:0;flex:1}
 .top h1 small{color:var(--mut);font-weight:500;margin-left:6px}
-nav{display:flex;gap:2px;overflow-x:auto;max-width:1180px;margin:8px auto 0;scrollbar-width:none}
-nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--mut);white-space:nowrap}
+nav{display:flex;flex-wrap:wrap;gap:2px 2px;max-width:1180px;margin:8px auto 0;padding:0 max(8px,env(safe-area-inset-left,0px))}
+nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:7px 10px;color:var(--mut);white-space:nowrap}
 nav button.on{color:var(--acc);border-bottom-color:var(--acc)}
 main{max-width:1180px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 60px max(16px,env(safe-area-inset-left,0px));display:grid;gap:14px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
@@ -80,7 +80,7 @@ dt{color:var(--mut)}dd{margin:0;font-variant-numeric:tabular-nums;min-width:0;ov
 .notice p{margin:0;white-space:pre-wrap;color:var(--mut)}
 a{color:var(--acc);font-weight:600;text-decoration:none}
 code{background:var(--chip);padding:1px 5px;border-radius:5px;font-size:12px}
-.hb{display:grid;grid-template-columns:72px 1fr 48px;gap:8px;align-items:center;font-size:12px;margin:4px 0}.hb i{display:block;height:12px;border-radius:6px;background:var(--acc);min-width:2px}.hb b{text-align:right;font-variant-numeric:tabular-nums}.hb span{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb{display:grid;grid-template-columns:72px 1fr 48px;gap:8px;align-items:center;font-size:12px;margin:4px 0}.hb i{display:block;height:12px;border-radius:6px;background:var(--acc);min-width:2px}.hb b{text-align:right;font-variant-numeric:tabular-nums}.hb.w{grid-template-columns:minmax(110px,190px) 1fr minmax(96px,auto);font-size:13px}.hb.w span{white-space:normal}.hb span{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bon{gap:8px}.bon .act label{font-size:11px}
 </style></head><body>
 <div id="loginV" class="login"><div class="card">
@@ -116,7 +116,7 @@ const itemSubs=e=>(e&&!e.mat&&e.subs||[]).map(s=>`${SUB[s[0]]||s[0]} +${s[1]}`).
 const REASON=r=>{r=r||'';return r==='earn'?'遊戲獲得':r==='spend'?'遊戲花費':r==='mail'?'信件領取':r.startsWith('summon')?'召喚 ×'+r.slice(6):r.startsWith('topup:')?'儲值 '+r.slice(6):r.startsWith('admin:')?'營運調整 '+r.slice(6):r.startsWith('market_buy')?'交易所購買':r.startsWith('market_sell_bot')?'交易所賣出(系統)':r.startsWith('market_sell')?'交易所賣出':r==='ladder_ticket'?'天梯挑戰券':r};
 const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',save_restore:'還原存檔',backup:'匯出備份',backup_restore:'從備份還原',save_accept:'接受存檔',admin_remove:'移除管理員'};
 let ME=null,TAB='home',PQ={q:'',sort:'recent'},MKS='open';
-const TABS=[['home','總覽'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['events','活動'],['codes','兌換碼'],['saves','存檔異常'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['guilds','公會'],['raffle','🎡 抽獎'],['tickets','客服回報'],['backup','💾 備份'],['system','維護 / 管理員'],['logs','操作紀錄']];
+const TABS=[['home','總覽'],['metrics','📈 玩家數據'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['events','活動'],['codes','兌換碼'],['saves','存檔異常'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['guilds','公會'],['raffle','🎡 抽獎'],['tickets','客服回報'],['backup','💾 備份'],['system','維護 / 管理員'],['logs','操作紀錄']];
 // ---------- login ----------
 const em=u=>String(u).trim().toLowerCase()+'@player.moe-planet.app';
 $('lgo').onclick=async()=>{const u=$('lu').value.trim(),p=$('lp').value;if(!u||!p)return toast('請輸入帳號和密碼');$('lgo').disabled=true;$('lmsg').textContent='登入中…';
@@ -241,6 +241,79 @@ V.report=async()=>{const R=await rpc('admin_report');const pc=(a,b,ok)=>ok?(b?Ma
   <div class="card"><h2>留存率 <small>某天註冊的玩家,在第 1 / 3 / 7 天還有回來玩的比例</small></h2><div class="tw"><table><thead><tr><th>註冊日</th><th class="n">人數</th><th class="n">次日</th><th class="n">第 3 天</th><th class="n">第 7 天</th></tr></thead><tbody>${(R.cohorts||[]).map(c=>`<tr><td>${c.d}</td><td class="n">${c.n}</td><td class="n">${pc(c.d1,c.n,c.ok1)}</td><td class="n">${pc(c.d3,c.n,c.ok3)}</td><td class="n">${pc(c.d7,c.n,c.ok7)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">還沒有資料</td></tr>'}</tbody></table></div><p class="mut" style="margin:8px 0 0">參考:手機遊戲次日留存 40% 以上算不錯,第 7 天 15% 以上算健康。</p></div>
   <div class="grid2"><div class="card"><h2>每日召喚次數 <small>最近 14 天</small></h2>${S.length?S.map(x=>`<div class="hb"><span>${x.d.slice(5)}</span><i style="width:${x.n/mx*100}%"></i><b>${fmt(x.n)}</b></div>`).join(''):'<div class="empty">還沒有資料</div>'}</div>
   <div class="card"><h2>最常出戰的萌獸 <small>全服玩家的出戰隊伍</small></h2>${P.length?P.map(x=>`<div class="hb"><span>${PET[x.k]||x.k}</span><i style="width:${x.n/pm*100}%;background:var(--blue)"></i><b>${fmt(x.n)}</b></div>`).join(''):'<div class="empty">還沒有資料</div>'}</div></div>`};
+// ---------- 📈 玩家數據 ----------
+let MT={days:30,R:null};
+const mtPct=(a,b)=>b?Math.round(a/b*100):null;
+const mtLight=(v,g,y)=>v==null?'':v>=g?'🟢':v>=y?'🟡':'🔴';
+const mtDelta=(a,b)=>b==null||a==null?'':a>b?`<small style="color:var(--ok)">▲ 比昨天 +${+(a-b).toFixed(1)}</small>`:a<b?`<small style="color:var(--bad)">▼ 比昨天 ${+(a-b).toFixed(1)}</small>`:'<small>與昨天相同</small>';
+function mtLine(T){const W=760,H=220,P=34,n=T.length,mx=Math.max(4,...T.map(x=>Math.max(x.dau,x.new,x.old)));const X=i=>P+(W-P-10)*i/Math.max(1,n-1),Y=v=>H-24-(H-44)*v/mx;
+  const L=(k,c)=>`<polyline fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" points="${T.map((x,i)=>X(i).toFixed(1)+','+Y(x[k]).toFixed(1)).join(' ')}"/>`+T.map((x,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(x[k]).toFixed(1)}" r="2.6" fill="${c}"><title>${x.d} ${({dau:'活躍',new:'新註冊',old:'老玩家'})[k]} ${x[k]}</title></circle>`).join('');
+  const grid=[0,.25,.5,.75,1].map(f=>{const v=Math.round(mx*f);return `<line x1="${P}" x2="${W-10}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--mut)">${v}</text>`}).join('');
+  const lab=T.map((x,i)=>i%5===0||i===n-1?`<text x="${X(i)}" y="${H-6}" text-anchor="middle" font-size="11" fill="var(--mut)">${x.d.slice(5)}</text>`:'').join('');
+  return `<div class="tw"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:520px;height:auto">${grid}${lab}${L('dau','#e8702a')}${L('new','#2f7ad8')}${L('old','#2a9a5a')}</svg></div>
+  <div class="row" style="gap:14px;font-size:13px"><span><b style="color:#e8702a">━</b> 每日活躍</span><span><b style="color:#2f7ad8">━</b> 新註冊</span><span><b style="color:#2a9a5a">━</b> 老玩家回來</span></div>`}
+function mtHB(obj,keys,lab,col,unit){const tot=keys.reduce((a,k)=>a+(obj[k]||0),0)||1,mx=Math.max(1,...keys.map(k=>obj[k]||0));
+  return keys.map(k=>`<div class="hb w"><span>${lab[k]||k}</span><i style="width:${(obj[k]||0)/mx*100}%;${col?'background:'+col:''}"></i><b>${obj[k]||0} 人 · ${Math.round((obj[k]||0)/tot*100)}%</b></div>`).join('')}
+const mtCell=(v,n,ref)=>{if(v==null)return '<td class="n mut">未到</td>';const p=n?v/n*100:0,a=Math.min(1,p/(ref*2));return `<td class="n" style="background:rgba(42,154,90,${(.08+a*.6).toFixed(2)});${p>=ref?'font-weight:800':''}">${Math.round(p)}%<br><small class="mut">${v}</small></td>`};
+V.metrics=async()=>{const R=MT.R=await rpc('admin_metrics',{p_days:MT.days}),K=R.kpi,stick=mtPct(K.dau,K.mau),F=R.funnel,C=R.churn;
+  const one=mtPct(C.oneday,C.oneday_n),T=R.trend||[];
+  const coh=(R.cohorts||[]).filter(c=>c.n>0),avg=k=>{const v=coh.filter(c=>c.r[k]!=null);const n=v.reduce((a,c)=>a+c.n,0);return n?Math.round(v.reduce((a,c)=>a+c.r[k],0)/n*100):null};
+  const A1=avg('1'),A7=avg('7'),A30=avg('30');
+  const FS=[['reg','註冊帳號'],['start','開始遊戲(取名、選蛋)'],['tut','完成新手教學'],['ch1','通關第 1 章頭目'],['lv5','守護員 Lv.5'],['lv10','守護員 Lv.10'],['quest','解完每日任務(至少一天)'],['spin','轉過抽獎轉盤'],['d1','隔天有回來']];
+  const TUT={0:'剛開始(第一場戰鬥前)',1:'第一場戰鬥',2:'幫萌獸升級',3:'升級後',4:'第二場戰鬥',5:'第一次召喚',6:'查看萌獸',7:'最後幾步',8:'最後幾步'};
+  const ts=Object.entries(R.tutstuck||{}).sort((a,b)=>+a[0]-+b[0]),tsm=Math.max(1,...ts.map(x=>x[1]));
+  const AC=R.act||[];
+  return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h2 style="margin:0">📈 玩家數據 <small>不含管理員帳號 · 每次打開即時計算</small></h2>
+    <div class="row" style="gap:6px"><span class="mut" style="font-size:13px">分析範圍:最近註冊的</span>${[7,14,30,60].map(d=>`<button class="${MT.days===d?'p':'s'}" data-a="mtd:${d}">${d} 天</button>`).join('')}</div></div></div>
+  <div class="kpis">
+    <div class="kpi"><small>今日活躍人數</small><b>${K.dau}</b>${mtDelta(K.dau,K.dau_y)}</div>
+    <div class="kpi"><small>近 7 天活躍</small><b>${K.wau}</b></div>
+    <div class="kpi"><small>近 30 天活躍</small><b>${K.mau}</b></div>
+    <div class="kpi"><small>黏著度(今日 ÷ 30 天)${mtLight(stick,20,10)}</small><b>${stick==null?'-':stick+'%'}</b><small>20% 以上算不錯</small></div>
+    <div class="kpi"><small>今日新註冊</small><b>${K.new}</b>${mtDelta(K.new,K.new_y)}</div>
+    <div class="kpi"><small>現在在線</small><b>${K.online}</b><small>累計註冊 ${K.total}</small></div>
+    <div class="kpi"><small>今日平均遊玩 ${mtLight(K.mins,20,10)}</small><b>${K.mins==null?'-':K.mins+' 分'}</b>${K.mins!=null?mtDelta(K.mins,K.mins_y):'<small>更新後開始記錄</small>'}</div>
+    <div class="kpi"><small>次日留存 ${mtLight(A1,40,25)}</small><b>${A1==null?'-':A1+'%'}</b><small>40% 以上算不錯</small></div>
+    <div class="kpi"><small>第 7 天留存 ${mtLight(A7,15,8)}</small><b>${A7==null?'-':A7+'%'}</b><small>15% 以上算不錯</small></div>
+    <div class="kpi"><small>一日遊比例 ${one==null?'':one<=50?'🟢':one<=65?'🟡':'🔴'}</small><b>${one==null?'-':one+'%'}</b><small>註冊後只來 1 天,越低越好</small></div>
+  </div>
+  <div class="card"><h2>每日趨勢 <small>最近 30 天:新註冊、每日活躍、老玩家(不是當天註冊)回來的人數</small></h2>${mtLine(T)}</div>
+  <div class="card"><h2>留存表 <small>某天註冊的玩家,第 N 天還有回來的比例。綠色越深越好;粗體 = 達到參考標準(次日 40%、第 3 天 25%、第 7 天 15%、第 14 天 10%、第 30 天 5%)</small></h2>
+    ${coh.length?`<div class="tw"><table><thead><tr><th>註冊日</th><th class="n">人數</th>${['次日','第 2 天','第 3 天','第 7 天','第 14 天','第 30 天'].map(x=>`<th class="n">${x}</th>`).join('')}</tr></thead><tbody>
+    ${coh.map(c=>`<tr><td>${c.d}</td><td class="n">${c.n}</td>${mtCell(c.r['1'],c.n,40)}${mtCell(c.r['2'],c.n,30)}${mtCell(c.r['3'],c.n,25)}${mtCell(c.r['7'],c.n,15)}${mtCell(c.r['14'],c.n,10)}${mtCell(c.r['30'],c.n,5)}</tr>`).join('')}
+    <tr style="border-top:2px solid var(--line)"><td><b>加權平均</b></td><td class="n">${coh.reduce((a,c)=>a+c.n,0)}</td>${['1','2','3','7','14','30'].map(k=>`<td class="n"><b>${avg(k)==null?'-':avg(k)+'%'}</b></td>`).join('')}</tr></tbody></table></div>`:'<div class="empty">這段期間沒有新註冊</div>'}</div>
+  <div class="grid2">
+    <div class="card"><h2>累計上線天數 <small>最近 ${MT.days} 天註冊的玩家,總共玩了幾天</small></h2>${mtHB(R.days,['1','2-3','4-7','8-14','15+'],{'1':'只有 1 天','2-3':'2~3 天','4-7':'4~7 天','8-14':'8~14 天','15+':'15 天以上'})}</div>
+    <div class="card"><h2>最長連續上線 <small>連續每天都來的最長天數</small></h2>${mtHB(R.streak,['1','2-3','4-7','8-14','15+'],{'1':'1 天','2-3':'2~3 天','4-7':'4~7 天','8-14':'8~14 天','15+':'15 天以上'},'var(--blue)')}</div>
+  </div>
+  <div class="card"><h2>每天遊玩時間 <small>最近 7 天有記錄的 ${R.mins.n} 位玩家,平均每天玩多久(這次更新後才開始記錄)</small></h2>${R.mins.n?mtHB(R.mins,['<5','5-15','15-30','30-60','60+'],{'<5':'5 分鐘以下','5-15':'5~15 分','15-30':'15~30 分','30-60':'30~60 分','60+':'60 分以上'},'var(--ok)'):'<div class="empty">還沒有資料,玩家更新後開始累積</div>'}</div>
+  <div class="card"><h2>新手漏斗 <small>最近 ${MT.days} 天註冊的 ${F.reg} 人,每一步還剩多少。掉最多的那一步最需要改善</small></h2>
+    ${FS.map(([k,n],i)=>{const v=F[k]||0,base=k==='d1'?F.d1n:F.reg,p=mtPct(v,base)||0,prev=i?F[FS[i-1][0]]||0:null,drop=prev&&k!=='d1'?Math.round((prev-v)/prev*100):null;
+      return `<div class="hb w"><span>${n}</span><i style="width:${p}%;background:${drop!=null&&drop>=40?'var(--bad)':'var(--acc)'}"></i><b>${v} 人 · ${p}%${drop!=null&&drop>0?` <small style="color:${drop>=40?'var(--bad)':'var(--mut)'}">(這步流失 ${drop}%)</small>`:''}</b></div>`}).join('')}
+    <p class="mut" style="font-size:12px">「隔天有回來」以註冊滿 1 天的 ${F.d1n} 人計算。紅色 = 這一步流失超過 40%。</p></div>
+  <div class="grid2">
+    <div class="card"><h2>新手教學卡在哪 <small>已開始但還沒完成教學的玩家</small></h2>${ts.length?ts.map(([k,c])=>`<div class="hb w"><span>步驟 ${k}:${TUT[k]||''}</span><i style="width:${c/tsm*100}%;background:var(--warn)"></i><b>${c} 人</b></div>`).join(''):'<div class="empty">沒有卡關的玩家 🎉</div>'}</div>
+    <div class="card"><h2>流失與回流</h2>
+      <div class="kpis" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))"><div class="kpi warn"><small>沉睡 3~6 天</small><b>${C.sleep3}</b></div><div class="kpi bad"><small>沉睡 7 天以上</small><b>${C.sleep7}</b></div><div class="kpi"><small>近 7 天回流</small><b style="color:var(--ok)">${C.back}</b></div></div>
+      <p class="mut" style="font-size:12px">沉睡 = 之前玩過 3 天以上,但已經 N 天沒上線。回流 = 休息 4 天以上後又回來。</p></div>
+  </div>
+  <div class="card"><h2>沉睡玩家名單 <small>之前玩過 3 天以上、已 3 天以上沒上線(最多 200 人)。勾選後可以寄回歸禮物</small></h2>
+    ${C.list.length?`<div class="tw" style="max-height:340px;overflow:auto"><table><thead><tr><th><input type="checkbox" id="mtAll" onchange="document.querySelectorAll('.mtck').forEach(c=>c.checked=this.checked)"></th><th>玩家</th><th class="n">等級</th><th class="n">上線天數</th><th>最後上線</th></tr></thead><tbody>
+    ${C.list.map(x=>`<tr><td><input type="checkbox" class="mtck" value="${x.uid}"></td><td><a href="#" data-a="pdet:${x.uid}">${esc(x.n)}</a></td><td class="n">Lv.${x.lv}</td><td class="n">${x.nd}</td><td>${x.last}</td></tr>`).join('')}</tbody></table></div>
+    <div class="grid2" style="margin-top:10px"><div class="act"><label>信件標題</label><input id="mtT" value="🎁 好久不見!回歸禮物"></div><div class="act"><label>鑽石</label><input id="mtG" type="number" value="300" min="0"></div></div>
+    <div class="act"><label>信件內容</label><input id="mtN" value="守護員好久不見!萌獸們都很想你,送你一份回歸禮物,回來看看新活動吧!"></div>
+    <div class="row"><button class="p" data-a="mtmail">寄給勾選的玩家</button></div>`:'<div class="empty">目前沒有沉睡玩家</div>'}</div>
+  <div class="card"><h2>活動參與 <small>最近 14 天,每天上線的人裡有幾 % 做了這些事</small></h2><div class="tw"><table><thead><tr><th>日期</th><th class="n">活躍</th><th class="n">簽到</th><th class="n">每日任務全清</th><th class="n">轉盤</th></tr></thead><tbody>
+    ${AC.slice().reverse().map(x=>`<tr><td>${x.d.slice(5)}</td><td class="n">${x.dau}</td>${['sign','quest','spin'].map(k=>`<td class="n">${x.dau?Math.round(x[k]/x.dau*100)+'%':'-'} <small class="mut">${x[k]}</small></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
+  <div class="card"><h2>怎麼判斷遊戲好不好?</h2><ul style="margin:0;padding-left:20px;line-height:1.8;font-size:14px">
+    <li><b>次日留存</b>最重要:低於 25% 通常是新手體驗有問題 → 看「新手漏斗」哪一步掉最多。</li>
+    <li><b>第 7 天留存</b>代表中期內容夠不夠:低的話,看「累計上線天數」是不是大多卡在 2~3 天。</li>
+    <li><b>黏著度</b>代表玩家是不是每天都想回來:低的話,每日任務、簽到、轉盤的參與率可以參考。</li>
+    <li>宣傳那幾天看「每日趨勢」:新註冊有沒有上升、之後的活躍有沒有跟著留下來。</li>
+    <li>沉睡玩家多,可以寄回歸禮物,隔幾天看「近 7 天回流」有沒有增加。</li></ul></div>`};
+A.mtd=d=>{MT.days=+d;render()};
+A.mtmail=async()=>{const ids=[...document.querySelectorAll('.mtck:checked')].map(x=>x.value);if(!ids.length)return toast('請先勾選玩家');const g=Math.round(+$('mtG').value||0),t=$('mtT').value.trim(),n=$('mtN').value.trim();if(!n)return toast('請填寫信件內容');
+  if(!sure('mtm'+ids.length+g,`寄給 ${ids.length} 位玩家(每人 💎${g})`))return;try{const r=await rpc('admin_mail_many',{p_uids:ids,p_gem:g,p_note:n,p_title:t||null,p_bonus:null});toast(`已寄出 ${r.sent} 封`)}catch(x){toast(x.message)}};
 // ---------- 活動 ----------
 const EVK={xp2:'雙倍經驗(萌獸經驗 ×2)',drop2:'雙倍掉落(星星幣、進化石 ×2)',sumup:'召喚機率 UP(傳說 3%、史詩 15%)'};
 const dtl=d=>{const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,16)};

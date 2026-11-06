@@ -2235,3 +2235,123 @@ revoke execute on function public.moe_beta_gift(uuid) from public, anon, authent
 update inbox set title = replace(title, '內測', '封測'), note = replace(note, '內測', '封測') where not claimed and kind in ('beta','beta2','beta3');
 update gem_rule set maxn = 150, cap = 2000 where p = 'signb';
 update gem_rule set maxn = 300 where p = 'signf';
+
+
+-- ================= 玩家數據分析(留存、黏著、流失、新手漏斗) =================
+alter table public.player_day add column if not exists secs int not null default 0;
+-- 遊玩時間:每次連線心跳(約 30 秒)把和上一次心跳的間隔累加到今天(間隔超過 3 分鐘視為離線,不計)
+create or replace function public.session_ping(p_sid uuid, p_act text default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := auth.uid(); S sessions; n int; pk jsonb; gap int;
+begin if u is null then return jsonb_build_object('ok', true); end if;
+  select * into S from sessions where uid = u;
+  if S.uid is null then return jsonb_build_object('ok', true); end if;
+  if S.sid <> p_sid then return jsonb_build_object('ok', false, 'dev', S.dev); end if;
+  gap := extract(epoch from now() - S.seen)::int;
+  update sessions set seen = now(), act = coalesce(left(p_act,30), act) where uid = u;
+  if gap > 0 and gap <= 180 then
+    insert into player_day(uid, d, secs) values (u, moe_today(), gap) on conflict (uid, d) do update set secs = player_day.secs + excluded.secs;
+  end if;
+  if random() < .2 then
+    select count(*) into n from sessions where seen > now() - interval '2 minutes';
+    select v into pk from settings where k = 'peak';
+    if pk is null or (pk->>'d') is distinct from moe_today()::text or n > (pk->>'n')::int then
+      insert into settings(k, v) values ('peak', jsonb_build_object('d', moe_today()::text, 'n', n, 'at', now())) on conflict (k) do update set v = excluded.v;
+    end if;
+  end if;
+  return jsonb_build_object('ok', true); end $$;
+grant execute on function public.session_ping(uuid,text) to authenticated;
+
+create or replace function public.moe_jsafe(t text) returns jsonb language plpgsql immutable as $$
+begin return coalesce(t::jsonb, '{}'::jsonb); exception when others then return '{}'::jsonb; end $$;
+create or replace function public.moe_glv(gx numeric) returns int language plpgsql immutable as $$
+declare l int := 1; x numeric := coalesce(gx, 0);
+begin while l < 50 and x >= 200 + 12 * l * l loop x := x - (200 + 12 * l * l); l := l + 1; end loop; return l; end $$;
+
+create or replace function public.admin_metrics(p_days int default 30) returns jsonb language plpgsql volatile security definer set search_path = public, auth as $$
+declare a uuid := moe_admin(); t date := moe_today(); w int := least(greatest(coalesce(p_days, 30), 7), 90); r jsonb;
+begin
+  create temp table if not exists _u(uid uuid primary key, reg date, nd int, last date, best int, sv jsonb) on commit drop;
+  truncate _u;
+  insert into _u(uid, reg, nd, last, best, sv)
+  select u.id, (u.created_at at time zone 'Asia/Taipei')::date,
+    (select count(*) from player_day p where p.uid = u.id),
+    (select max(d) from player_day p where p.uid = u.id),
+    coalesce((select max(c) from (select count(*) c from (select d, d - (row_number() over (order by d))::int g from player_day p where p.uid = u.id) z group by g) y), 0),
+    moe_jsafe((select data->>'json' from docs where path = 'data/users/' || u.id::text || '/save'))
+  from auth.users u where not exists (select 1 from admins x where x.uid = u.id);
+
+  r := jsonb_build_object(
+  'kpi', jsonb_build_object(
+    'dau', (select count(distinct uid) from player_day where d = t and uid in (select uid from _u)),
+    'dau_y', (select count(distinct uid) from player_day where d = t - 1 and uid in (select uid from _u)),
+    'wau', (select count(distinct uid) from player_day where d > t - 7 and uid in (select uid from _u)),
+    'mau', (select count(distinct uid) from player_day where d > t - 30 and uid in (select uid from _u)),
+    'new', (select count(*) from _u where reg = t),
+    'new_y', (select count(*) from _u where reg = t - 1),
+    'total', (select count(*) from _u),
+    'online', (select count(*) from sessions where seen > now() - interval '2 minutes'),
+    'mins', (select round(avg(secs) / 60.0, 1) from player_day where d = t and secs > 0 and uid in (select uid from _u)),
+    'mins_y', (select round(avg(secs) / 60.0, 1) from player_day where d = t - 1 and secs > 0 and uid in (select uid from _u))),
+  'trend', (select coalesce(jsonb_agg(jsonb_build_object('d', g.d, 'new', (select count(*) from _u where reg = g.d),
+      'dau', (select count(*) from player_day p join _u using (uid) where p.d = g.d),
+      'old', (select count(*) from player_day p join _u using (uid) where p.d = g.d and _u.reg < g.d),
+      'mins', (select round(avg(secs) / 60.0, 1) from player_day p join _u using (uid) where p.d = g.d and secs > 0)) order by g.d), '[]'::jsonb)
+    from generate_series(t - 29, t, interval '1 day') g0, lateral (select g0::date d) g),
+  'cohorts', (select coalesce(jsonb_agg(x order by x->>'d' desc), '[]'::jsonb) from (
+    select jsonb_build_object('d', c.reg, 'n', count(*),
+      'r', jsonb_build_object(
+        '1', case when c.reg + 1 <= t then count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.reg + 1)) end,
+        '2', case when c.reg + 2 <= t then count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.reg + 2)) end,
+        '3', case when c.reg + 3 <= t then count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.reg + 3)) end,
+        '7', case when c.reg + 7 <= t then count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.reg + 7)) end,
+        '14', case when c.reg + 14 <= t then count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.reg + 14)) end,
+        '30', case when c.reg + 30 <= t then count(*) filter (where exists (select 1 from player_day p where p.uid = c.uid and p.d = c.reg + 30)) end)) x
+    from _u c where c.reg > t - w group by c.reg) s),
+  'days', (select jsonb_build_object('1', count(*) filter (where nd <= 1), '2-3', count(*) filter (where nd between 2 and 3), '4-7', count(*) filter (where nd between 4 and 7),
+      '8-14', count(*) filter (where nd between 8 and 14), '15+', count(*) filter (where nd >= 15)) from _u where reg > t - w),
+  'streak', (select jsonb_build_object('1', count(*) filter (where best <= 1), '2-3', count(*) filter (where best between 2 and 3), '4-7', count(*) filter (where best between 4 and 7),
+      '8-14', count(*) filter (where best between 8 and 14), '15+', count(*) filter (where best >= 15)) from _u where reg > t - w),
+  'mins', (select jsonb_build_object('<5', count(*) filter (where m < 5), '5-15', count(*) filter (where m >= 5 and m < 15), '15-30', count(*) filter (where m >= 15 and m < 30),
+      '30-60', count(*) filter (where m >= 30 and m < 60), '60+', count(*) filter (where m >= 60), 'n', count(*))
+      from (select uid, avg(secs) / 60.0 m from player_day where d > t - 7 and secs > 0 and uid in (select uid from _u) group by uid) z),
+  'churn', jsonb_build_object(
+    'oneday', (select count(*) filter (where nd <= 1) from _u where reg < t - 1 and reg > t - w),
+    'oneday_n', (select count(*) from _u where reg < t - 1 and reg > t - w),
+    'sleep3', (select count(*) from _u where nd >= 3 and last <= t - 3 and last > t - 7),
+    'sleep7', (select count(*) from _u where nd >= 3 and last <= t - 7),
+    'back', (select count(distinct p.uid) from player_day p join _u using (uid) where p.d > t - 7
+       and exists (select 1 from player_day q where q.uid = p.uid and q.d < p.d and q.d >= p.d - 30)
+       and not exists (select 1 from player_day q where q.uid = p.uid and q.d < p.d and q.d > p.d - 4)),
+    'list', (select coalesce(jsonb_agg(jsonb_build_object('uid', uid, 'n', coalesce(sv->>'name', '守護員'), 'nd', nd, 'last', last, 'lv', moe_glv((sv->>'gx')::numeric)) order by last desc), '[]'::jsonb)
+       from (select * from _u where nd >= 3 and last <= t - 3 order by last desc limit 200) z)),
+  'funnel', (select jsonb_build_object('reg', count(*),
+      'start', count(*) filter (where coalesce((sv->>'started')::text, '') not in ('', 'false', '0', 'null')),
+      'tut', count(*) filter (where coalesce((sv->>'tut')::int, 0) >= 9),
+      'ch1', count(*) filter (where coalesce((sv->'stars'->>'9')::int, 0) > 0),
+      'lv5', count(*) filter (where moe_glv((sv->>'gx')::numeric) >= 5),
+      'lv10', count(*) filter (where moe_glv((sv->>'gx')::numeric) >= 10),
+      'quest', count(*) filter (where exists (select 1 from raffle_tix x where x.uid = _u.uid and x.kind = 'quest')),
+      'spin', count(*) filter (where exists (select 1 from raffle_spin x where x.uid = _u.uid)),
+      'd1', count(*) filter (where reg < t and exists (select 1 from player_day p where p.uid = _u.uid and p.d = reg + 1)),
+      'd1n', count(*) filter (where reg < t)) from _u where reg > t - w),
+  'tutstuck', (select coalesce(jsonb_object_agg(k, c), '{}'::jsonb) from (select coalesce(sv->>'tut', '0') k, count(*) c from _u
+      where reg > t - w and coalesce((sv->>'started')::text, '') not in ('', 'false', '0', 'null') and coalesce((sv->>'tut')::int, 0) < 9 group by 1) z),
+  'act', (select coalesce(jsonb_agg(jsonb_build_object('d', g.d,
+      'dau', (select count(*) from player_day p join _u using (uid) where p.d = g.d),
+      'quest', (select count(distinct x.uid) from raffle_tix x join _u using (uid) where x.kind = 'quest' and x.key = g.d::text),
+      'spin', (select count(distinct x.uid) from raffle_spin x join _u using (uid) where (x.at at time zone 'Asia/Taipei')::date = g.d),
+      'sign', (select count(distinct c.uid) from gem_cnt c join _u using (uid) where c.p in ('sign', 'signb') and c.pid like g.d::text || '%')) order by g.d), '[]'::jsonb)
+    from generate_series(t - 13, t, interval '1 day') g0, lateral (select g0::date d) g));
+  return r;
+end $$;
+grant execute on function public.admin_metrics(int) to authenticated;
+
+create or replace function public.admin_mail_many(p_uids uuid[], p_gem int, p_note text, p_title text default null, p_bonus jsonb default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); u uuid; n int := 0;
+begin
+  if p_uids is null or array_length(p_uids, 1) is null then raise exception '沒有選擇玩家'; end if;
+  if array_length(p_uids, 1) > 500 then raise exception '一次最多寄 500 人'; end if;
+  foreach u in array p_uids loop perform admin_mail(u, p_gem, p_note, p_title, p_bonus); n := n + 1; end loop;
+  return jsonb_build_object('sent', n);
+end $$;
+grant execute on function public.admin_mail_many(uuid[],int,text,text,jsonb) to authenticated;
