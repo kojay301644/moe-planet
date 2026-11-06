@@ -2397,3 +2397,89 @@ begin
   return jsonb_build_object('ok', true, 'name', n, 'cost', cost, 'gem', (select gem from wallet where uid = u), 'next', 100);
 end $$;
 grant execute on function public.rename_info(), public.rename_name(text) to authenticated;
+
+
+-- ================= 上線前安全修補(日期、補簽/全勤、守塔排行入帳、規則收緊、暱稱) =================
+-- 伺服器時間:遊戲用它判斷「今天/本週/本月」,改手機日期無效
+create or replace function public.server_now() returns bigint language sql stable as $$ select (extract(epoch from now()) * 1000)::bigint $$;
+grant execute on function public.server_now() to anon, authenticated;
+-- 全勤只接受本月;補簽只接受本月、今天以前的日期,而且每個日期一輩子只能領一次
+create or replace function public.moe_gem_src(u uuid, src jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare x jsonb; k text; n int; pp text; suf text; r gem_rule; ok int := 0; rej jsonb := '[]'::jsonb; v_pid text; c gem_cnt; tp int; why text; i int := 0;
+begin
+  if src is null or jsonb_typeof(src) <> 'array' then return jsonb_build_object('ok', 0, 'rej', rej); end if;
+  select topup into tp from wallet where uid = u; tp := coalesce(tp, 0);
+  for x in select value from jsonb_array_elements(src) loop
+    i := i + 1; exit when i > 300; why := null;
+    k := left(coalesce(x->>0, ''), 80); n := coalesce((x->>1)::numeric, 0)::int;
+    pp := split_part(k, ':', 1); suf := substr(k, length(pp) + 2);
+    select * into r from gem_rule where p = pp and p <> 'misc';
+    if not found then why := 'unknown';
+    elsif n <= 0 then why := 'amount';
+    elsif r.re is not null and suf !~ r.re then why := 'id';
+    elsif pp = 'signf' and suf <> to_char(moe_today(), 'YYYY-MM') then why := 'id';
+    elsif pp = 'signb' and (left(suf, 8) <> to_char(moe_today(), 'YYYY-MM') || '-' or split_part(suf, '-', 3)::int >= extract(day from moe_today())::int) then why := 'id';
+    elsif r.need = 'vip' and moe_vip(tp) < 1 then why := 'need';
+    elsif r.need = 'viplv' and (suf !~ '^[0-9]+$' or suf::int > moe_vip(tp)) then why := 'need';
+    elsif r.need = 'card' and not exists (select 1 from gem_log where uid = u and reason = 'topup:card' and at > now() - interval '31 days') then why := 'need';
+    elsif r.need = 'fund' and not exists (select 1 from gem_log where uid = u and reason = 'topup:fund') then why := 'need';
+    end if;
+    if why is null and n > r.maxn then n := r.maxn; end if;
+    if why is null and r.per = 'once' then
+      insert into gem_once(uid, k, n) values (u, k, n) on conflict do nothing; if not found then why := 'dup'; end if;
+    elsif why is null then
+      v_pid := case r.per when 'week' then moe_week()::text else moe_today()::text end;
+      if r.re is not null then insert into gem_once(uid, k, n) values (u, k || '@' || v_pid, n) on conflict do nothing; if not found then why := 'dup'; end if; end if;
+      if why is null then
+        insert into gem_cnt(uid, p, pid) values (u, pp, v_pid) on conflict do nothing;
+        select * into c from gem_cnt where uid = u and gem_cnt.p = pp and gem_cnt.pid = v_pid for update;
+        if c.cnt >= r.lim then why := 'limit'; elsif r.cap is not null and c.sum + n > r.cap then n := greatest(0, r.cap - c.sum); if n = 0 then why := 'cap'; end if; end if;
+        if why is null then update gem_cnt set cnt = cnt + 1, sum = sum + n where uid = u and gem_cnt.p = pp and gem_cnt.pid = v_pid; end if;
+      end if;
+    end if;
+    if why is null then ok := ok + n; else rej := rej || jsonb_build_array(jsonb_build_object('k', k, 'n', n, 'why', why)); end if;
+  end loop;
+  return jsonb_build_object('ok', ok, 'rej', rej);
+end $$;
+update gem_rule set per = 'once', lim = 1, cap = null where p = 'signb';
+-- 守塔每週排行:鑽石改成領信時入帳,並補發先前沒入帳的
+create or replace function public.td_claim() returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); pw int := moe_week() - 1; r int; g int; T td_week;
+begin
+  select * into T from td_week where uid = u and wk = pw for update;
+  if T.uid is null or T.claimed then return jsonb_build_object('gem',0); end if;
+  select rn into r from (select uid, row_number() over () rn from td_board(pw)) q where q.uid = u;
+  update td_week set claimed = true where uid = u and wk = pw;
+  g := case when r is null then 0 when r = 1 then 600 when r <= 3 then 400 when r <= 10 then 200 when r <= 50 then 60 else 0 end;
+  if g > 0 then
+    insert into inbox(uid, gem, credit, note, title, kind) values (u, g, true, '上週守塔挑戰無盡模式第 ' || r || ' 名(' || T.best || ' 波),獎勵請收下!', '🛡️ 守塔排行獎勵', 'system');
+  end if;
+  return jsonb_build_object('gem',g,'rank',r);
+end $$;
+insert into inbox(uid, gem, credit, note, title, kind)
+  select uid, gem, true, '補發:先前的守塔排行鑽石沒有正確入帳,這次補給你,抱歉!', '🛡️ 守塔排行獎勵(補發)', 'system'
+  from inbox where title = '🛡️ 守塔排行獎勵' and claimed and not credit and gem > 0;
+update inbox set credit = true where title = '🛡️ 守塔排行獎勵' and not credit;
+-- 已關閉的交易所不再是鑽石來源
+delete from gem_rule where p = 'mksell';
+-- 成就「收集全部 20 種萌獸」是 💎800
+update gem_rule set maxn = 800 where p = 'ach';
+-- 收緊每日上限(接近正常玩家實際拿得到的量)
+update gem_rule set cap = 250 where p = 'siege';
+update gem_rule set cap = 300 where p = 'endless';
+update gem_rule set cap = 300 where p = 'wish';
+
+-- 對戰卡片上的暱稱由伺服器決定:改過名就用改名紀錄,沒改過但含不當字詞的改成「守護員」
+create or replace function public.moe_arena_name() returns trigger language plpgsql security definer set search_path = public as $$
+declare u uuid; nm text;
+begin
+  if NEW.path not like 'arena/%' or current_setting('moe.skip', true) = '1' then return NEW; end if;
+  begin u := split_part(NEW.path, '/', 2)::uuid; exception when others then return NEW; end;
+  select l.new into nm from name_log l where l.uid = u order by l.id desc limit 1;
+  if nm is not null then NEW.data := jsonb_set(NEW.data, '{n}', to_jsonb(nm));
+  elsif moe_name_bad(NEW.data->>'n') = '暱稱含有不能使用的字' then NEW.data := jsonb_set(NEW.data, '{n}', to_jsonb('守護員'::text)); end if;
+  return NEW;
+end $$;
+drop trigger if exists docs_arena_name on public.docs;
+create trigger docs_arena_name before insert or update on public.docs for each row execute function public.moe_arena_name();
+revoke execute on function public.moe_arena_name() from public, anon, authenticated;
