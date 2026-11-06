@@ -2204,3 +2204,10 @@ create or replace function public.admin_queue_set(p_max int) returns jsonb langu
 declare a uuid := moe_admin();
 begin insert into settings(k, v) values ('queue', jsonb_build_object('max', greatest(0, coalesce(p_max,0)))) on conflict (k) do update set v = excluded.v;
   perform alog('queue_set', null, jsonb_build_object('max', p_max)); return admin_queue(); end $$;
+
+-- ================= 每月簽到(可補簽)的鑽石規則 =================
+insert into gem_rule(p, per, lim, maxn, cap, re, need, note) values
+ ('sign','day',1,150,null,null,null,'每月簽到'),
+ ('signb','day',31,150,1200,'^[0-9]{4}-[0-9]{2}-([1-9]|[12][0-9]|3[01])$',null,'簽到補簽'),
+ ('signf','once',1,200,null,'^[0-9]{4}-[0-9]{2}$',null,'簽到全勤')
+on conflict (p) do update set per = excluded.per, lim = excluded.lim, maxn = excluded.maxn, cap = excluded.cap, re = excluded.re, need = excluded.need, note = excluded.note;
