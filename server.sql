@@ -2080,7 +2080,7 @@ begin
     return jsonb_build_object('prize', 'cash', 'serial', win.serial, 'left', moe_rf_left(u));
   end if;
   r := random() * 100;
-  pz := case when r < 40 then 'gem100' when r < 60 then 'coin' when r < 75 then 'rtix' when r < 90 then 'gem300' when r < 97 then 'gem1000' when r < 99.5 then 'pack' else 'skin' end;
+  pz := case when r < 40 then 'gem100' when r < 60 then 'coin' when r < 75 then 'rtix' when r < 90 then 'gem300' when r < 97 then 'gem1000' when r < 99.5 then 'skin' else 'pack' end;
   insert into raffle_spin(uid, prize, slot, ip, dev) values (u, pz, sl, moe_ip(), left(coalesce(p_dev,''),80));
   if pz in ('gem100','gem300','gem1000','coin','rtix') then
     g := case pz when 'gem100' then 100 when 'gem300' then 300 when 'gem1000' then 1000 else 0 end;
