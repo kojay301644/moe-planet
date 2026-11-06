@@ -2561,3 +2561,81 @@ declare a uuid := moe_admin(); begin
   return jsonb_build_object('ok', true);
 end $$;
 grant execute on function public.invite_bind(text,text), public.invite_claim(), public.invite_me(), public.admin_invites(), public.admin_invite_ok(uuid) to authenticated;
+
+
+-- ================= 客服私訊(管理員 ↔ 玩家) =================
+create table if not exists public.dm(id bigserial primary key, uid uuid not null, adm boolean not null, body text not null, rd boolean not null default false, by_uid uuid, at timestamptz not null default now());
+create index if not exists dm_uid_idx on public.dm(uid, id);
+alter table public.dm enable row level security;
+
+-- 玩家:讀自己的私訊(p_mark = 打開客服私訊頁時把管理員訊息標示已讀)
+create or replace function public.dm_list(p_mark boolean default false) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); n int;
+begin
+  if p_mark then update dm set rd = true where uid = u and adm and not rd; end if;
+  select count(*) into n from dm where uid = u and adm and not rd;
+  return jsonb_build_object('unread', n,
+    'msgs', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'adm', adm, 'body', body, 'at', at) order by id) from (select * from dm where uid = u order by id desc limit 100) x), '[]'::jsonb));
+end $$;
+
+-- 玩家:回覆管理員(要管理員先私訊過才能回;每分鐘 5 則、每則 300 字)
+create or replace function public.dm_send(p_body text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); b text := left(trim(coalesce(p_body,'')), 300);
+begin
+  if b = '' then raise exception '請輸入訊息'; end if;
+  if not exists (select 1 from dm where uid = u and adm) then raise exception '目前沒有客服對話,如有問題請到「設定 → 回報問題」'; end if;
+  if (select count(*) from dm where uid = u and not adm and at > now() - interval '1 minute') >= 5 then raise exception '傳太快了,請稍等一下再傳'; end if;
+  if (select count(*) from dm where uid = u and not adm and at > now() - interval '1 day') >= 100 then raise exception '今天訊息太多了,請明天再傳'; end if;
+  insert into dm(uid, adm, body) values (u, false, b);
+  return dm_list(true);
+end $$;
+
+-- 管理員:對話列表
+create or replace function public.admin_dm_threads() returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare a uuid := moe_admin();
+begin
+  return coalesce((select jsonb_agg(row_to_json(x) order by x.last_at desc) from (
+    select t.uid, moe_pname(t.uid) pname, nullif(moe_acct(u.email),'') acct,
+      (select body from dm d where d.uid = t.uid order by id desc limit 1) last,
+      (select adm from dm d where d.uid = t.uid order by id desc limit 1) last_adm,
+      max(t.at) last_at, count(*) filter (where not t.adm and not t.rd) unread,
+      exists (select 1 from raffle_win w where w.uid = t.uid and w.status <> 'void') winner
+    from dm t left join auth.users u on u.id = t.uid group by t.uid, u.email order by max(t.at) desc limit 200) x), '[]'::jsonb);
+end $$;
+
+-- 管理員:讀一個玩家的對話(並把玩家訊息標示已讀)
+create or replace function public.admin_dm_get(p_uid uuid) returns jsonb language plpgsql security definer set search_path = public, auth as $$
+declare a uuid := moe_admin();
+begin
+  update dm set rd = true where uid = p_uid and not adm and not rd;
+  return jsonb_build_object('uid', p_uid, 'pname', moe_pname(p_uid), 'acct', (select nullif(moe_acct(email),'') from auth.users where id = p_uid),
+    'fc', (select code from fcodes where uid = p_uid),
+    'win', (select jsonb_build_object('serial', serial, 'status', status) from raffle_win where uid = p_uid),
+    'seen', (select greatest(w.updated_at, u.last_sign_in_at) from auth.users u left join wallet w on w.uid = u.id where u.id = p_uid),
+    'msgs', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'adm', adm, 'body', body, 'rd', rd, 'at', at) order by id) from (select * from dm where uid = p_uid order by id desc limit 300) x), '[]'::jsonb));
+end $$;
+
+-- 管理員:傳訊息給玩家
+create or replace function public.admin_dm_send(p_uid uuid, p_body text) returns jsonb language plpgsql security definer set search_path = public, auth as $$
+declare a uuid := moe_admin(); b text := left(trim(coalesce(p_body,'')), 1000);
+begin
+  if b = '' then raise exception '請輸入訊息'; end if;
+  if not exists (select 1 from auth.users where id = p_uid) then raise exception '找不到這位玩家'; end if;
+  insert into dm(uid, adm, body, by_uid) values (p_uid, true, b, a);
+  perform alog('dm', p_uid, jsonb_build_object('body', left(b, 200)));
+  return admin_dm_get(p_uid);
+end $$;
+
+-- 管理員:用暱稱 / 帳號 / 好友碼找玩家
+create or replace function public.admin_dm_find(p_q text) returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare a uuid := moe_admin(); q text := lower(trim(coalesce(p_q,'')));
+begin
+  if length(q) < 1 then return '[]'::jsonb; end if;
+  return coalesce((select jsonb_agg(row_to_json(x)) from (
+    select u.id uid, moe_pname(u.id) pname, nullif(moe_acct(u.email),'') acct, f.code fc
+    from auth.users u left join docs d on d.path = 'arena/' || u.id::text left join fcodes f on f.uid = u.id
+    where lower(coalesce(f.code,'')) = q or lower(coalesce(d.data->>'n','')) like '%' || q || '%' or lower(coalesce(u.email,'')) like '%' || q || '%'
+    order by (lower(coalesce(f.code,'')) = q) desc, u.last_sign_in_at desc nulls last limit 20) x), '[]'::jsonb);
+end $$;
+
+grant execute on function public.dm_list(boolean), public.dm_send(text), public.admin_dm_threads(), public.admin_dm_get(uuid), public.admin_dm_send(uuid,text), public.admin_dm_find(text) to authenticated;
