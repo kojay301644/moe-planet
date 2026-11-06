@@ -2029,7 +2029,7 @@ end $$;
 revoke execute on function public.moe_beta_gift(uuid) from public, anon, authenticated;
 
 -- ================= 封測抽獎轉盤 =================
-insert into settings(k, v) values ('raffle', '{"on":false,"start":"2026-11-13","end":"2026-12-03","spin_end":"2026-12-07","p":0.01,"cap":20,"lv":10}'::jsonb) on conflict (k) do nothing;
+insert into settings(k, v) values ('raffle', '{"on":false,"start":"2026-11-13","end":"2026-12-03","spin_end":"2026-12-07","p":0.01,"cap":20,"lv":0}'::jsonb) on conflict (k) do nothing;
 create table if not exists public.raffle_tix(uid uuid not null, kind text not null, key text not null, n int not null, at timestamptz not null default now(), primary key(uid, kind, key));
 create table if not exists public.raffle_spin(id bigserial primary key, uid uuid not null, at timestamptz not null default now(), prize text not null, cash boolean not null default false, slot text, ip text, dev text);
 create table if not exists public.raffle_win(id bigserial primary key, uid uuid not null unique, serial text unique, won_at timestamptz not null default now(), day date not null default moe_today(), slot text,
@@ -2054,7 +2054,7 @@ create or replace function public.raffle_earn(p_kind text, p_key text, p_lv int 
 declare u uuid := moe_uid(); c jsonb := moe_rf(); d date := moe_today(); n int; k text := coalesce(p_key,'');
 begin
   if not coalesce((c->>'on')::boolean, false) or d < (c->>'start')::date or d > (c->>'end')::date then return jsonb_build_object('ok', false, 'left', moe_rf_left(u)); end if;
-  if p_kind in ('login','quest') then k := d::text; n := 1;
+  if p_kind = 'quest' then k := d::text; n := 2;
   elsif p_kind = 'lv' then if k not in ('5','10','15','20','25') or coalesce(p_lv,0) < k::int then raise exception 'bad'; end if; n := 2;
   elsif p_kind = 'boss' then if k !~ '^[0-9]{1,2}$' or k::int > 20 then raise exception 'bad'; end if; n := 1;
   else raise exception 'bad'; end if;
@@ -2068,7 +2068,7 @@ create or replace function public.raffle_spin(p_dev text default '', p_lv int de
 declare u uuid := moe_uid(); c jsonb := moe_rf(); d date := moe_today(); sl text := moe_rf_slot(); r float8; pz text; win raffle_win; mid bigint; g int := 0; bo jsonb := '{}'::jsonb; ttl text;
 begin
   if not coalesce((c->>'on')::boolean, false) or d < (c->>'start')::date or d > coalesce((c->>'spin_end')::date, (c->>'end')::date) then raise exception '抽獎轉盤目前沒有開放'; end if;
-  if coalesce(p_lv,0) < coalesce((c->>'lv')::int, 10) then raise exception '守護員 Lv.% 以上才能轉', coalesce((c->>'lv')::int, 10); end if;
+  if coalesce(p_lv,0) < coalesce((c->>'lv')::int, 0) then raise exception '守護員 Lv.% 以上才能轉', coalesce((c->>'lv')::int, 0); end if;
   perform pg_advisory_xact_lock(hashtext('raffle_spin'));
   if moe_rf_left(u) < 1 then raise exception '沒有抽獎券了'; end if;
   if sl is not null and not exists (select 1 from raffle_win where uid = u)
@@ -2161,3 +2161,4 @@ end $$;
 create or replace function public.raffle_feed() returns jsonb language sql stable security definer set search_path = public as $$
   select coalesce((select jsonb_agg(moe_pname(uid)) from raffle_win where day = moe_today() and status <> 'void'), '[]'::jsonb) $$;
 revoke execute on function public.moe_rf_expire() from public, anon, authenticated;
+update settings set v = v || '{"lv":0}'::jsonb where k = 'raffle';
