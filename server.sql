@@ -2128,7 +2128,7 @@ begin
     'spins', coalesce((select jsonb_agg(jsonb_build_object('p', prize, 'at', at) order by id desc) from (select * from raffle_spin where uid = u order by id desc limit 30) s), '[]'::jsonb),
     'win', (select jsonb_build_object('serial', serial, 'won_at', won_at, 'ck', ck, 'ck_day', ck_day, 'status', status, 'deadline', won_at + interval '14 days') from raffle_win where uid = u),
     'given', (select count(*) from raffle_win where status <> 'void' and coalesce(serial,'') not like 'TEST-%'),
-    'feed', coalesce((select jsonb_agg(moe_pname(uid)) from raffle_win where day = d and status <> 'void' and coalesce(serial,'') not like 'TEST-%'), '[]'::jsonb));
+    'feed', coalesce((select jsonb_agg(jsonb_build_object('n', moe_pname(uid), 'd', to_char(day, 'FMMM/FMDD')) order by won_at desc) from (select uid, day, won_at from raffle_win where status not in ('void','expired') and coalesce(serial,'') not like 'TEST-%' order by won_at desc limit 5) x), '[]'::jsonb));
 end $$;
 
 -- 後台
