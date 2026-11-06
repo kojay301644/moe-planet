@@ -2355,3 +2355,45 @@ begin
   return jsonb_build_object('sent', n);
 end $$;
 grant execute on function public.admin_mail_many(uuid[],int,text,text,jsonb) to authenticated;
+
+
+-- ================= 更改暱稱(第一次免費,之後每次 💎100) =================
+create table if not exists public.name_log(id bigserial primary key, uid uuid not null, old text, new text not null, cost int not null default 0, at timestamptz not null default now());
+alter table public.name_log enable row level security;
+revoke all on public.name_log from anon, authenticated;
+create or replace function public.moe_name_bad(n text) returns text language plpgsql immutable as $$
+declare w text; x text := lower(regexp_replace(coalesce(n,''), '\s', '', 'g'));
+begin
+  if char_length(trim(coalesce(n,''))) < 2 or char_length(trim(n)) > 12 then return '暱稱要 2~12 個字'; end if;
+  if x !~ '[0-9a-z㐀-鿿぀-ヿ가-힯]' then return '暱稱不能只有符號或空白'; end if;
+  foreach w in array array['官方','管理員','管理者','gm','客服','營運','系統','admin','萌獸星球','幹你','幹林','操你','媽的','靠北','白癡','智障','屌','雞巴','fuck','shit','bitch'] loop
+    if position(w in x) > 0 then return '暱稱含有不能使用的字'; end if;
+  end loop;
+  return null;
+end $$;
+create or replace function public.rename_info() returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); begin
+  return jsonb_build_object('n', (select count(*) from name_log where uid = u), 'cost', case when exists (select 1 from name_log where uid = u) then 100 else 0 end);
+end $$;
+create or replace function public.rename_name(p_name text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); n text := trim(coalesce(p_name,'')); bad text; old text; cost int; g int;
+begin
+  bad := moe_name_bad(n); if bad is not null then raise exception '%', bad; end if;
+  perform pg_advisory_xact_lock(hashtext('rename:' || lower(n)));
+  if exists (select 1 from docs where coll = 'arena' and owner <> u and lower(trim(data->>'n')) = lower(n))
+     or exists (select 1 from bots where lower(name) = lower(n)) then raise exception '這個暱稱已經有人使用了'; end if;
+  select data->>'n' into old from docs where path = 'arena/' || u::text;
+  if old is not null and old = n then raise exception '和目前的暱稱一樣'; end if;
+  if exists (select 1 from name_log where uid = u and at > now() - interval '10 seconds') then raise exception '操作太快了,請稍後再試'; end if;
+  cost := case when exists (select 1 from name_log where uid = u) then 100 else 0 end;
+  insert into wallet(uid) values (u) on conflict do nothing;
+  if cost > 0 then
+    update wallet set gem = gem - cost, updated_at = now() where uid = u and gem >= cost returning gem into g;
+    if g is null then raise exception '鑽石不足,改名需要 💎%', cost; end if;
+    insert into gem_log(uid, delta, reason) values (u, -cost, 'rename');
+  end if;
+  insert into name_log(uid, old, new, cost) values (u, old, n, cost);
+  update docs set data = jsonb_set(data, '{n}', to_jsonb(n)) where path = 'arena/' || u::text;
+  return jsonb_build_object('ok', true, 'name', n, 'cost', cost, 'gem', (select gem from wallet where uid = u), 'next', 100);
+end $$;
+grant execute on function public.rename_info(), public.rename_name(text) to authenticated;
