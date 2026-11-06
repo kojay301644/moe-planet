@@ -2071,10 +2071,9 @@ begin
   if coalesce(p_lv,0) < coalesce((c->>'lv')::int, 0) then raise exception '守護員 Lv.% 以上才能轉', coalesce((c->>'lv')::int, 0); end if;
   perform pg_advisory_xact_lock(hashtext('raffle_spin'));
   if moe_rf_left(u) < 1 then raise exception '沒有抽獎券了'; end if;
-  if sl is not null and not exists (select 1 from raffle_win where uid = u)
-     and not exists (select 1 from raffle_win where day = d and slot = sl)
-     and (select count(*) from raffle_win where status <> 'void') < coalesce((c->>'cap')::int, 20)
-     and random() < coalesce((c->>'p')::float8, 0.01) then
+  if not exists (select 1 from raffle_win where uid = u)
+     and (coalesce((c->>'cap')::int, 0) <= 0 or (select count(*) from raffle_win where status <> 'void') < (c->>'cap')::int)
+     and random() < coalesce((c->>'p')::float8, 0.003) then
     insert into raffle_win(uid, day, slot, ip, dev) values (u, d, sl, moe_ip(), left(coalesce(p_dev,''),80)) returning * into win;
     update raffle_win set serial = 'MOE-1000-' || lpad(win.id::text, 4, '0') where id = win.id returning * into win;
     insert into raffle_spin(uid, prize, cash, slot, ip, dev) values (u, 'cash', true, sl, moe_ip(), left(coalesce(p_dev,''),80));
@@ -2161,4 +2160,4 @@ end $$;
 create or replace function public.raffle_feed() returns jsonb language sql stable security definer set search_path = public as $$
   select coalesce((select jsonb_agg(moe_pname(uid)) from raffle_win where day = moe_today() and status <> 'void'), '[]'::jsonb) $$;
 revoke execute on function public.moe_rf_expire() from public, anon, authenticated;
-update settings set v = v || '{"lv":0}'::jsonb where k = 'raffle';
+update settings set v = v || '{"lv":0,"p":0.003,"cap":0}'::jsonb where k = 'raffle';
