@@ -2073,7 +2073,7 @@ begin
   if moe_rf_left(u) < 1 then raise exception '沒有抽獎券了'; end if;
   if not exists (select 1 from raffle_win where uid = u)
      and (coalesce((c->>'cap')::int, 0) <= 0 or (select count(*) from raffle_win where status <> 'void' and coalesce(serial,'') not like 'TEST-%') < (c->>'cap')::int)
-     and random() < coalesce((c->>'p')::float8, 0.005) then
+     and random() < coalesce((c->>'p')::float8, 0.003) then
     insert into raffle_win(uid, day, slot, ip, dev) values (u, d, sl, moe_ip(), left(coalesce(p_dev,''),80)) returning * into win;
     update raffle_win set serial = 'MOE-1000-' || lpad(win.id::text, 4, '0') where id = win.id returning * into win;
     insert into raffle_spin(uid, prize, cash, slot, ip, dev) values (u, 'cash', true, sl, moe_ip(), left(coalesce(p_dev,''),80));
@@ -2170,7 +2170,7 @@ begin
     values (a, 'TEST-' || to_char(now() at time zone 'Asia/Taipei', 'MMDDHH24MISS'), d, 'T', k, d, case when k >= 3 then 'form' else 'checkin' end, '管理員測試券');
   return jsonb_build_object('ok', true, 'ck', k);
 end $$;
-update settings set v = v || '{"lv":0,"p":0.005,"cap":0}'::jsonb where k = 'raffle';
+update settings set v = v || '{"lv":0,"p":0.003,"cap":0}'::jsonb where k = 'raffle';
 
 -- ================= 排隊入場(同時在線上限) =================
 insert into settings(k, v) values ('queue', '{"max":200}'::jsonb) on conflict (k) do nothing;
