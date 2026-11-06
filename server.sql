@@ -2483,3 +2483,81 @@ end $$;
 drop trigger if exists docs_arena_name on public.docs;
 create trigger docs_arena_name before insert or update on public.docs for each row execute function public.moe_arena_name();
 revoke execute on function public.moe_arena_name() from public, anon, authenticated;
+
+
+-- ================= 邀請好友送抽獎券(新朋友完成新手教學 → 邀請人 2 張、新朋友 1 張;每人最多 10 位) =================
+create or replace function public.moe_fc(id uuid) returns text language plpgsql immutable as $$
+declare s text := id::text; h bigint := 2166136261; i int; o text := ''; a text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+begin
+  for i in 1..length(s) loop h := ((h # ascii(substr(s, i, 1))) * 16777619) % 4294967296; end loop;
+  for i in 1..6 loop o := o || substr(a, (h % 32)::int + 1, 1); h := (h / 32) # (((h::numeric * 2654435761) % 4294967296) % 1000003)::bigint; end loop;
+  return o;
+end $$;
+create table if not exists public.fcodes(uid uuid primary key, code text not null);
+create index if not exists fcodes_code on public.fcodes(code);
+create table if not exists public.invites(invitee uuid primary key, inviter uuid not null, at timestamptz not null default now(), ip text, dev text, flag text, paid boolean not null default false, paid_at timestamptz);
+create index if not exists invites_inviter on public.invites(inviter);
+alter table public.fcodes enable row level security; alter table public.invites enable row level security;
+revoke all on public.fcodes, public.invites from anon, authenticated;
+
+create or replace function public.invite_bind(p_code text, p_dev text default '') returns jsonb language plpgsql security definer set search_path = public, auth as $$
+declare u uuid := moe_uid(); c text := upper(regexp_replace(coalesce(p_code,''), '[^A-Za-z0-9]', '', 'g')); inv uuid; created timestamptz; v_ip text := moe_ip(); fl text;
+begin
+  if exists (select 1 from invites where invitee = u) then raise exception '你已經填過邀請碼了'; end if;
+  select created_at into created from auth.users where id = u;
+  if created < now() - interval '7 days' then raise exception '邀請碼只能在註冊 7 天內填寫'; end if;
+  if length(c) <> 6 then raise exception '邀請碼是 6 碼英文和數字'; end if;
+  select uid into inv from fcodes where code = c limit 1;
+  if inv is null then
+    insert into fcodes(uid, code) select id, moe_fc(id) from auth.users where not exists (select 1 from fcodes f where f.uid = auth.users.id) on conflict do nothing;
+    select uid into inv from fcodes where code = c limit 1;
+  end if;
+  if inv is null then raise exception '找不到這個邀請碼'; end if;
+  if inv = u then raise exception '不能填自己的邀請碼'; end if;
+  if (select created_at from auth.users where id = inv) > created then raise exception '只能填比你早註冊的玩家的邀請碼'; end if;
+  if exists (select 1 from raffle_spin where uid = inv and ip = v_ip and v_ip <> '' and at > now() - interval '30 days')
+     or exists (select 1 from invites where invitee = inv and ip = v_ip and v_ip <> '') then fl := 'same_net'; end if;
+  insert into invites(invitee, inviter, ip, dev, flag) values (u, inv, v_ip, left(coalesce(p_dev,''), 80), fl);
+  return jsonb_build_object('ok', true, 'name', coalesce((select data->>'n' from docs where path = 'arena/' || inv::text), '守護員'));
+end $$;
+
+create or replace function public.invite_claim() returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); I invites; tut int; n int; nm text;
+begin
+  select * into I from invites where invitee = u for update;
+  if I.invitee is null then return jsonb_build_object('status', 'none'); end if;
+  if I.paid then return jsonb_build_object('status', 'paid'); end if;
+  tut := coalesce((moe_jsafe((select data->>'json' from docs where path = 'data/users/' || u::text || '/save'))->>'tut')::int, 0);
+  if tut < 9 then return jsonb_build_object('status', 'wait'); end if;
+  if not coalesce((moe_rf()->>'on')::boolean, false) then return jsonb_build_object('status', 'off'); end if;
+  if I.flag is not null then return jsonb_build_object('status', 'review'); end if;
+  select count(*) into n from invites where inviter = I.inviter and paid;
+  update invites set paid = true, paid_at = now() where invitee = u;
+  insert into raffle_tix(uid, kind, key, n) values (u, 'invited', 'x', 1) on conflict do nothing;
+  nm := coalesce((select data->>'n' from docs where path = 'arena/' || u::text), '新朋友');
+  if n < 10 then
+    insert into raffle_tix(uid, kind, key, n) values (I.inviter, 'invite', u::text, 2) on conflict do nothing;
+    insert into inbox(uid, gem, note, credit, kind, title) values (I.inviter, 0, '你邀請的好友「' || nm || '」完成了新手教學,送你 🎟 抽獎券 ×2!(已放進抽獎轉盤)', true, 'system', '👫 邀請好友獎勵');
+  end if;
+  return jsonb_build_object('status', 'ok', 'me', 1, 'inviter', n < 10);
+end $$;
+
+create or replace function public.invite_me() returns jsonb language plpgsql security definer set search_path = public, auth as $$
+declare u uuid := moe_uid(); begin
+  return jsonb_build_object('code', moe_fc(u),
+    'ok', (select count(*) from invites where inviter = u and paid), 'wait', (select count(*) from invites where inviter = u and not paid),
+    'bound', (select jsonb_build_object('paid', paid, 'name', coalesce((select data->>'n' from docs where path = 'arena/' || inviter::text), '守護員')) from invites where invitee = u),
+    'canbind', (select created_at > now() - interval '7 days' from auth.users where id = u) and not exists (select 1 from invites where invitee = u));
+end $$;
+
+create or replace function public.admin_invites() returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); begin
+  return coalesce((select jsonb_agg(jsonb_build_object('at', i.at, 'inviter', coalesce(d1.data->>'n','守護員'), 'invitee', coalesce(d2.data->>'n','新朋友'), 'paid', i.paid, 'flag', i.flag, 'iuid', i.invitee) order by i.at desc)
+    from (select * from invites order by at desc limit 300) i left join docs d1 on d1.path = 'arena/' || i.inviter::text left join docs d2 on d2.path = 'arena/' || i.invitee::text), '[]'::jsonb);
+end $$;
+create or replace function public.admin_invite_ok(p_invitee uuid) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); begin
+  update invites set flag = null where invitee = p_invitee and not paid; perform alog('invite_ok', p_invitee, '{}'::jsonb);
+  return jsonb_build_object('ok', true);
+end $$;
+grant execute on function public.invite_bind(text,text), public.invite_claim(), public.invite_me(), public.admin_invites(), public.admin_invite_ok(uuid) to authenticated;
