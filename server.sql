@@ -2080,7 +2080,9 @@ begin
     insert into raffle_spin(uid, prize, cash, slot, ip, dev) values (u, 'cash', true, sl, moe_ip(), left(coalesce(p_dev,''),80));
     return jsonb_build_object('prize', 'cash', 'serial', win.serial, 'left', moe_rf_left(u));
   end if;
-  pz := case when r < 40 then 'gem100' when r < 60 then 'coin' when r < 75 then 'rtix' when r < 90 then 'gem300' when r < 97 then 'gem1000' when r < 99.5 then 'skin' else 'pack' end;
+  -- 已經中過現金的人再轉到現金 → 改給正式版禮包
+  if r < least(coalesce((c->>'p')::float8, 0.005), 0.4) * 100 and exists (select 1 from raffle_win where uid = u and status <> 'void') then pz := 'pack';
+  else pz := case when r < 40 then 'gem100' when r < 60 then 'coin' when r < 75 then 'rtix' when r < 90 then 'gem300' when r < 97 then 'gem1000' when r < 99.5 then 'skin' else 'pack' end; end if;
   insert into raffle_spin(uid, prize, slot, ip, dev) values (u, pz, sl, moe_ip(), left(coalesce(p_dev,''),80));
   if pz in ('gem100','gem300','gem1000','coin','rtix') then
     g := case pz when 'gem100' then 100 when 'gem300' then 300 when 'gem1000' then 1000 else 0 end;
