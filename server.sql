@@ -2161,3 +2161,36 @@ create or replace function public.raffle_feed() returns jsonb language sql stabl
   select coalesce((select jsonb_agg(moe_pname(uid)) from raffle_win where day = moe_today() and status <> 'void'), '[]'::jsonb) $$;
 revoke execute on function public.moe_rf_expire() from public, anon, authenticated;
 update settings set v = v || '{"lv":0,"p":0.003,"cap":0}'::jsonb where k = 'raffle';
+
+-- ================= 排隊入場(同時在線上限) =================
+insert into settings(k, v) values ('queue', '{"max":200}'::jsonb) on conflict (k) do nothing;
+create table if not exists public.login_queue(uid uuid primary key, at timestamptz not null default now(), seen timestamptz not null default now());
+alter table public.login_queue enable row level security;
+create or replace function public.moe_online() returns int language sql stable security definer set search_path = public as $$
+  select count(*)::int from sessions where seen > now() - interval '2 minutes' $$;
+create or replace function public.session_start(p_dev text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := auth.uid(); s uuid := gen_random_uuid(); mx int := coalesce((select (v->>'max')::int from settings where k = 'queue'), 0); act int; ahead int; me login_queue;
+begin if u is null then raise exception 'not signed in'; end if;
+  if to_regprocedure('public.moe_cleanup_maybe()') is not null then perform moe_cleanup_maybe(); end if;
+  if mx > 0 and not exists (select 1 from admins where uid = u)
+     and not exists (select 1 from sessions where uid = u and seen > now() - interval '2 minutes') then
+    act := moe_online();
+    insert into login_queue(uid) values (u) on conflict (uid) do update set seen = now(), at = case when login_queue.seen < now() - interval '90 seconds' then now() else login_queue.at end returning * into me;
+    select count(*) into ahead from login_queue q where q.at < me.at and q.seen > now() - interval '60 seconds';
+    if act + ahead >= mx then
+      return jsonb_build_object('queue', true, 'pos', ahead + 1, 'online', act, 'max', mx);
+    end if;
+  end if;
+  delete from login_queue where uid = u or seen < now() - interval '10 minutes';
+  insert into sessions(uid, sid, dev, at, seen) values (u, s, left(coalesce(p_dev,''),60), now(), now())
+    on conflict (uid) do update set sid = excluded.sid, dev = excluded.dev, at = now(), seen = now();
+  begin perform moe_beta_gift(u); exception when others then null; end;
+  return jsonb_build_object('sid', s); end $$;
+grant execute on function public.session_start(text) to authenticated;
+create or replace function public.admin_queue() returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin return jsonb_build_object('online', moe_online(), 'queue', (select count(*) from login_queue where seen > now() - interval '60 seconds'), 'max', coalesce((select (v->>'max')::int from settings where k = 'queue'), 0)); end $$;
+create or replace function public.admin_queue_set(p_max int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin insert into settings(k, v) values ('queue', jsonb_build_object('max', greatest(0, coalesce(p_max,0)))) on conflict (k) do update set v = excluded.v;
+  perform alog('queue_set', null, jsonb_build_object('max', p_max)); return admin_queue(); end $$;
