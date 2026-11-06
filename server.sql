@@ -2211,3 +2211,27 @@ insert into gem_rule(p, per, lim, maxn, cap, re, need, note) values
  ('signb','day',31,150,1200,'^[0-9]{4}-[0-9]{2}-([1-9]|[12][0-9]|3[01])$',null,'簽到補簽'),
  ('signf','once',1,200,null,'^[0-9]{4}-[0-9]{2}$',null,'簽到全勤')
 on conflict (p) do update set per = excluded.per, lim = excluded.lim, maxn = excluded.maxn, cap = excluded.cap, re = excluded.re, need = excluded.need, note = excluded.note;
+
+
+-- ================= 封測上線調整:內測改封測字樣、每月簽到新獎勵 =================
+create or replace function public.moe_beta_gift(u uuid) returns void language plpgsql security definer set search_path = public as $$
+declare b inbox; n int;
+begin
+  if u is null or not coalesce((select (v->>'gift')::boolean from settings where k = 'beta'), false) then return; end if;
+  select * into b from inbox where uid = u and kind = 'beta' order by id limit 1;
+  if b.id is null then
+    insert into inbox(uid, gem, note, credit, kind, title, bonus) values (u, 1000,
+      '感謝參加萌獸星球封測!這是給測試玩家的大禮包,領取後還可以「自選一隻傳說品質的萌獸」。明天、後天登入還會再各收到 💎1,000。正式上線前會刪檔,請盡量體驗各種功能,有問題到「設定 → 回報問題」告訴我們!',
+      true, 'beta', '🎁 封測大禮包(第 1 天)', '{"coin":100000,"candy":500,"stones":100,"rtix":3,"lpick":1}'::jsonb);
+    return;
+  end if;
+  if b.gem <> 1000 then return; end if; -- 舊版一次給 3000 的不再補寄
+  select count(*) into n from inbox where uid = u and kind in ('beta2','beta3');
+  if n >= 2 then return; end if;
+  if exists (select 1 from inbox where uid = u and kind in ('beta','beta2','beta3') and (created > now() - interval '20 hours' or (created at time zone 'Asia/Taipei')::date >= moe_today())) then return; end if;
+  insert into inbox(uid, gem, note, credit, kind, title) values (u, 1000, '封測大禮包第 ' || (n + 2) || ' 天:💎1,000!謝謝你持續參與封測。', true, case when n = 0 then 'beta2' else 'beta3' end, '🎁 封測大禮包(第 ' || (n + 2) || ' 天)');
+end $$;
+revoke execute on function public.moe_beta_gift(uuid) from public, anon, authenticated;
+update inbox set title = replace(title, '內測', '封測'), note = replace(note, '內測', '封測') where not claimed and kind in ('beta','beta2','beta3');
+update gem_rule set maxn = 150, cap = 2000 where p = 'signb';
+update gem_rule set maxn = 300 where p = 'signf';
