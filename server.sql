@@ -2850,7 +2850,9 @@ end $$;
 create or replace function public.raid_join() returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); w int := moe_raid_last(); R raid_run; pw numeric;
 begin
-  if now() >= moe_raid_st(w) + interval '10 minutes' then raise exception '團隊 Boss 還沒開打'; end if;
+  if now() >= moe_raid_st(w) + interval '10 minutes' then
+    if moe_raid_st(w + 1) - now() <= interval '5 minutes' then w := w + 1; else raise exception '團隊 Boss 還沒開打(開打前 5 分鐘開放等待房間)'; end if;
+  end if;
   insert into raid_win(wid) values (w) on conflict do nothing;
   if (select killed_at from raid_win where wid = w) is not null then raise exception 'Boss 已經被打倒了'; end if;
   select * into R from raid_run where wid = w and uid = u;
@@ -2870,8 +2872,8 @@ begin
   if R.uid is null then raise exception '沒有進場紀錄'; end if;
   select * into W from raid_win where wid = p_wid;
   lim := coalesce(W.killed_at, moe_raid_st(p_wid) + interval '10 minutes');
-  if R.quit or now() > lim + interval '20 seconds' then return raid_board(p_wid); end if;
-  sec := greatest(0, extract(epoch from (least(now(), lim) - R.joined)));
+  if R.quit or now() > lim + interval '20 seconds' or now() < moe_raid_st(p_wid) then return raid_board(p_wid); end if;
+  sec := greatest(0, extract(epoch from (least(now(), lim) - greatest(R.joined, moe_raid_st(p_wid)))));
   d := least(greatest(coalesce(p_dmg, 0), 0), floor(sec * R.cap)::bigint);
   update raid_run set dmg = greatest(dmg, d), last = now(), quit = quit or coalesce(p_quit, false) where wid = p_wid and uid = u;
   if W.killed_at is null then
@@ -2895,3 +2897,61 @@ begin
     from (select * from raid_win order by wid desc limit 15) w) q);
 end $$;
 grant execute on function public.admin_raid() to authenticated;
+
+-- 等待房間:開打前 5 分鐘可以進場等待,房間裡可以聊天
+create table if not exists public.raid_chat(id bigserial primary key, wid int not null, uid uuid not null, x text not null, t timestamptz not null default now());
+create index if not exists raid_chat_wid_idx on public.raid_chat(wid, id);
+alter table public.raid_chat enable row level security;
+create or replace function public.raid_lobby(p_wid int, p_after bigint default 0) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid();
+begin
+  return jsonb_build_object('wid', p_wid, 'st', extract(epoch from moe_raid_st(p_wid)) * 1000, 'now', extract(epoch from now()) * 1000,
+    'n', (select count(*) from raid_run where wid = p_wid and not quit),
+    'who', (select coalesce(jsonb_agg(coalesce(nullif(left(d.data->>'n', 16), ''), '守護員') order by r.joined), '[]'::jsonb) from (select * from raid_run where wid = p_wid and not quit order by joined limit 40) r left join docs d on d.path = 'arena/' || r.uid::text),
+    'chat', (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'n', coalesce(nullif(left(d.data->>'n', 16), ''), '守護員'), 'x', c.x, 'me', c.uid = u, 'av', d.data->>'av') order by c.id), '[]'::jsonb)
+      from (select * from raid_chat where wid = p_wid and id > coalesce(p_after, 0) order by id desc limit 50) c left join docs d on d.path = 'arena/' || c.uid::text));
+end $$;
+create or replace function public.raid_chat_send(p_wid int, p_x text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); x text := trim(regexp_replace(coalesce(p_x,''), '[<>]', '', 'g'));
+begin
+  if x = '' then raise exception '請輸入內容'; end if;
+  if char_length(x) > 40 then raise exception '最多 40 個字'; end if;
+  if x ~* '(https?:|www\.|line\.me|\.com|\.tw)' then raise exception '不能貼網址'; end if;
+  if not exists (select 1 from raid_run where wid = p_wid and uid = u) then raise exception '要先進入等待房間才能聊天'; end if;
+  if exists (select 1 from mutes where uid = u and (until is null or until > now())) then raise exception '你目前被禁言'; end if;
+  if exists (select 1 from raid_chat where uid = u and t > now() - interval '3 seconds') then raise exception '說太快了,休息一下再說'; end if;
+  insert into raid_chat(wid, uid, x) values (p_wid, u, x);
+  delete from raid_chat where t < now() - interval '1 day';
+  return raid_lobby(p_wid, 0);
+end $$;
+create or replace function public.raid_leave(p_wid int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid();
+begin
+  -- 開打前離開等待房間不算用掉機會
+  if now() < moe_raid_st(p_wid) then delete from raid_run where wid = p_wid and uid = u and dmg = 0; end if;
+  return jsonb_build_object('ok', true);
+end $$;
+grant execute on function public.raid_lobby(int,bigint), public.raid_chat_send(int,text), public.raid_leave(int) to authenticated;
+
+-- ================= 定時廣播 =================
+-- 後台設定多則廣播,每隔 N 分鐘自動跳給所有在線玩家,直到關閉
+insert into settings(k, v) values ('auto_bc', '[]'::jsonb) on conflict (k) do nothing;
+drop policy if exists settings_read on public.settings;
+create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint','wipe','raffle','home_notice','auto_bc'));
+create or replace function public.admin_auto_bc_set(p jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); it jsonb; out jsonb := '[]'::jsonb; x text; ev int; n int := 0;
+begin
+  if jsonb_typeof(p) <> 'array' then raise exception '格式錯誤'; end if;
+  for it in select * from jsonb_array_elements(p) loop
+    n := n + 1; if n > 10 then exit; end if;
+    x := left(trim(regexp_replace(coalesce(it->>'x',''), '[<>]', '', 'g')), 120);
+    if x = '' then continue; end if;
+    ev := least(1440, greatest(5, coalesce((it->>'every')::int, 30)));
+    out := out || jsonb_build_array(jsonb_build_object('id', left(coalesce(nullif(it->>'id',''), md5(random()::text)), 16), 'on', coalesce((it->>'on')::boolean, false), 'x', x, 'every', ev,
+      'start', case when coalesce(it->>'start','') <> '' then (it->>'start')::timestamptz end, 'end', case when coalesce(it->>'end','') <> '' then (it->>'end')::timestamptz end));
+  end loop;
+  insert into settings(k, v) values ('auto_bc', out) on conflict (k) do update set v = excluded.v;
+  perform alog('auto_bc', null, out);
+  return out;
+end $$;
+grant execute on function public.admin_auto_bc_set(jsonb) to authenticated;
