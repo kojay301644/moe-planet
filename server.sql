@@ -358,6 +358,7 @@ revoke execute on function public.market_tick(uuid) from public, anon, authentic
 create or replace function public.inbox_list() returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid();
 begin
+  begin perform moe_raid_settle_due(); exception when others then null; end;
   perform market_tick(u);
   insert into inbox(uid, item, note, kind, title) select seller, item, '上架 48 小時沒有賣出,領取後回到背包。', 'market', '交易所:過期退回' from market where seller = u and status = 'open' and created < now() - interval '48 hours';
   update market set status = 'expired' where seller = u and status = 'open' and created < now() - interval '48 hours';
@@ -785,7 +786,7 @@ end $$;
 create or replace function public.admin_tickets(p_status text default 'open') returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
 declare a uuid := moe_admin();
 begin return (select coalesce(jsonb_agg(to_jsonb(t) || jsonb_build_object('name', d.data->>'n', 'acct', moe_acct(u.email)) order by t.id desc), '[]'::jsonb)
-  from (select * from tickets where case when p_status = 'err' then cat = '系統錯誤' else cat is distinct from '系統錯誤' and (p_status = 'all' or status = p_status) end order by id desc limit 100) t left join docs d on d.path = 'arena/' || t.uid::text left join auth.users u on u.id = t.uid); end $$;
+  from (select * from tickets where case when p_status = 'err' then cat = '系統錯誤' and status <> 'closed' else cat is distinct from '系統錯誤' and (p_status = 'all' or status = p_status) end order by id desc limit 100) t left join docs d on d.path = 'arena/' || t.uid::text left join auth.users u on u.id = t.uid); end $$;
 create or replace function public.admin_ticket_reply(p_id bigint, p_reply text, p_close boolean) returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin(); t tickets;
 begin
@@ -977,7 +978,7 @@ create or replace function public.report_error(p_msg text, p_stack text, p_ctx t
 declare u uuid := auth.uid(); b text := left(coalesce(p_msg,''),300) || chr(10) || left(coalesce(p_ctx,''),300) || chr(10) || left(coalesce(p_stack,''),900);
 begin
   if u is null then return jsonb_build_object('ok', false); end if;
-  if b ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中|Failed to start the audio device|^Script error\.)' then return jsonb_build_object('ok', false, 'skip', true); end if;
+  if b ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中|Failed to start the audio device|^Script error\.|timeout|Failed to fetch|Load failed|NetworkError|伺服器忙碌中)' then return jsonb_build_object('ok', false, 'skip', true); end if;
   if (select count(*) from tickets where uid = u and cat = '系統錯誤' and at > now() - interval '1 hour') >= 10 then return jsonb_build_object('ok', false); end if;
   if exists (select 1 from tickets where uid = u and cat = '系統錯誤' and left(body, 300) = left(b, 300) and at > now() - interval '1 day') then return jsonb_build_object('ok', false); end if;
   insert into tickets(uid, cat, body) values (u, '系統錯誤', b);
@@ -1338,6 +1339,7 @@ revoke execute on function public.moe_res_from_save(uuid), public.moe_res_add(uu
 create or replace function public.wallet_init(p_local int) returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); w wallet;
 begin
+  begin perform moe_raid_settle_due(); exception when others then null; end;
   insert into wallet(uid) values (u) on conflict (uid) do nothing;
   insert into player_day values (u, moe_today()) on conflict do nothing;
   select * into w from wallet where uid = u;
@@ -2917,7 +2919,13 @@ create or replace function public.moe_raid_settle_due() returns void language pl
 declare w int;
 begin
   for w in select wid from raid_win where not settled and coalesce(killed_at, moe_raid_st(wid) + make_interval(mins => moe_rc('min',10)::int)) + interval '30 seconds' < now() order by wid limit 5 loop
-    begin perform moe_raid_settle(w); exception when others then null; end;
+    begin perform moe_raid_settle(w); exception when others then
+      begin
+        if not exists (select 1 from tickets where cat = '系統錯誤' and body like '團隊 Boss 結算失敗:第 ' || w || ' 場%' and at > now() - interval '1 hour') then
+          insert into tickets(uid, cat, body) values (coalesce(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid), '系統錯誤', '團隊 Boss 結算失敗:第 ' || w || ' 場' || chr(10) || sqlerrm || chr(10) || '可以到後台「團隊 Boss」按「立即結算」重試');
+        end if;
+      exception when others then null; end;
+    end;
   end loop;
 end $$;
 revoke execute on function public.moe_raid_settle_due() from public, anon, authenticated;
@@ -3162,7 +3170,7 @@ begin
   return jsonb_build_object(
     'role', r,
     'tickets', (select count(*) from tickets where status = 'open' and cat is distinct from '系統錯誤'),
-    'errors', (select count(*) from tickets where cat = '系統錯誤' and at > now() - interval '24 hours'),
+    'errors', (select count(*) from tickets where cat = '系統錯誤' and status <> 'closed' and at > now() - interval '24 hours'),
     'dm', (select count(*) from dm where not adm and not rd),
     'flags', (select count(*) from save_flags where status = 'open'),
     'raffle', (select count(*) from raffle_win where status = 'review'),
@@ -3211,7 +3219,7 @@ grant execute on function public.admin_todo(), public.admin_player2(uuid), publi
 
 -- ================= 一鍵刪檔(只有超級管理員)+ 重複登入不算系統錯誤 =================
 -- 把舊的「重複登入 / 維護中」錯誤回報標成已處理(不刪除)
-update tickets set status = 'closed' where cat = '系統錯誤' and status = 'open' and body ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中|Failed to start the audio device|^Script error\.)';
+update tickets set status = 'closed' where cat = '系統錯誤' and status = 'open' and body ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中|Failed to start the audio device|^Script error\.|timeout|Failed to fetch|Load failed|NetworkError|伺服器忙碌中)';
 create or replace function public.admin_wipe_preview() returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin_need('super'); begin
   return jsonb_build_object(
@@ -3270,3 +3278,29 @@ declare a uuid := moe_admin_need('cs'); begin
       and delta >= greatest(1, coalesce(p_min,3000)) and reason not like 'topup:%' order by at desc limit 300) g);
 end $$;
 grant execute on function public.admin_gem_big(int,int) to authenticated;
+
+-- ================= 團隊 Boss:後台正式場/測試場分開列、立即結算 =================
+create or replace function public.admin_raid() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  return (select coalesce(jsonb_agg(x order by (x->>'test')::boolean, (x->>'wid')::int desc), '[]'::jsonb) from (
+    select jsonb_build_object('wid', w.wid, 'test', w.wid >= 900000000, 'hp', moe_raid_hpw(w.wid), 'st', moe_raid_st(w.wid), 'killed', w.killed_at, 'settled', w.settled, 'n', (select count(*) from raid_run r where r.wid = w.wid),
+      'due', not w.settled and coalesce(w.killed_at, moe_raid_st(w.wid) + make_interval(mins => moe_rc('min',10)::int)) + interval '30 seconds' < now(),
+      'total', (select coalesce(sum(dmg),0) from raid_run r where r.wid = w.wid),
+      'top', (select coalesce(jsonb_agg(jsonb_build_object('uid', r.uid, 'n', d.data->>'n', 'd', r.dmg, 'cap', r.cap, 'pw', (d.data->>'pw')::numeric, 'quit', r.quit,
+          'dps', round(r.dmg / greatest(1, extract(epoch from (coalesce(r.last, r.joined) - r.joined))))) order by r.dmg desc), '[]'::jsonb)
+        from (select * from raid_run r where r.wid = w.wid order by dmg desc limit 10) r left join docs d on d.path = 'arena/' || r.uid::text)) x
+    from ((select * from raid_win where wid < 900000000 order by wid desc limit 12) union all (select * from raid_win where wid >= 900000000 order by wid desc limit 5)) w) q);
+end $$;
+create or replace function public.admin_raid_settle(p_wid int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin_need('ops'); W raid_win;
+begin
+  select * into W from raid_win where wid = p_wid;
+  if W.wid is null then raise exception '找不到這一場'; end if;
+  if W.settled then return jsonb_build_object('ok', true, 'msg', '這一場已經結算過了'); end if;
+  if now() < coalesce(W.killed_at, moe_raid_st(p_wid) + make_interval(mins => moe_rc('min',10)::int)) + interval '30 seconds' then raise exception '這一場還沒結束,結束 30 秒後才能結算'; end if;
+  perform moe_raid_settle(p_wid);
+  perform alog('raid_settle', null, jsonb_build_object('wid', p_wid));
+  return jsonb_build_object('ok', true, 'msg', '已結算,獎勵已寄到參戰玩家的信箱', 'n', (select count(*) from inbox where title like '團隊 Boss%' and created > now() - interval '10 seconds'));
+end $$;
+grant execute on function public.admin_raid(), public.admin_raid_settle(int) to authenticated;
