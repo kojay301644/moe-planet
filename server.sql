@@ -5,6 +5,8 @@
 create or replace function public.moe_cfg() returns jsonb language plpgsql stable security definer set search_path = public as $$
 begin return coalesce((select v->'d' from settings where k = 'game_cfg'), '{}'::jsonb); exception when undefined_table then return '{}'::jsonb; end $$;
 revoke execute on function public.moe_cfg() from public, anon, authenticated;
+create or replace function public.moe_rc(k text, d numeric) returns numeric language plpgsql stable security definer set search_path = public as $$
+begin return coalesce((moe_cfg()->'raid'->>k)::numeric, d); end $$;
 
 -- ============ 錢包 ============
 -- 後台顯示用的帳號名稱:帳號密碼玩家顯示帳號,Google 玩家顯示「G:信箱」
@@ -186,12 +188,12 @@ begin
   p_opp_pts := least(greatest(coalesce(p_opp_pts, L.pts), 0), L.pts + 400);
   if p_win and (coalesce(p_secs,0) < 4 or coalesce(p_my_pw,0) * 2.5 < coalesce(p_opp_pw,0)) then ok := false; L.flags := L.flags + 1; end if;
   if p_win and ok then
-    g := round(least(greatest(25 + (p_opp_pts - L.pts) / 10.0, 12), 40));
-    if L.ls >= 3 then g := round(g * 1.5); end if;
+    g := round(least(greatest(coalesce((moe_cfg()->'ladder'->>'gb')::numeric, 25) + (p_opp_pts - L.pts) / 10.0, coalesce((moe_cfg()->'ladder'->>'gmin')::numeric, 12)), coalesce((moe_cfg()->'ladder'->>'gmax')::numeric, 40)));
+    if L.ls >= 3 then g := round(g * coalesce((moe_cfg()->'ladder'->>'streak')::numeric, 1.5)); end if;
     if p_rev is not null then update ladder_def set revenged = true where id = p_rev and defender = u and attacker = p_opp_uid and att_win and not revenged and at > now() - interval '1 day'; rv := found; if rv then g := g + 5; end if; end if;
     L.pts := L.pts + g; L.w := L.w + 1; L.ls := 0;
   else
-    g := round(least(greatest(15 + (L.pts - p_opp_pts) / 12.0, 6), 25));
+    g := round(least(greatest(coalesce((moe_cfg()->'ladder'->>'lb')::numeric, 15) + (L.pts - p_opp_pts) / 12.0, coalesce((moe_cfg()->'ladder'->>'lmin')::numeric, 6)), coalesce((moe_cfg()->'ladder'->>'lmax')::numeric, 25)));
     L.pts := greatest(0, L.pts - g); L.l := L.l + 1; L.ls := L.ls + 1; g := -g;
   end if;
   L.best := greatest(L.best, L.pts); L.used := L.used + 1;
@@ -203,10 +205,10 @@ end $$;
 create or replace function public.ladder_buy() returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); L ladder := ladder_row(); v int;
 begin
-  if L.bought >= 10 then raise exception 'limit'; end if;
-  update wallet set gem = gem - 30, updated_at = now() where uid = u and gem >= 30;
+  if L.bought >= coalesce((moe_cfg()->'ladder'->>'buyMax')::numeric, 10) then raise exception 'limit'; end if;
+  update wallet set gem = gem - coalesce((moe_cfg()->'ladder'->>'buyCost')::numeric, 30)::int, updated_at = now() where uid = u and gem >= coalesce((moe_cfg()->'ladder'->>'buyCost')::numeric, 30)::int;
   if not found then raise exception 'not enough gem'; end if;
-  insert into gem_log(uid,delta,reason) values (u,-30,'ladder_ticket');
+  insert into gem_log(uid,delta,reason) values (u,-coalesce((moe_cfg()->'ladder'->>'buyCost')::numeric, 30)::int,'ladder_ticket');
   update ladder set bought = bought + 1 where uid = u;
   return ladder_me() || jsonb_build_object('gem',(select gem from wallet where uid = u));
 end $$;
@@ -1002,7 +1004,7 @@ begin
   if T.uid is null or T.claimed then return jsonb_build_object('gem',0); end if;
   select rn into r from (select uid, row_number() over () rn from td_board(pw)) q where q.uid = u;
   update td_week set claimed = true where uid = u and wk = pw;
-  g := case when r is null then 0 when r = 1 then 600 when r <= 3 then 400 when r <= 10 then 200 when r <= 50 then 60 else 0 end;
+  g := case when r is null then 0 when r = 1 then coalesce((moe_cfg()->'td'->>'w1')::int, 600) when r <= 3 then coalesce((moe_cfg()->'td'->>'w2')::int, 400) when r <= 10 then coalesce((moe_cfg()->'td'->>'w3')::int, 200) when r <= 50 then coalesce((moe_cfg()->'td'->>'w4')::int, 60) else 0 end;
   if g > 0 then
     insert into inbox(uid, gem, note, title, kind) values (u, g, '上週守塔挑戰無盡模式第 ' || r || ' 名(' || T.best || ' 波),獎勵請收下!', '🛡️ 守塔排行獎勵', 'system');
   end if;
@@ -2492,7 +2494,7 @@ begin
   if T.uid is null or T.claimed then return jsonb_build_object('gem',0); end if;
   select rn into r from (select uid, row_number() over () rn from td_board(pw)) q where q.uid = u;
   update td_week set claimed = true where uid = u and wk = pw;
-  g := case when r is null then 0 when r = 1 then 600 when r <= 3 then 400 when r <= 10 then 200 when r <= 50 then 60 else 0 end;
+  g := case when r is null then 0 when r = 1 then coalesce((moe_cfg()->'td'->>'w1')::int, 600) when r <= 3 then coalesce((moe_cfg()->'td'->>'w2')::int, 400) when r <= 10 then coalesce((moe_cfg()->'td'->>'w3')::int, 200) when r <= 50 then coalesce((moe_cfg()->'td'->>'w4')::int, 60) else 0 end;
   if g > 0 then
     insert into inbox(uid, gem, credit, note, title, kind) values (u, g, true, '上週守塔挑戰無盡模式第 ' || r || ' 名(' || T.best || ' 波),獎勵請收下!', '🛡️ 守塔排行獎勵', 'system');
   end if;
@@ -2743,12 +2745,12 @@ begin
   p_opp_pts := least(greatest(coalesce(p_opp_pts, L.pts), 0), L.pts + 400);
   if p_win and (coalesce(p_secs,0) < 4 or coalesce(p_my_pw,0) * 2.5 < coalesce(p_opp_pw,0)) then ok := false; L.flags := L.flags + 1; end if;
   if p_win and ok then
-    g := round(least(greatest(25 + (p_opp_pts - L.pts) / 10.0, 12), 40));
-    if L.ls >= 3 then g := round(g * 1.5); end if;
+    g := round(least(greatest(coalesce((moe_cfg()->'ladder'->>'gb')::numeric, 25) + (p_opp_pts - L.pts) / 10.0, coalesce((moe_cfg()->'ladder'->>'gmin')::numeric, 12)), coalesce((moe_cfg()->'ladder'->>'gmax')::numeric, 40)));
+    if L.ls >= 3 then g := round(g * coalesce((moe_cfg()->'ladder'->>'streak')::numeric, 1.5)); end if;
     if p_rev is not null then update ladder_def set revenged = true where id = p_rev and defender = u and attacker = p_opp_uid and att_win and not revenged and at > now() - interval '1 day'; rv := found; if rv then g := g + 5; end if; end if;
     L.pts := L.pts + g; L.w := L.w + 1; L.ls := 0;
   else
-    g := round(least(greatest(15 + (L.pts - p_opp_pts) / 12.0, 6), 25));
+    g := round(least(greatest(coalesce((moe_cfg()->'ladder'->>'lb')::numeric, 15) + (L.pts - p_opp_pts) / 12.0, coalesce((moe_cfg()->'ladder'->>'lmin')::numeric, 6)), coalesce((moe_cfg()->'ladder'->>'lmax')::numeric, 25)));
     L.pts := greatest(0, L.pts - g); L.l := L.l + 1; L.ls := L.ls + 1; g := -g;
   end if;
   L.best := greatest(L.best, L.pts); L.used := L.used + 1;
@@ -2821,14 +2823,14 @@ alter table public.raid_test enable row level security;
 create or replace function public.moe_raid_st(p_wid int) returns timestamptz language plpgsql stable security definer set search_path = public as $$
 begin
   if p_wid >= 900000000 then return coalesce((select st from raid_test where wid = p_wid), 'infinity'::timestamptz); end if;
-  return to_timestamp((p_wid / 3)::bigint * 86400 - 28800 + (array[13,19,22])[p_wid % 3 + 1] * 3600);
+  return to_timestamp((p_wid / 3)::bigint * 86400 - 28800 + (coalesce((select array_agg(x::int) from jsonb_array_elements_text(moe_cfg()->'raid'->'slots') x), array[13,19,22]))[p_wid % 3 + 1] * 3600);
 end $$;
 create or replace function public.moe_raid_last() returns int language plpgsql stable as $$
 declare w int := (floor((extract(epoch from now()) + 28800) / 86400)::int + 1) * 3 + 2;
 begin while moe_raid_st(w) > now() loop w := w - 1; end loop; return w; end $$;
-create or replace function public.moe_raid_hp() returns bigint language sql immutable as $$ select 4000000::bigint $$;
+create or replace function public.moe_raid_hp() returns bigint language plpgsql stable as $$ begin return moe_rc('hp',4000000)::bigint; end $$;
 create or replace function public.moe_raid_hpw(p_wid int) returns bigint language sql stable security definer set search_path = public as $$
-  select coalesce((select hp from raid_test where wid = p_wid), 4000000::bigint) $$;
+  select coalesce((select hp from raid_test where wid = p_wid), moe_rc('hp',4000000)::bigint) $$;
 
 -- 伺服器產生一件裝備(格式和遊戲相同)
 create or replace function public.moe_raid_eq(p_set text, p_rar int) returns jsonb language plpgsql volatile as $$
@@ -2849,11 +2851,11 @@ declare W raid_win; r record; rk int := 0; st text := (array['guard','wind','hun
 begin
   select * into W from raid_win where wid = p_wid for update;
   if W.wid is null or W.settled then return; end if;
-  fin := coalesce(W.killed_at, moe_raid_st(p_wid) + interval '10 minutes');
+  fin := coalesce(W.killed_at, moe_raid_st(p_wid) + make_interval(mins => moe_rc('min',10)::int));
   if now() < fin + interval '30 seconds' then return; end if;
   killed := W.killed_at is not null;
   for r in select * from raid_run where wid = p_wid and dmg > 0
-    and (coalesce(last, joined) - joined >= interval '60 seconds' or (W.killed_at is not null and coalesce(last, joined) >= W.killed_at - interval '20 seconds'))
+    and (coalesce(last, joined) - joined >= make_interval(secs => moe_rc('minsec',60)::int) or (W.killed_at is not null and coalesce(last, joined) >= W.killed_at - interval '20 seconds'))
     order by dmg desc, joined loop
     rk := rk + 1;
     if p_wid >= 900000000 then
@@ -2861,14 +2863,14 @@ begin
         bn || (case when killed then '(已打倒)' else '(時間到)' end) || ' · 你的傷害 ' || to_char(r.dmg, 'FM999,999,999') || ',排名第 ' || rk || ' 名。測試場不發放獎勵。');
       continue;
     end if;
-    g := case when rk = 1 then 150 when rk <= 3 then 100 when rk <= 10 then 60 else 30 end;
-    rr := case when rk = 1 then 3 when rk <= 3 then 2 when rk <= 10 then 1 else 0 end;
+    g := case when rk = 1 then moe_rc('g1',150) when rk <= 3 then moe_rc('g2',100) when rk <= 10 then moe_rc('g3',60) else moe_rc('g4',30) end;
+    rr := case when rk = 1 then moe_rc('r1',3) when rk <= 3 then moe_rc('r2',2) when rk <= 10 then moe_rc('r3',1) else 0 end;
     eq := case when rk = 1 then moe_raid_eq(st, 3) when rk <= 3 then moe_raid_eq(st, 2) when rk <= 10 and random() < .5 then moe_raid_eq(st, 2) else null end;
     insert into inbox(uid, gem, credit, item, kind, title, note, bonus) values (r.uid, g, true, eq, 'system', '團隊 Boss 結算:第 ' || rk || ' 名',
       bn || (case when killed then '(已打倒)' else '(時間到)' end) || ' · 你的傷害 ' || to_char(r.dmg, 'FM999,999,999') || ',排名第 ' || rk || ' 名',
-      jsonb_strip_nulls(jsonb_build_object('ore', 15, 'enh', 5, 'reroll', nullif(rr, 0), 'ti', case when rk = 1 then 'sp_raid' end)));
+      jsonb_strip_nulls(jsonb_build_object('ore', moe_rc('ore',15)::int, 'enh', moe_rc('enh',5)::int, 'reroll', nullif(rr, 0), 'ti', case when rk = 1 then 'sp_raid' end)));
     if killed then
-      insert into inbox(uid, gem, credit, item, kind, title, note) values (r.uid, 50, true, moe_raid_eq(st, case when random() < .05 then 3 else 2 end), 'system', '團隊 Boss 打倒獎勵', bn || ' 被大家打倒了!有參戰的守護員都能領');
+      insert into inbox(uid, gem, credit, item, kind, title, note) values (r.uid, moe_rc('kg',50)::int, true, moe_raid_eq(st, case when random() < .05 then 3 else 2 end), 'system', '團隊 Boss 打倒獎勵', bn || ' 被大家打倒了!有參戰的守護員都能領');
     end if;
   end loop;
   update raid_win set settled = true, settled_at = now() where wid = p_wid;
@@ -2878,7 +2880,7 @@ revoke execute on function public.moe_raid_settle(int) from public, anon, authen
 create or replace function public.moe_raid_settle_due() returns void language plpgsql security definer set search_path = public as $$
 declare w int;
 begin
-  for w in select wid from raid_win where not settled and coalesce(killed_at, moe_raid_st(wid) + interval '10 minutes') + interval '30 seconds' < now() order by wid limit 5 loop
+  for w in select wid from raid_win where not settled and coalesce(killed_at, moe_raid_st(wid) + make_interval(mins => moe_rc('min',10)::int)) + interval '30 seconds' < now() order by wid limit 5 loop
     begin perform moe_raid_settle(w); exception when others then null; end;
   end loop;
 end $$;
@@ -2893,7 +2895,7 @@ begin
   select coalesce(sum(dmg), 0) into tot from raid_run where wid = wd;
   select * into me from raid_run where wid = wd and uid = u;
   if me.uid is not null then select count(*) + 1 into myrk from raid_run where wid = wd and (dmg > me.dmg or (dmg = me.dmg and joined < me.joined)); end if;
-  return jsonb_build_object('wid', wd, 'st', extract(epoch from moe_raid_st(wd)) * 1000, 'en', extract(epoch from moe_raid_st(wd) + interval '10 minutes') * 1000, 'now', extract(epoch from now()) * 1000,
+  return jsonb_build_object('wid', wd, 'st', extract(epoch from moe_raid_st(wd)) * 1000, 'en', extract(epoch from moe_raid_st(wd) + make_interval(mins => moe_rc('min',10)::int)) * 1000, 'now', extract(epoch from now()) * 1000,
     'hp', moe_raid_hpw(wd), 'test', wd >= 900000000, 'total', tot, 'killed', WN.killed_at is not null, 'settled', coalesce(WN.settled, false), 'n', (select count(*) from raid_run where wid = wd),
     'me', case when me.uid is null then null else jsonb_build_object('d', me.dmg, 'quit', me.quit, 'rank', myrk) end,
     'list', (select coalesce(jsonb_agg(jsonb_build_object('n', coalesce(nullif(left(d.data->>'n', 16), ''), '守護員'), 'd', x.dmg, 'me', x.uid = u, 'av', d.data->>'av') order by x.dmg desc, x.joined), '[]'::jsonb)
@@ -2908,10 +2910,10 @@ begin
   if p_test is not null then
     a := moe_admin(); w := p_test;
     if not exists (select 1 from raid_test where wid = w) then raise exception '找不到這個測試場'; end if;
-    if now() >= moe_raid_st(w) + interval '10 minutes' then raise exception '測試場已經結束'; end if;
-    if moe_raid_st(w) - now() > interval '5 minutes' then raise exception '測試場還沒開放'; end if;
-  elsif now() >= moe_raid_st(w) + interval '10 minutes' then
-    if moe_raid_st(w + 1) - now() <= interval '5 minutes' then w := w + 1; else raise exception '團隊 Boss 還沒開打(開打前 5 分鐘開放等待房間)'; end if;
+    if now() >= moe_raid_st(w) + make_interval(mins => moe_rc('min',10)::int) then raise exception '測試場已經結束'; end if;
+    if moe_raid_st(w) - now() > make_interval(mins => moe_rc('lobby',5)::int) then raise exception '測試場還沒開放'; end if;
+  elsif now() >= moe_raid_st(w) + make_interval(mins => moe_rc('min',10)::int) then
+    if moe_raid_st(w + 1) - now() <= make_interval(mins => moe_rc('lobby',5)::int) then w := w + 1; else raise exception '團隊 Boss 還沒開打(開打前 5 分鐘開放等待房間)'; end if;
   end if;
   insert into raid_win(wid) values (w) on conflict do nothing;
   if (select killed_at from raid_win where wid = w) is not null then raise exception 'Boss 已經被打倒了'; end if;
@@ -2931,7 +2933,7 @@ begin
   select * into R from raid_run where wid = p_wid and uid = u for update;
   if R.uid is null then raise exception '沒有進場紀錄'; end if;
   select * into W from raid_win where wid = p_wid;
-  lim := coalesce(W.killed_at, moe_raid_st(p_wid) + interval '10 minutes');
+  lim := coalesce(W.killed_at, moe_raid_st(p_wid) + make_interval(mins => moe_rc('min',10)::int));
   if R.quit or now() > lim + interval '20 seconds' or now() < moe_raid_st(p_wid) then return raid_board(p_wid); end if;
   sec := greatest(0, extract(epoch from (least(now(), lim) - greatest(R.joined, moe_raid_st(p_wid)))));
   d := least(greatest(coalesce(p_dmg, 0), 0), floor(sec * R.cap * (case when p_wid >= 900000000 then 5 else 1 end))::bigint);
