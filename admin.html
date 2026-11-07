@@ -31,8 +31,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-off
 .top h1{font-size:16px;margin:0;flex:1}
 .top h1 small{color:var(--mut);font-weight:500;margin-left:6px}
 nav{display:flex;flex-wrap:wrap;gap:2px 2px;max-width:1180px;margin:8px auto 0;padding:0 max(8px,env(safe-area-inset-left,0px))}
+nav{flex-direction:column;flex-wrap:nowrap!important}nav .ng,nav .ns{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}nav .ng::-webkit-scrollbar,nav .ns::-webkit-scrollbar{display:none}nav .ng button{font-weight:800;font-size:14px}nav .ns{border-top:1px solid var(--line);padding-top:2px}nav .ns button{font-size:13px}
 nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:7px 10px;color:var(--mut);white-space:nowrap}
-nav button.on{color:var(--acc);border-bottom-color:var(--acc)}
+nav button.on{color:var(--acc);border-bottom-color:var(--acc)}nav .ng button.on{background:var(--acc2);border-radius:8px 8px 0 0}
 main{max-width:1180px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 60px max(16px,env(safe-area-inset-left,0px));display:grid;gap:14px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
 .card h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -43,6 +44,7 @@ main{max-width:1180px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-ri
 .kpi b{font-size:22px;font-variant-numeric:tabular-nums}
 .kpi.warn b{color:var(--warn)}.kpi.bad b{color:var(--bad)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cfg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}.cfr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}.cfr span:first-child{display:flex;flex-direction:column;font-weight:700;font-size:13px}.cfr small{color:var(--mut);font-weight:500;font-size:11px}.cfr input[type=number]{width:100px}.cfr.chg,tr.chg{background:var(--warnbg)}.cfgbar{position:sticky;top:96px;z-index:3}
 .row>input{flex:1 1 160px}
 .tw{overflow-x:auto;margin:0 -4px}
 table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
@@ -121,15 +123,24 @@ const ago=t=>{if(!t)return '-';const s=(Date.now()-new Date(t))/1e3;return s<60?
 let toastT;function toast(m){const el=$('toast');el.textContent=m;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600)}
 async function rpc(fn,a){const {data,error}=await sb.rpc(fn,a||{});if(error){const m=error.message||'';throw new Error(/[\u4e00-\u9fff]/.test(m)?m:/does not exist|Could not find/.test(m)?'伺服器還沒安裝後台功能,請先在 Supabase 執行最新的 server.sql':m)}return data}
 const PET={fox:'小焰狐',otter:'泡泡獺',penguin:'雪糰企鵝',pango:'小石甲',ferret:'靜電毛球',whale:'小鯨鈴',bear:'苔苔熊',dragon:'星晶龍寶',bunny:'蘑菇兔',mouse:'火花鼠',mole:'礦石鼴',puffer:'泡泡豚',owl:'雪絨鴞',lizard:'火蜥寶',deer:'雷光鹿',moth:'花芽蝶',armad:'小鋼甲',seal:'雪球海豹',marten:'影絨貂',phoenix:'火鳥雛'};
-const EQT={collar:'項圈',hat:'帽子',charm:'護符',bell:'鈴鐺'},SET={basic:'一般',fire:'烈焰',ice:'冰霜',elec:'雷鳴',guard:'守護',wind:'疾風',siege:'攻城',hunt:'獵王'},UQ={vamp:'吸血項圈',wind:'疾風帽',thorn:'荊棘護符',revenge:'復仇鈴鐺'},RAR=['普通','稀有','史詩','傳說','神話'];
-const SUB={atk:'攻擊',hp:'血量',def:'防禦',crit:'爆擊率',critd:'爆擊傷害',cdr:'技能冷卻',boss:'對Boss',siege:'對城門塔',heal:'治療'};
+const EQT={collar:'項圈',hat:'帽子',charm:'護符',bell:'鈴鐺'},SET={basic:'一般',fire:'烈焰',ice:'冰霜',elec:'雷鳴',guard:'守護',wind:'疾風',siege:'蠻王',hunt:'獵王'},UQ={vamp:'吸血項圈',wind:'疾風帽',thorn:'荊棘護符',revenge:'復仇鈴鐺'},RAR=['普通','稀有','史詩','傳說','神話'];
+const SUB={atk:'攻擊',hp:'血量',def:'防禦',crit:'爆擊率',critd:'爆擊傷害',cdr:'技能冷卻',boss:'對Boss',siege:'對城門塔(舊)',spd:'攻擊速度',heal:'治療'};
 const MATN={stones:'進化石',enh:'強化石',ore:'礦石',reroll:'洗練石',candy:'經驗糖果'};
 const itemName=e=>e&&e.mat?`<b>${e.mat==='shard'?(PET[e.pet]||e.pet)+'碎片':MATN[e.mat]||e.mat} ×${fmt(e.n)}</b> <span class="tag">${e.mat==='shard'?'碎片':'材料'}</span>`:e?`<span class="item r${e.rar}c"><b>${e.uq?UQ[e.uq]:SET[e.set||'basic']+EQT[e.type]}${e.lv?' +'+e.lv:''}</b></span> <span class="tag">${RAR[e.rar]||''}</span>`:'-';
 const itemSubs=e=>(e&&!e.mat&&e.subs||[]).map(s=>`${SUB[s[0]]||s[0]} +${s[1]}`).join('、');
 const REASON=r=>{r=r||'';return r==='earn'?'遊戲獲得':r==='spend'?'遊戲花費':r==='mail'?'信件領取':r.startsWith('summon')?'召喚 ×'+r.slice(6):r.startsWith('topup:')?'儲值 '+r.slice(6):r.startsWith('admin:')?'營運調整 '+r.slice(6):r.startsWith('market_buy')?'交易所購買':r.startsWith('market_sell_bot')?'交易所賣出(系統)':r.startsWith('market_sell')?'交易所賣出':r==='ladder_ticket'?'天梯挑戰券':r};
 const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',save_restore:'還原存檔',backup:'匯出備份',backup_restore:'從備份還原',save_accept:'接受存檔',admin_remove:'移除管理員'};
 let DMU=null,DMN=0,DMQ='',DMF=null;let ME=null,TAB='home',PQ={q:'',sort:'recent'},MKS='open';
-const TABS=[['home','總覽'],['metrics','📈 玩家數據'],['report','數據報表'],['players','玩家'],['mail','寄信 / 補償'],['notice','公告 / 廣播'],['hnotice','📢 主頁公告'],['raid','🐙 團隊 Boss'],['events','活動'],['codes','兌換碼'],['saves','存檔異常'],['topups','儲值紀錄'],['bots','電腦玩家'],['chat','聊天管理'],['guilds','公會'],['raffle','🎡 抽獎'],['dm','💬 私訊'],['tickets','客服回報'],['backup','💾 備份'],['system','維護 / 管理員'],['logs','操作紀錄']];
+const GROUPS=[['data','📊 數據',[['home','總覽','cs'],['metrics','📈 玩家數據','cs'],['report','數據報表','cs']]],
+ ['ply','👤 玩家',[['players','玩家查詢','cs'],['saves','存檔異常','cs'],['topups','儲值紀錄','super']]],
+ ['com','📢 營運溝通',[['notice','公告 / 廣播','ops'],['hnotice','主頁公告','ops'],['mail','寄信 / 補償','cs'],['tickets','客服回報','cs'],['dm','💬 私訊','cs'],['chat','聊天管理','cs']]],
+ ['evt','🎉 活動',[['events','活動','ops'],['codes','兌換碼','ops'],['raffle','🎡 抽獎','ops'],['raid','🐙 團隊 Boss','ops']]],
+ ['cfg','⚙️ 遊戲設定',[['cfg_sum','召喚','super'],['cfg_sta','體力與次數','super'],['cfg_mult','倍率與獎勵','super'],['cfg_shop','商店','super'],['cfg_pay','儲值方案','super'],['cfg_flag','功能開關 / 解鎖','super'],['cfg_hist','版本紀錄','super']]],
+ ['soc','🏰 社群經濟',[['guilds','公會','cs'],['market','交易所','cs'],['bots','電腦玩家','ops']]],
+ ['sys','🛠 系統',[['system','維護 / 排隊','super'],['admins','管理員 / 權限','super'],['backup','💾 備份','super'],['logs','操作紀錄','cs']]]];
+const RLV={super:3,ops:2,cs:1},RNM={super:'👑 超級管理員',ops:'🛠 營運',cs:'💬 客服'};let ROLE='cs';
+const canR=r=>(RLV[ROLE]||0)>=(RLV[r]||9);
+let TABS=[];function tabsBuild(){TABS=[];GROUPS.forEach(([g,gn,L])=>L.forEach(([k,n,r])=>{if(canR(r))TABS.push([k,n,g])}))}
 // ---------- login ----------
 const em=u=>String(u).trim().toLowerCase()+'@player.moe-planet.app';
 $('lgo').onclick=async()=>{const u=$('lu').value.trim(),p=$('lp').value;if(!u||!p)return toast('請輸入帳號和密碼');$('lgo').disabled=true;$('lmsg').textContent='登入中…';
@@ -142,10 +153,13 @@ async function boot(){const {data:{session}}=await sb.auth.getSession();if(!sess
   if(!w.admin){$('loginV').hidden=false;$('appV').hidden=true;
     $('lmsg').innerHTML=w.anyAdmin?'這個帳號沒有管理員權限。<br>請現有管理員到「管理員」頁新增你。<br><button class="s" id="lout">換帳號</button>':'目前還沒有任何管理員。<br><button class="p" id="lclaim">設定我為第一位管理員</button> <button class="s" id="lout">換帳號</button>';
     $('lout').onclick=async()=>{await sb.auth.signOut();location.reload()};if($('lclaim'))$('lclaim').onclick=async()=>{try{await rpc('admin_claim');toast('你已經是管理員了');boot()}catch(e){toast(e.message)}};return}
-  const {data:{user}}=await sb.auth.getUser();ME={uid:user.id,acct:(user.email||'').split('@')[0]};$('who').textContent=ME.acct;$('loginV').hidden=true;$('appV').hidden=false;
+  const {data:{user}}=await sb.auth.getUser();ME={uid:user.id,acct:(user.email||'').split('@')[0]};ROLE=w.role||'super';tabsBuild();$('who').textContent=ME.acct+' · '+(RNM[ROLE]||'');$('loginV').hidden=true;$('appV').hidden=false;
   TAB=(location.hash||'#home').slice(1);if(!TABS.some(t=>t[0]===TAB))TAB='home';render()}
 addEventListener('hashchange',()=>{const t=location.hash.slice(1);if(TABS.some(x=>x[0]===t)&&t!==TAB){TAB=t;render()}});
-function navR(){$('nav').innerHTML=TABS.map(([k,n])=>`<button class="${k===TAB?'on':''}" data-t="${k}">${n}${k==='dm'&&DMN?` <span class="dmn">${DMN}</span>`:''}</button>`).join('');$('nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{TAB=b.dataset.t;location.hash=TAB;render()})}
+function navR(){const cur=(TABS.find(t=>t[0]===TAB)||[])[2];const G=GROUPS.filter(g=>TABS.some(t=>t[2]===g[0]));
+  $('nav').innerHTML=`<div class="ng">${G.map(([g,gn])=>`<button class="${g===cur?'on':''}" data-g="${g}">${gn}${g==='com'&&DMN?' <span class="dmn">●</span>':''}</button>`).join('')}</div><div class="ns">${TABS.filter(t=>t[2]===cur).map(([k,n])=>`<button class="${k===TAB?'on':''}" data-t="${k}">${n}${k==='dm'&&DMN?` <span class="dmn">${DMN}</span>`:''}</button>`).join('')}</div>`;
+  $('nav').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{const f=TABS.find(t=>t[2]===b.dataset.g);if(f){TAB=f[0];location.hash=TAB;render()}});
+  $('nav').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{TAB=b.dataset.t;location.hash=TAB;render()})}
 async function render(){navR();const m=$('main');m.innerHTML='<div class="empty">讀取中…</div>';try{m.innerHTML=await V[TAB]();bind(m);if(TAB==='hnotice')hnPrev()}catch(e){m.innerHTML=`<div class="card"><h2>讀取失敗</h2><p>${esc(e.message)}</p></div>`}}
 // click handlers: data-a="name:arg"
 const A={};function bind(root){root.querySelectorAll('[data-a]').forEach(el=>{el.onclick=e=>{e.stopPropagation();e.preventDefault();const [k,...a]=el.dataset.a.split(':');A[k]&&A[k](...a)}})}
@@ -477,6 +491,64 @@ A.chide=async(uid,t,h)=>{try{await rpc('admin_chat_hide',{p_uid:uid,p_t:+t,p_hid
 A.mute=async uid=>{const d=$('drawer'),I=$('dIn');d.hidden=false;I.innerHTML=`<div class="hd"><h2>禁言玩家</h2><button data-a="close">關閉</button></div><div class="card act"><label>原因</label><input id="mr" placeholder="例如:洗版、不雅言語"><label>時間</label><select id="mh"><option value="1">1 小時</option><option value="24" selected>1 天</option><option value="168">7 天</option><option value="0">永久</option></select><div class="row"><button class="d" data-a="mutego:${uid}">禁言</button></div></div>`;bind(I)};
 A.mutego=async uid=>{try{await rpc('admin_mute',{p_uid:uid,p_hours:+$('mh').value,p_reason:$('mr').value.trim()});toast('已禁言,他的訊息也會被隱藏');$('drawer').hidden=true;render()}catch(e){toast(e.message)}};
 A.unmute=async uid=>{try{await rpc('admin_mute',{p_uid:uid,p_hours:-1,p_reason:null});toast('已解除禁言');render()}catch(e){toast(e.message)}};
+
+
+// ---------- ⚙️ 遊戲設定(遠端數值) ----------
+const CFGF={
+ summon:{t:'召喚',f:[['r3','傳說機率(%)',1.5,0,100,.1],['r2','史詩機率(%)',8.5,0,100,.1],['r1','稀有機率(%)',30,0,100,.5],['up3','UP 活動:傳說機率(%)',3,0,100,.1],['up2','UP 活動:史詩機率(%)',12,0,100,.1],['pity3','傳說保底(抽)',80,1,500,1],['pityd','神獸保底(抽)',200,1,2000,1],['cost1','單抽價格(💎)',160,0,100000,1],['cost10','十連價格(💎)',1440,0,1000000,1],['wish','心願命中率(%)',50,0,100,1],['guard10','十連保底稀有以上',true]]},
+ sta:{t:'體力',f:[['max','體力上限',60,1,9999,1],['regen','每幾分鐘回復 1 點',6,.1,600,.1],['cost','每場冒險消耗',6,0,999,1]]},
+ en:{t:'攻打令(攻城)',f:[['max','攻打令上限',5,1,99,1],['regen','每幾小時回復 1 次',2,.1,48,.1]]},
+ daily:{t:'每日次數',f:[['boss','個人副本券(每天)',3,0,99,1],['ladder','天梯挑戰券(每天)',5,0,99,1],['trial','試煉塔次數(每天)',5,0,99,1]]},
+ mult:{t:'戰鬥獎勵倍率(全域,和活動雙倍可疊加)',f:[['xp','經驗',1,0,20,.1],['coin','星星幣',1,0,20,.1],['drop','進化石',1,0,20,.1],['ore','礦石',1,0,20,.1]]},
+ rw:{t:'鑽石獎勵倍率(伺服器同步放寬上限)',f:[['q','每日任務',1,0,10,.1],['wq','每週任務',1,0,10,.1],['ach','成就',1,0,10,.1],['sign','簽到',1,0,10,.1],['gl','守護員升級',1,0,10,.1]]},
+ flags:{t:'功能開關',f:[['beta','封測歡迎視窗(每天跳一次)',true],['google','Google 登入按鈕',true]]}};
+const CFG_SHOP=[['coin','星星幣袋',100,2],['fruit','經驗糖果包',60,null],['stone','進化石 ×5',120,null],['sta','體力藥水',80,3],['att','攻打令',80,3],['egg','稀有召喚券',400,null],['enh','強化石 ×10',80,3],['reroll','洗練石 ×3',100,2],['eqbox','精選裝備箱(每週)',300,1]];
+const CFG_PAY=[['p30',30,60,0],['p150',150,300,30],['p300',300,600,80],['p790',790,1580,300],['p1490',1490,2980,700],['p3290',3290,6580,1900]];
+const CFG_UL=[['td','守塔挑戰',1],['friends','好友',1],['chat','聊天',1],['farm','農場',2],['ach','成就',2],['shop','商店',3],['evo','進化之泉',3],['train','訓練場',4],['siege','攻城',5],['event','每日活動',6],['guild','公會',7],['board','排行榜',8],['ladder','天梯',8],['deco','佈置城鎮',9],['boss','Boss 副本',10],['forge','鍛造',12]];
+let CFG=null,CFGD=null;const cfgClone=o=>JSON.parse(JSON.stringify(o||{}));
+async function cfgLoad(force){if(!CFG||force){CFG=await rpc('admin_cfg_get');CFGD=cfgClone((CFG.cur||{}).d)}return CFG}
+const cv=(sec,k)=>CFGD[sec]&&CFGD[sec][k]!=null?CFGD[sec][k]:undefined;
+function cfgField(sec,[k,lab,def,mn,mx,st]){const v=cv(sec,k),ch=v!==undefined&&v!==def;
+  if(typeof def==='boolean')return `<label class="cfr ${ch?'chg':''}"><span>${lab}<small>預設:${def?'開':'關'}</small></span><span><input type="checkbox" data-cf="${sec}.${k}" ${(v??def)?'checked':''}> ${(v??def)?'開':'關'}</span></label>`;
+  return `<label class="cfr ${ch?'chg':''}"><span>${lab}<small>預設:${def}${mn!=null?` · 範圍 ${mn}~${mx}`:''}</small></span><input type="number" data-cf="${sec}.${k}" data-def="${def}" min="${mn}" max="${mx}" step="${st||1}" value="${v??def}"></label>`}
+function cfgSec(sec){const S=CFGF[sec];return `<div class="card act"><h2>${S.t} <button class="s" data-a="cfgDef:${sec}">這區恢復預設</button></h2><div class="cfg">${S.f.map(f=>cfgField(sec,f)).join('')}</div></div>`}
+function cfgBar(extra){return `<div class="card cfgbar"><div class="row"><span class="mut" style="flex:1">目前版本:第 ${(CFG.cur||{}).ver||0} 版${(CFG.cur||{}).at?' · '+tm(CFG.cur.at):''}。黃色底 = 跟預設不同。改完按「檢查並儲存」,玩家約 1 分鐘內套用。</span><button class="p" data-a="cfgSave">檢查並儲存</button></div>${extra||''}</div>`}
+function cfgRead(){document.querySelectorAll('[data-cf]').forEach(i=>{const [sec,...kk]=i.dataset.cf.split('.'),k=kk.join('.');let v;
+  if(i.type==='checkbox')v=i.checked;else{if(i.value==='')return;v=+i.value}
+  const path=[sec,...kk];let o=CFGD;for(let j=0;j<path.length-1;j++){o[path[j]]=o[path[j]]||{};o=o[path[j]]}o[path[path.length-1]]=v})}
+function cfgDefOf(path){const [sec,a,b]=path;if(CFGF[sec]){const f=CFGF[sec].f.find(x=>x[0]===a);return f?f[2]:undefined}
+  if(sec==='shop'){const r=CFG_SHOP.find(x=>x[0]===a);return r?{cost:r[2],lim:r[3],on:true}[b]:undefined}
+  if(sec==='pay'){const r=CFG_PAY.find(x=>x[0]===a);return r?{nt:r[1],g:r[2],b:r[3],on:true}[b]:undefined}
+  if(sec==='unlock'){const r=CFG_UL.find(x=>x[0]===a);return r?r[2]:undefined}}
+function cfgClean(d){const o=cfgClone(d);const walk=(x,path)=>{for(const k of Object.keys(x)){const p=[...path,k];if(x[k]&&typeof x[k]==='object'){walk(x[k],p);if(!Object.keys(x[k]).length)delete x[k]}else{const df=cfgDefOf(p);if(df!==undefined&&(x[k]===df||(df===null&&(x[k]===0||x[k]===''))))delete x[k]}}};walk(o,[]);return o}
+function cfgLab(path){const [sec,a,b]=path;if(CFGF[sec]){const f=CFGF[sec].f.find(x=>x[0]===a);return CFGF[sec].t+' › '+(f?f[1]:a)}
+  if(sec==='shop')return '商店 › '+((CFG_SHOP.find(x=>x[0]===a)||[])[1]||a)+' › '+({cost:'價格',lim:'每日限購',on:'上架'}[b]||b);
+  if(sec==='pay')return '儲值 › NT$'+((CFG_PAY.find(x=>x[0]===a)||[])[1]||a)+' 方案 › '+({nt:'售價',g:'鑽石',b:'加贈',on:'販售'}[b]||b);
+  if(sec==='unlock')return '解鎖等級 › '+((CFG_UL.find(x=>x[0]===a)||[])[1]||a);return path.join(' › ')}
+function cfgDiff(a,b){const out=[],flat=(x,p,m)=>{for(const k in x||{}){const q=[...p,k];if(x[k]&&typeof x[k]==='object')flat(x[k],q,m);else m[q.join('.')]=x[k]}return m};const A2=flat(a,[],{}),B2=flat(b,[],{});
+  for(const k of new Set([...Object.keys(A2),...Object.keys(B2)])){if(A2[k]!==B2[k]){const p=k.split('.'),df=cfgDefOf(p);out.push({lab:cfgLab(p),from:A2[k]??df??'預設',to:B2[k]??df??'預設'})}}return out}
+function cfgCheck(d){const e=[],S=d.summon||{},g=(k,df)=>S[k]??df;if(g('r3',1.5)+g('r2',8.5)+g('r1',30)>100)e.push('一般召喚:傳說+史詩+稀有機率加總不能超過 100%');if(g('up3',3)+g('up2',12)+g('r1',30)>100)e.push('UP 活動:傳說+史詩+稀有機率加總不能超過 100%');
+  document.querySelectorAll('[data-cf][type=number]').forEach(i=>{const v=+i.value;if(i.value!==''&&((i.min!==''&&v<+i.min)||(i.max!==''&&v>+i.max)))e.push(`「${cfgLab(i.dataset.cf.split('.'))}」超出範圍 ${i.min}~${i.max}`)});return e}
+A.cfgDef=sec=>{delete CFGD[sec];render()};
+A.cfgSave=()=>{cfgRead();const errs=cfgCheck(CFGD);if(errs.length)return toast(errs[0]);const nd=cfgClean(CFGD),df=cfgDiff((CFG.cur||{}).d||{},nd);if(!df.length)return toast('沒有任何變更');
+  const d=$('drawer'),I=$('dIn');d.hidden=false;I.innerHTML=`<div class="hd"><h2>確認變更(${df.length} 項)</h2><button data-a="close">取消</button></div><div class="card"><div class="tw"><table><thead><tr><th>項目</th><th>原本</th><th>改成</th></tr></thead><tbody>${df.map(x=>`<tr><td>${esc(x.lab)}</td><td class="mut">${esc(String(x.from===true?'開':x.from===false?'關':x.from))}</td><td><b>${esc(String(x.to===true?'開':x.to===false?'關':x.to))}</b></td></tr>`).join('')}</tbody></table></div><label>這次修改的說明(會記在版本紀錄)</label><input id="cfgNote" maxlength="200" placeholder="例如:週末召喚價格調降"><div class="row" style="margin-top:10px"><button class="p" data-a="cfgGo">確認儲存並套用</button></div></div>`;bind(I);CFGD._nd=nd};
+A.cfgGo=async()=>{const nd=CFGD._nd;delete CFGD._nd;try{const r=await rpc('admin_cfg_set',{p:nd,p_note:$('cfgNote').value.trim()});toast('已儲存為第 '+r.ver+' 版,玩家約 1 分鐘內套用');$('drawer').hidden=true;await cfgLoad(true);render()}catch(e){toast(e.message)}};
+V.cfg_sum=async()=>{await cfgLoad();return cfgBar()+cfgSec('summon')+`<div class="card"><p class="mut" style="margin:0">普通機率 = 100% − 傳說 − 史詩 − 稀有,會自動算出。召喚的機率、保底與價格由伺服器套用,玩家無法竄改。UP 活動在「活動」頁建立「召喚機率 UP」時生效。</p></div>`};
+V.cfg_sta=async()=>{await cfgLoad();return cfgBar()+cfgSec('sta')+cfgSec('en')+cfgSec('daily')};
+V.cfg_mult=async()=>{await cfgLoad();return cfgBar()+cfgSec('mult')+cfgSec('rw')};
+V.cfg_flag=async()=>{await cfgLoad();const ul=CFGD.unlock||{};return cfgBar()+cfgSec('flags')+`<div class="card act"><h2>功能解鎖等級 <small>守護員達到這個等級才開放</small><button class="s" data-a="cfgDef:unlock">恢復預設</button></h2><div class="cfg">${CFG_UL.map(([k,n,d])=>{const v=ul[k];return `<label class="cfr ${v!=null&&v!==d?'chg':''}"><span>${n}<small>預設:Lv.${d}</small></span><input type="number" min="1" max="50" step="1" data-cf="unlock.${k}" value="${v??d}"></label>`}).join('')}</div></div>
+  <div class="card"><p class="mut" style="margin:0">交易所目前在伺服器端關閉;要開放需先評估遊戲經濟,之後的階段會加開關。</p></div>`};
+V.cfg_shop=async()=>{await cfgLoad();const S=CFGD.shop||{};return cfgBar()+`<div class="card act"><h2>商店商品 <small>價格單位為 💎;每日限購填 0 = 不限購</small><button class="s" data-a="cfgDef:shop">恢復預設</button></h2><div class="tw"><table><thead><tr><th>商品</th><th>上架</th><th>價格</th><th>每日限購</th></tr></thead><tbody>${CFG_SHOP.map(([id,n,c,l])=>{const o=S[id]||{},chg=Object.keys(o).length;return `<tr class="${chg?'chg':''}"><td><b>${n}</b><br><small class="mut">預設 💎${c}${l?` · 限購 ${l}`:''}</small></td><td><input type="checkbox" data-cf="shop.${id}.on" ${o.on===false?'':'checked'}></td><td><input type="number" min="0" max="100000" data-cf="shop.${id}.cost" value="${o.cost??c}" style="width:90px"></td><td>${id==='eqbox'?'每週 1':`<input type="number" min="0" max="99" data-cf="shop.${id}.lim" value="${o.lim??(l??'')}" style="width:70px">`}</td></tr>`}).join('')}</tbody></table></div><p class="mut">商品內容(給什麼、給多少)目前固定;價格與上下架即時生效。</p></div>`};
+V.cfg_pay=async()=>{await cfgLoad();const S=CFGD.pay||{};return cfgBar()+`<div class="card act"><h2>儲值方案 <small>售價(NT$)、鑽石、加贈;伺服器入帳也會用這裡的數字</small><button class="s" data-a="cfgDef:pay">恢復預設</button></h2><div class="tw"><table><thead><tr><th>方案</th><th>販售</th><th>售價 NT$</th><th>💎 鑽石</th><th>加贈 💎</th></tr></thead><tbody>${CFG_PAY.map(([id,nt,g,b])=>{const o=S[id]||{};return `<tr class="${Object.keys(o).length?'chg':''}"><td><b>NT$${nt} 方案</b><br><small class="mut">預設 ${g}+${b}</small></td><td><input type="checkbox" data-cf="pay.${id}.on" ${o.on===false?'':'checked'}></td><td><input type="number" min="1" max="100000" data-cf="pay.${id}.nt" value="${o.nt??nt}" style="width:90px"></td><td><input type="number" min="1" max="1000000" data-cf="pay.${id}.g" value="${o.g??g}" style="width:100px"></td><td><input type="number" min="0" max="1000000" data-cf="pay.${id}.b" value="${o.b??b}" style="width:90px"></td></tr>`}).join('')}</tbody></table></div>
+  <label class="cfr ${S.first2===false?'chg':''}" style="margin-top:8px"><span>首次購買鑽石加倍<small>預設:開</small></span><span><input type="checkbox" data-cf="pay.first2" ${S.first2===false?'':'checked'}> 開</span></label><p class="mut">⚠ 售價改的是遊戲內顯示;實際金流串接後,金流後台的商品價格也要一致。</p></div>`};
+V.cfg_hist=async()=>{await cfgLoad(true);const H=CFG.hist||[];return `<div class="card"><h2>版本紀錄 <small>最近 50 版;可以查看內容或還原</small></h2><div class="tw"><table><thead><tr><th>#</th><th>時間</th><th>修改者</th><th>說明</th><th>改動區塊</th><th></th></tr></thead><tbody>${H.map((h,i)=>`<tr><td>${h.id}</td><td class="mut">${tm(h.at)}</td><td>${esc(h.by||'')}</td><td style="white-space:normal">${esc(h.note||'')}${i===0?' <span class="tag ok">目前</span>':''}</td><td>${h.n}</td><td style="white-space:nowrap"><button class="s" data-a="cfgView:${h.id}">查看</button>${i?` <button class="s" data-a="cfgBack:${h.id}">還原到這版</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">還沒有修改紀錄,目前全部是預設值</td></tr>'}</tbody></table></div>
+  <div class="row" style="margin-top:10px"><button class="d" data-a="cfgReset">全部恢復預設</button></div></div>`};
+A.cfgView=async id=>{try{const d=await rpc('admin_cfg_hist_get',{p_id:+id});const df=cfgDiff({},d||{});const D=$('drawer'),I=$('dIn');D.hidden=false;I.innerHTML=`<div class="hd"><h2>第 ${id} 筆的內容(和預設不同的項目)</h2><button data-a="close">關閉</button></div><div class="card"><div class="tw"><table><tbody>${df.map(x=>`<tr><td>${esc(x.lab)}</td><td><b>${esc(String(x.to===true?'開':x.to===false?'關':x.to))}</b></td></tr>`).join('')||'<tr><td class="empty">全部是預設值</td></tr>'}</tbody></table></div></div>`;bind(I)}catch(e){toast(e.message)}};
+A.cfgBack=async id=>{try{const d=await rpc('admin_cfg_hist_get',{p_id:+id});CFGD=cfgClone(d);CFGD._nd=cfgClean(CFGD);const df=cfgDiff((CFG.cur||{}).d||{},CFGD._nd);if(!df.length){toast('跟目前一樣,不用還原');return}
+  const D=$('drawer'),I=$('dIn');D.hidden=false;I.innerHTML=`<div class="hd"><h2>還原到第 ${id} 筆(${df.length} 項變更)</h2><button data-a="close">取消</button></div><div class="card"><div class="tw"><table><thead><tr><th>項目</th><th>目前</th><th>還原成</th></tr></thead><tbody>${df.map(x=>`<tr><td>${esc(x.lab)}</td><td class="mut">${esc(String(x.from))}</td><td><b>${esc(String(x.to))}</b></td></tr>`).join('')}</tbody></table></div><input id="cfgNote" value="還原到第 ${id} 筆"><div class="row" style="margin-top:10px"><button class="p" data-a="cfgGo">確認還原</button></div></div>`;bind(I)}catch(e){toast(e.message)}};
+A.cfgReset=()=>{if(!sure('cfgReset','全部數值恢復成預設'))return;CFGD={_nd:{}};const df=cfgDiff((CFG.cur||{}).d||{},{});if(!df.length)return toast('目前已經全部是預設值');const D=$('drawer'),I=$('dIn');D.hidden=false;I.innerHTML=`<div class="hd"><h2>全部恢復預設(${df.length} 項)</h2><button data-a="close">取消</button></div><div class="card"><input id="cfgNote" value="全部恢復預設"><div class="row" style="margin-top:10px"><button class="d" data-a="cfgGo">確認恢復預設</button></div></div>`;bind(I)};
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.cf){const r=t.closest('.cfr,tr');if(r)r.classList.add('chg');if(t.type==='checkbox'&&t.nextSibling&&t.nextSibling.nodeType===3)t.nextSibling.textContent=t.checked?' 開':' 關'}});
+
 // ---------- 公會 ----------
 let GQ='',GSEL=null;
 
@@ -540,7 +612,7 @@ A.dmsend=async()=>{const t=$('dmt'),b=(t&&t.value||'').trim();if(!b)return toast
 // ---------- 系統 ----------
 V.system=async()=>{let q={online:0,queue:0,max:0};try{q=await rpc('admin_queue')}catch(e){}return `<div class="card act"><h2>🚦 同時在線上限(排隊入場)</h2><p>目前在線 <b>${q.online}</b> 人 · 排隊中 <b>${q.queue}</b> 人 · 上限 <b>${q.max||'不限制'}</b></p><label>同時在線上限(0 = 不限制;Supabase 免費版建議 200)</label><input id="qmax" type="number" value="${q.max||0}"><div class="row"><button class="p" data-a="qset">儲存</button></div><p class="mut">超過上限時,新登入的玩家會看到「伺服器擁塞中」並自動排隊;已在遊戲裡的玩家不受影響,管理員帳號不用排隊。</p></div>`+await V.system0()};
 V.system0=async()=>{const {data}=await sb.from('settings').select('v').eq('k','maint').maybeSingle(),m=(data&&data.v)||{};return `<div class="card act" style="${m.on?'border-color:var(--bad)':''}"><h2>🛠 維護模式 ${m.on?'<span class="tag bad">維護中</span>':'<span class="tag ok">正常營運</span>'}</h2><p class="mut" style="margin:0">開啟後一般玩家打開遊戲只會看到維護畫面,所有伺服器功能暫停;管理員帳號仍然可以進遊戲測試。</p>
-  <label>維護訊息(玩家看得到)</label><input id="mm" value="${esc(m.msg||'')}" placeholder="例如:預計 15:00 完成維護,完成後會寄送補償!"><div class="row">${m.on?'<button class="p" data-a="maint:0">結束維護</button>':'<button class="d" data-a="maint:1">開始維護</button>'}</div></div>`+await V.admins()};
+  <label>維護訊息(玩家看得到)</label><input id="mm" value="${esc(m.msg||'')}" placeholder="例如:預計 15:00 完成維護,完成後會寄送補償!"><div class="row">${m.on?'<button class="p" data-a="maint:0">結束維護</button>':'<button class="d" data-a="maint:1">開始維護</button>'}</div></div>`};
 A.maint=async on=>{if(on==='1'&&!sure('maint','開始維護,玩家將無法進入遊戲'))return;try{await rpc('admin_maint',{p_on:on==='1',p_msg:$('mm').value.trim()});toast(on==='1'?'已開始維護':'已結束維護');render()}catch(e){toast(e.message)}};
 // ---------- 交易所 ----------
 V.market=async()=>{const L=await rpc('admin_market',{p_status:MKS});return `<div class="card"><div class="row">${[['open','上架中'],['sold','已成交'],['cancelled','已下架'],['expired','已過期'],['all','全部']].map(([k,n])=>`<button class="s ${MKS===k?'p':''}" data-a="mks:${k}">${n}</button>`).join('')}</div></div>
@@ -549,8 +621,13 @@ V.market=async()=>{const L=await rpc('admin_market',{p_status:MKS});return `<div
 A.mks=k=>{MKS=k;render()};
 A.mkrm=async id=>{if(!sure('mk'+id,'下架這件裝備並退回賣家'))return;try{await rpc('admin_market_remove',{p_id:+id,p_reason:'違反交易規範'});toast('已下架');render()}catch(e){toast(e.message)}};
 // ---------- 管理員 ----------
-V.admins=async()=>{const L=await rpc('admin_admins');return `<div class="card act"><h2>新增管理員 <small>對方要先在遊戲裡建立帳號密碼</small></h2><div class="row"><input id="aa" placeholder="對方的遊戲帳號" autocapitalize="off"><button class="p" data-a="aadd">新增</button></div></div>
-  <div class="card"><h2>管理員</h2><div class="tw"><table><thead><tr><th>帳號</th><th>加入時間</th><th></th></tr></thead><tbody>${L.map(x=>`<tr><td><b>${esc(x.acct)}</b>${x.uid===ME.uid?' <span class="tag">你</span>':''}</td><td class="mut">${tm(x.added)}</td><td>${x.uid===ME.uid?'':`<button class="s d" data-a="arm:${esc(x.acct)}">移除</button>`}</td></tr>`).join('')}</tbody></table></div></div>`};
+V.admins=async()=>{const L=await rpc('admin_admins');let C={};try{C=await rpc('admin_caps_get')}catch(e){}const KN={gem:'💎 鑽石',coin:'⭐ 星星幣',candy:'🍬 糖果',stones:'💠 進化石',ore:'🔩 礦石',enh:'🔨 強化石',reroll:'🔄 洗練石',rtix:'🎟 抽獎券'};
+  return `<div class="card act"><h2>新增管理員 <small>對方要先在遊戲裡建立帳號密碼;新增後預設是「客服」,再到下面調整權限</small></h2><div class="row"><input id="aa" placeholder="對方的遊戲帳號" autocapitalize="off"><button class="p" data-a="aadd">新增</button></div></div>
+  <div class="card"><h2>管理員</h2><div class="tw"><table><thead><tr><th>帳號</th><th>權限</th><th>加入時間</th><th></th></tr></thead><tbody>${L.map(x=>`<tr><td><b>${esc(x.acct)}</b>${x.uid===ME.uid?' <span class="tag">你</span>':''}</td><td>${x.uid===ME.uid?RNM[x.role||'super']:`<select data-rl="${x.uid}">${['super','ops','cs'].map(r=>`<option value="${r}" ${r===(x.role||'super')?'selected':''}>${RNM[r]}</option>`).join('')}</select>`}</td><td class="mut">${tm(x.added)}</td><td>${x.uid===ME.uid?'':`<button class="s d" data-a="arm:${esc(x.acct)}">移除</button>`}</td></tr>`).join('')}</tbody></table></div>
+  <details style="margin-top:10px"><summary>各權限能做什麼</summary><div class="tw"><table><thead><tr><th>功能</th><th>超級管理員</th><th>營運</th><th>客服</th></tr></thead><tbody>${[['看數據、玩家資料、回客服、私訊、聊天管理(含禁言)','✅','✅','✅'],['寄信補償','✅','✅(有上限)','✅(有上限)'],['寄給所有玩家、直接調整鑽石','✅','✅(有上限)','❌'],['公告、廣播、活動、兌換碼、抽獎、團隊 Boss 測試','✅','✅','❌'],['停權、修改玩家資料、還原存檔、電腦玩家','✅','✅','❌'],['遊戲數值設定、儲值紀錄','✅','❌','❌'],['維護模式、排隊、備份','✅','❌','❌'],['管理員與權限、補償上限','✅','❌','❌'],['操作紀錄','全部','只看自己','只看自己']].map(r=>`<tr>${r.map((c,i)=>`<td${i?' style="text-align:center"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details></div>
+  <div class="card act" id="capCard"><h2>補償上限 <small>營運和客服「每次」寄信或調整鑽石的最高數量;超級管理員不受限</small></h2><div class="tw"><table><thead><tr><th>項目</th><th>🛠 營運</th><th>💬 客服</th></tr></thead><tbody>${Object.keys(KN).map(k=>`<tr><td>${KN[k]}</td>${['ops','cs'].map(r=>`<td><input type="number" min="0" data-cap="${r}:${k}" value="${(C[r]||{})[k]??0}" style="width:120px"></td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="row"><button class="p" data-a="capSave">儲存上限</button></div></div>`};
+A.capSave=async()=>{const o={ops:{},cs:{}};document.querySelectorAll('[data-cap]').forEach(i=>{const [r,k]=i.dataset.cap.split(':');o[r][k]=Math.max(0,+i.value||0)});try{await rpc('admin_caps_set',{p:o});toast('補償上限已儲存')}catch(e){toast(e.message)}};
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||!t.dataset.rl)return;try{await rpc('admin_admin_role',{p_uid:t.dataset.rl,p_role:t.value});toast('權限已更新:'+RNM[t.value])}catch(er){toast(er.message);render()}});
 A.aadd=async()=>{const a=$('aa').value.trim();if(!a)return toast('請輸入帳號');try{await rpc('admin_admin_set',{p_acct:a,p_add:true});toast('已新增管理員');render()}catch(e){toast(e.message)}};
 A.arm=async a=>{if(!sure('arm'+a,'移除管理員 '+a))return;try{await rpc('admin_admin_set',{p_acct:a,p_add:false});toast('已移除');render()}catch(e){toast(e.message)}};
 // ---------- 紀錄 ----------

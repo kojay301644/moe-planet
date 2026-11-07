@@ -1,6 +1,11 @@
 -- 萌獸星球 伺服器驗證(第 2 份 SQL):鑽石錢包、伺服器抽卡、天梯結算、玩家交易所
 -- 在 Supabase → SQL Editor 貼上整段 → Run。可以重複執行,不會刪除資料。
 
+-- 後台遠端數值設定(game_cfg);plpgsql 寫法,讓前面的函式也能引用
+create or replace function public.moe_cfg() returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin return coalesce((select v->'d' from settings where k = 'game_cfg'), '{}'::jsonb); exception when undefined_table then return '{}'::jsonb; end $$;
+revoke execute on function public.moe_cfg() from public, anon, authenticated;
+
 -- ============ 錢包 ============
 -- 後台顯示用的帳號名稱:帳號密碼玩家顯示帳號,Google 玩家顯示「G:信箱」
 create or replace function public.moe_acct(e text) returns text language sql immutable as $$
@@ -84,10 +89,15 @@ declare u uuid := moe_uid(); w wallet; cost int; res jsonb := '[]'::jsonb; i int
   ks text[] := array['fox','otter','penguin','pango','ferret','whale','bear','dragon','bunny','mouse','mole','puffer','owl','lizard','deer','moth','armad','seal','marten','phoenix'];
   ws float[] := array[1,1,1,1,1,1,.5,.08,1,1,1,1,1,1,1,1,.5,.5,.5,.08];
   epic text[] := array['bear','armad','seal','marten']; anyhi boolean := false; up boolean;
+  C jsonb := coalesce(moe_cfg()->'summon','{}'::jsonb);
+  p3 float := coalesce((C->>'r3')::float, 1.5)/100; p2 float := coalesce((C->>'r2')::float, 8.5)/100; p1 float := coalesce((C->>'r1')::float, 30)/100;
+  u3 float := coalesce((C->>'up3')::float, 3)/100; u2 float := coalesce((C->>'up2')::float, 12)/100;
+  pity3 int := coalesce((C->>'pity3')::int, 80); pityd int := coalesce((C->>'pityd')::int, 200);
+  wishp float := coalesce((C->>'wish')::float, 50)/100; guard boolean := coalesce((C->>'guard10')::boolean, true);
 begin
   up := to_regclass('public.game_event') is not null and exists (select 1 from game_event where kind = 'sumup' and starts <= now() and ends > now());
   if p_n not in (1,10) then raise exception 'bad n'; end if;
-  cost := case when p_free then 0 when p_n = 10 then 1440 else 160 end;
+  cost := case when p_free then 0 when p_n = 10 then coalesce((C->>'cost10')::int, 1440) else coalesce((C->>'cost1')::int, 160) end;
   select * into w from wallet where uid = u for update;
   if not found then raise exception 'not enough gem'; end if;
   if p_free then
@@ -99,16 +109,16 @@ begin
   select sum(x) into tot from unnest(ws) x;
   for i in 1..p_n loop
     w.pity := w.pity + 1; w.dpity := w.dpity + 1; r := random();
-    q := case when r < (case when up then .03 else .015 end) then 3 when r < (case when up then .15 else .1 end) then 2 when r < .4 then 1 else 0 end;
-    if w.pity >= 80 then q := 3; end if;
-    if p_n = 10 and i = 10 and not anyhi and q < 1 then q := 1; end if;
+    q := case when r < (case when up then u3 else p3 end) then 3 when r < (case when up then u3 + u2 else p3 + p2 end) then 2 when r < (case when up then u3 + u2 else p3 + p2 end) + p1 then 1 else 0 end;
+    if w.pity >= pity3 then q := 3; end if;
+    if guard and p_n = 10 and i = 10 and not anyhi and q < 1 then q := 1; end if;
     if q >= 1 then anyhi := true; end if;
     if q = 3 then w.pity := 0; end if;
-    if w.dpity >= 200 then k := case when random() < .5 then 'dragon' else 'phoenix' end;
+    if w.dpity >= pityd then k := case when random() < .5 then 'dragon' else 'phoenix' end;
     else r := random() * tot; acc := 0; k := ks[1];
       for j in 1..array_length(ks,1) loop acc := acc + ws[j]; if r < acc then k := ks[j]; exit; end if; end loop;
     end if;
-    if q >= 2 and p_wish = any(epic) and k not in ('dragon','phoenix') and random() < .5 then k := p_wish; end if;
+    if q >= 2 and p_wish = any(epic) and k not in ('dragon','phoenix') and random() < wishp then k := p_wish; end if;
     if k in ('dragon','phoenix') then w.dpity := 0; end if;
     res := res || jsonb_build_object('k',k,'q',q);
   end loop;
@@ -123,8 +133,10 @@ declare u uuid := moe_uid(); g int; b int; first boolean; w wallet;
 begin
   select v.g, v.b into g, b from (values ('p30',60,0),('p150',300,30),('p300',600,80),('p790',1580,300),('p1490',2980,700),('p3290',6580,1900),('card',300,0),('fund',600,0)) v(id,g,b) where v.id = p_pkg;
   if g is null then raise exception 'bad pkg'; end if;
+  if (moe_cfg()->'pay'->p_pkg->>'on') = 'false' then raise exception '這個方案目前沒有販售'; end if;
+  g := coalesce((moe_cfg()->'pay'->p_pkg->>'g')::int, g); b := coalesce((moe_cfg()->'pay'->p_pkg->>'b')::int, b);
   insert into pay_first(uid,pkg) values (u,p_pkg) on conflict do nothing; first := found;
-  if first and p_pkg not in ('card','fund') then b := g; end if;
+  if first and p_pkg not in ('card','fund') and coalesce((moe_cfg()->'pay'->>'first2')::boolean, true) then b := g; end if;
   insert into wallet(uid) values (u) on conflict do nothing;
   update wallet set gem = gem + g + b, topup = topup + g, updated_at = now() where uid = u returning * into w;
   insert into gem_log(uid,delta,reason) values (u, g + b, 'topup:'||p_pkg);
@@ -154,7 +166,7 @@ begin
   return L;
 end $$;
 create or replace function public.ladder_json(L ladder, p_extra int) returns jsonb language sql stable as $$
-  select jsonb_build_object('ss',L.ss,'pts',L.pts,'best',L.best,'w',L.w,'l',L.l,'ls',L.ls,'tix',greatest(0,5 + p_extra + L.bought - L.used),'bought',L.bought) $$;
+  select jsonb_build_object('ss',L.ss,'pts',L.pts,'best',L.best,'w',L.w,'l',L.l,'ls',L.ls,'tix',greatest(0,coalesce((moe_cfg()->'daily'->>'ladder')::int, 5) + p_extra + L.bought - L.used),'bought',L.bought) $$;
 create or replace function public.ladder_me() returns jsonb language plpgsql security definer set search_path = public as $$
 declare L ladder := ladder_row(); v int;
 begin select moe_vip(topup) into v from wallet where uid = auth.uid(); v := coalesce(v,0);
@@ -169,7 +181,7 @@ create or replace function public.ladder_report(p_win boolean, p_opp_pts int, p_
 declare u uuid := moe_uid(); L ladder := ladder_row(); v int; extra int; g int; ok boolean := true; rv boolean := false;
 begin
   select moe_vip(topup) into v from wallet where uid = u; v := coalesce(v,0); extra := (v>=1)::int + (v>=7)::int;
-  if L.used >= 5 + extra + L.bought then raise exception 'no tickets'; end if;
+  if L.used >= coalesce((moe_cfg()->'daily'->>'ladder')::int, 5) + extra + L.bought then raise exception 'no tickets'; end if;
   if L.last_at is not null and now() - L.last_at < interval '8 seconds' then raise exception 'too fast'; end if;
   p_opp_pts := least(greatest(coalesce(p_opp_pts, L.pts), 0), L.pts + 400);
   if p_win and (coalesce(p_secs,0) < 4 or coalesce(p_my_pw,0) * 2.5 < coalesce(p_opp_pw,0)) then ok := false; L.flags := L.flags + 1; end if;
@@ -251,7 +263,7 @@ begin
   if coalesce(p_item->>'set','basic') not in ('basic','fire','ice','elec','guard','wind','siege','hunt') then raise exception '套裝不合理'; end if;
   if (select count(distinct x->>0) from jsonb_array_elements(coalesce(p_item->'subs','[]'::jsonb)) x) <> ns then raise exception '副屬性重複'; end if;
   for s in select * from jsonb_array_elements(coalesce(p_item->'subs','[]'::jsonb)) loop
-    mx := case s->>0 when 'atk' then 4 when 'hp' then 4 when 'def' then 4 when 'crit' then 4 when 'critd' then 12 when 'cdr' then 3 when 'boss' then 8 when 'siege' then 10 when 'heal' then 10 end;
+    mx := case s->>0 when 'atk' then 4 when 'hp' then 4 when 'def' then 4 when 'crit' then 4 when 'critd' then 12 when 'cdr' then 3 when 'boss' then 8 when 'siege' then 10 when 'spd' then 6 when 'heal' then 10 end;
     if mx is null or (s->>1)::numeric < 0 or (s->>1)::numeric > mx * (1 + floor(lv / 3)) + .05 then raise exception '副屬性數值不合理'; end if;
   end loop;
   if coalesce(p_item->>'uq','') <> '' and p_item->>'uq' not in ('vamp','wind','thorn','revenge') then raise exception '獨特裝備不合理'; end if;
@@ -386,13 +398,37 @@ end $$;
 grant execute on function public.delete_account() to authenticated;
 
 grant execute on function public.wallet_init(int), public.gem_sync(int,int), public.summon(int,text,boolean), public.topup_test_impl(text),
-  public.ladder_me(), public.ladder_report(boolean,int,int,int,real), public.ladder_buy(), public.ladder_top(int),
+  public.ladder_me(), public.ladder_report(boolean,int,int,int,real,uuid,bigint), public.ladder_buy(), public.ladder_top(int),
   public.market_list(jsonb,int), public.market_browse(), public.market_mine(), public.market_buy(bigint), public.market_cancel(bigint), public.inbox_claim() to authenticated;
 revoke execute on function public.ladder_row(), public.ladder_json(ladder,int) from public, anon, authenticated;
 grant select on public.wallet, public.gem_log, public.ladder, public.market, public.inbox to authenticated;
 
 -- ============ 營運後台 ============
 create table if not exists public.admins(uid uuid primary key, added timestamptz not null default now());
+-- 權限分級:super 超級管理員 / ops 營運 / cs 客服
+alter table public.admins add column if not exists role text not null default 'super';
+create or replace function public.moe_role() returns text language sql stable security definer set search_path = public as $$
+  select role from admins where uid = auth.uid() $$;
+create or replace function public.moe_admin_need(p text) returns uuid language plpgsql stable security definer set search_path = public as $$
+declare r text := moe_role();
+begin
+  if auth.uid() is null or r is null then raise exception '沒有管理員權限'; end if;
+  if (case r when 'super' then 3 when 'ops' then 2 else 1 end) < (case p when 'super' then 3 when 'ops' then 2 else 1 end) then
+    raise exception '權限不足:這個功能需要「%」以上權限', case p when 'super' then '超級管理員' when 'ops' then '營運' else '客服' end; end if;
+  return auth.uid();
+end $$;
+-- 補償上限(超級管理員不受限)
+create or replace function public.moe_cap_check(p_gem int, p_bonus jsonb) returns void language plpgsql stable security definer set search_path = public as $$
+declare r text := moe_role(); c jsonb; kk text; vv bigint;
+begin
+  if r = 'super' then return; end if;
+  c := coalesce((select st.v->r from settings st where st.k = 'adm_caps'), case r when 'ops' then '{"gem":500,"coin":10000000,"candy":5000,"stones":500,"ore":1000,"enh":500,"reroll":100,"rtix":10}'::jsonb else '{"gem":0,"coin":100000,"candy":500,"stones":50,"ore":100,"enh":50,"reroll":10,"rtix":0}'::jsonb end);
+  if coalesce(p_gem,0) > coalesce((c->>'gem')::bigint, 0) then raise exception '超過你的權限上限:鑽石每次最多 %', coalesce((c->>'gem')::bigint, 0); end if;
+  for kk, vv in select key, (value)::text::bigint from jsonb_each(coalesce(p_bonus,'{}'::jsonb)) loop
+    if vv > coalesce((c->>kk)::bigint, 0) then raise exception '超過你的權限上限:% 每次最多 %', kk, coalesce((c->>kk)::bigint, 0); end if;
+  end loop;
+end $$;
+revoke execute on function public.moe_cap_check(int,jsonb) from public, anon, authenticated;
 create table if not exists public.notice(id bigserial primary key, title text not null, body text not null default '', active boolean not null default true, created timestamptz not null default now());
 create table if not exists public.admin_log(id bigserial primary key, admin uuid, action text, target uuid, detail jsonb, at timestamptz not null default now());
 alter table public.admins enable row level security;
@@ -409,7 +445,7 @@ create or replace function public.alog(a text, t uuid, d jsonb) returns void lan
 
 -- 查自己是不是管理員(後台登入時用)
 create or replace function public.admin_whoami() returns jsonb language sql stable security definer set search_path = public as $$
-  select jsonb_build_object('uid', auth.uid(), 'admin', exists (select 1 from admins where uid = auth.uid()), 'anyAdmin', exists (select 1 from admins)) $$;
+  select jsonb_build_object('uid', auth.uid(), 'admin', exists (select 1 from admins where uid = auth.uid()), 'anyAdmin', exists (select 1 from admins), 'role', (select role from admins where uid = auth.uid())) $$;
 
 -- 第一位管理員:還沒有任何管理員時,登入的人可以自己認領(之後就關閉)
 create or replace function public.admin_claim() returns jsonb language plpgsql security definer set search_path = public, auth as $$
@@ -485,9 +521,10 @@ end $$;
 
 -- 直接加/扣某位玩家的鑽石(玩家會在信箱看到說明)
 create or replace function public.admin_gem(p_uid uuid, p_delta int, p_reason text) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); g int;
+declare a uuid := moe_admin_need('ops'); g int;
 begin
   if coalesce(p_delta,0) = 0 or abs(p_delta) > 1000000 then raise exception '數量不合理'; end if;
+  perform moe_cap_check(abs(p_delta), null);
   insert into wallet(uid) values (p_uid) on conflict do nothing;
   update wallet set gem = greatest(0, gem + p_delta), updated_at = now() where uid = p_uid returning gem into g;
   insert into gem_log(uid,delta,reason) values (p_uid, p_delta, 'admin:' || coalesce(p_reason,''));
@@ -505,6 +542,8 @@ begin
   if coalesce(p_gem,0) < 0 or p_gem > 100000 then raise exception '鑽石數量要在 0 ~ 100000 之間'; end if;
   if coalesce(trim(p_note),'') = '' then raise exception '請填寫信件內容'; end if;
   p_bonus := (select jsonb_object_agg(key, least(greatest((value)::text::numeric, 0), 100000000)::bigint) from jsonb_each(coalesce(p_bonus,'{}'::jsonb)) where key in ('coin','candy','stones','ore','enh','reroll','rtix') and (value)::text ~ '^[0-9]+$' and (value)::text::numeric > 0);
+  if p_uid is null then perform moe_admin_need('ops'); end if;
+  perform moe_cap_check(coalesce(p_gem,0), p_bonus);
   if p_uid is null then
     insert into inbox(uid, gem, note, credit, kind, title, bonus) select uid, coalesce(p_gem,0), p_note, true, 'ops', coalesce(nullif(trim(p_title),''),'營運信件'), p_bonus from wallet;
   else
@@ -516,7 +555,7 @@ begin
 end $$;
 
 create or replace function public.admin_ban(p_uid uuid, p_reason text, p_hours int) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin
   if p_uid = a then raise exception '不能停權自己'; end if;
   insert into bans(uid, reason, until) values (p_uid, p_reason, case when coalesce(p_hours,0) > 0 then now() + make_interval(hours => p_hours) end)
@@ -526,11 +565,11 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 create or replace function public.admin_unban(p_uid uuid) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin delete from bans where uid = p_uid; perform alog('unban', p_uid, '{}'::jsonb); return jsonb_build_object('ok', true); end $$;
 
 create or replace function public.admin_player_set(p_uid uuid, p_field text, p_val int) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin
   if p_field = 'flags' then update wallet set flags = 0 where uid = p_uid; update ladder set flags = 0 where uid = p_uid;
   elsif p_field = 'pts' then update ladder set pts = greatest(0, p_val), best = greatest(0, p_val) where uid = p_uid;
@@ -547,7 +586,7 @@ begin
     from (select * from market where (p_status = 'all' or status = p_status) order by id desc limit 100) m);
 end $$;
 create or replace function public.admin_market_remove(p_id bigint, p_reason text) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); m market;
+declare a uuid := moe_admin_need('ops'); m market;
 begin
   select * into m from market where id = p_id for update;
   if not found or m.status <> 'open' then raise exception '這件已經不在上架中'; end if;
@@ -559,7 +598,7 @@ end $$;
 
 drop function if exists public.admin_notice_save(bigint,text,text,boolean);
 create or replace function public.admin_notice_save(p_id bigint, p_title text, p_body text, p_active boolean, p_mail boolean default false) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); i bigint; n int := 0;
+declare a uuid := moe_admin_need('ops'); i bigint; n int := 0;
 begin
   if coalesce(trim(p_title),'') = '' then raise exception '請填寫標題'; end if;
   if p_id is null then insert into notice(title, body, active) values (p_title, coalesce(p_body,''), coalesce(p_active,true)) returning id into i;
@@ -569,21 +608,21 @@ begin
   return jsonb_build_object('id', i, 'mailed', n);
 end $$;
 create or replace function public.admin_notice_delete(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin delete from notice where id = p_id; perform alog('notice_delete', null, jsonb_build_object('id', p_id)); return jsonb_build_object('ok', true); end $$;
 create or replace function public.admin_notices() returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare a uuid := moe_admin();
 begin return (select coalesce(jsonb_agg(to_jsonb(n) order by n.id desc), '[]'::jsonb) from notice n); end $$;
 
 create or replace function public.admin_admins() returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
-declare a uuid := moe_admin();
-begin return (select coalesce(jsonb_agg(jsonb_build_object('uid', x.uid, 'acct', moe_acct(u.email), 'added', x.added)), '[]'::jsonb) from admins x left join auth.users u on u.id = x.uid); end $$;
+declare a uuid := moe_admin_need('super');
+begin return (select coalesce(jsonb_agg(jsonb_build_object('uid', x.uid, 'acct', moe_acct(u.email), 'added', x.added, 'role', x.role)), '[]'::jsonb) from admins x left join auth.users u on u.id = x.uid); end $$;
 create or replace function public.admin_admin_set(p_acct text, p_add boolean) returns jsonb language plpgsql security definer set search_path = public, auth as $$
-declare a uuid := moe_admin(); t uuid;
+declare a uuid := moe_admin_need('super'); t uuid;
 begin
   select id into t from auth.users where lower(email) = lower(trim(p_acct)) || '@player.moe-planet.app';
   if t is null then raise exception '找不到這個帳號'; end if;
-  if p_add then insert into admins(uid) values (t) on conflict do nothing;
+  if p_add then insert into admins(uid, role) values (t, 'cs') on conflict do nothing;
   else if t = a then raise exception '不能移除自己'; end if; delete from admins where uid = t; end if;
   perform alog(case when p_add then 'admin_add' else 'admin_remove' end, t, '{}'::jsonb);
   return jsonb_build_object('ok', true);
@@ -592,7 +631,7 @@ end $$;
 create or replace function public.admin_logs(p_limit int default 100) returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
 declare a uuid := moe_admin();
 begin return (select coalesce(jsonb_agg(jsonb_build_object('at', l.at, 'action', l.action, 'target', l.target, 'detail', l.detail, 'admin', moe_acct(u.email), 'tname', d.data->>'n') order by l.id desc), '[]'::jsonb)
-  from (select * from admin_log order by id desc limit least(greatest(p_limit,1),300)) l left join auth.users u on u.id = l.admin left join docs d on d.path = 'arena/' || l.target::text); end $$;
+  from (select * from admin_log where moe_role() = 'super' or admin = a order by id desc limit least(greatest(p_limit,1),300)) l left join auth.users u on u.id = l.admin left join docs d on d.path = 'arena/' || l.target::text); end $$;
 
 revoke execute on function public.alog(text,uuid,jsonb) from public, anon, authenticated;
 grant execute on function public.admin_whoami(), public.admin_claim(), public.admin_stats(), public.admin_players(text,text,int), public.admin_player(uuid),
@@ -622,7 +661,7 @@ grant select on public.settings, public.game_event to anon, authenticated; grant
 
 -- 即時廣播:所有在線玩家畫面跳出 30 秒
 create or replace function public.admin_live(p_txt text, p_secs int default 30) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin
   if coalesce(trim(p_txt),'') = '' then raise exception '請輸入廣播內容'; end if;
   insert into live_msg(txt, until) values (left(p_txt, 120), now() + make_interval(secs => least(greatest(coalesce(p_secs,30),5),300)));
@@ -636,7 +675,7 @@ create or replace function public.admin_events() returns jsonb language plpgsql 
 declare a uuid := moe_admin();
 begin return (select coalesce(jsonb_agg(to_jsonb(e) order by e.starts desc), '[]'::jsonb) from (select * from game_event order by starts desc limit 50) e); end $$;
 create or replace function public.admin_event_save(p_id bigint, p_kind text, p_starts timestamptz, p_ends timestamptz, p_note text) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); i bigint;
+declare a uuid := moe_admin_need('ops'); i bigint;
 begin
   if p_kind not in ('xp2','drop2','sumup') then raise exception '活動種類不對'; end if;
   if p_ends <= p_starts then raise exception '結束時間要晚於開始時間'; end if;
@@ -646,7 +685,7 @@ begin
   return jsonb_build_object('id', i);
 end $$;
 create or replace function public.admin_event_delete(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin delete from game_event where id = p_id; perform alog('event_delete', null, jsonb_build_object('id', p_id)); return jsonb_build_object('ok', true); end $$;
 
 -- 兌換碼:reward = {"gem":100,"coin":5000,"candy":30,"stones":10,"rtix":1}
@@ -654,7 +693,7 @@ create or replace function public.admin_codes() returns jsonb language plpgsql s
 declare a uuid := moe_admin();
 begin return (select coalesce(jsonb_agg(to_jsonb(c) order by c.created desc), '[]'::jsonb) from codes c); end $$;
 create or replace function public.admin_code_save(p_code text, p_reward jsonb, p_max int, p_expires timestamptz, p_active boolean) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); c text := upper(regexp_replace(coalesce(p_code,''), '[^A-Za-z0-9]', '', 'g'));
+declare a uuid := moe_admin_need('ops'); c text := upper(regexp_replace(coalesce(p_code,''), '[^A-Za-z0-9]', '', 'g'));
 begin
   if length(c) < 4 or length(c) > 20 then raise exception '兌換碼要 4–20 個英文或數字'; end if;
   if coalesce((p_reward->>'gem')::int,0) > 100000 then raise exception '鑽石太多了'; end if;
@@ -679,7 +718,7 @@ end $$;
 
 -- 維護模式
 create or replace function public.admin_maint(p_on boolean, p_msg text) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('super');
 begin
   insert into settings(k, v) values ('maint', jsonb_build_object('on', p_on, 'msg', coalesce(p_msg,''))) on conflict (k) do update set v = excluded.v;
   perform alog('maint', null, jsonb_build_object('on', p_on, 'msg', p_msg));
@@ -740,7 +779,7 @@ end $$;
 
 -- 儲值紀錄
 create or replace function public.admin_topups(p_from date, p_to date) returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('super');
 begin return (select coalesce(jsonb_agg(jsonb_build_object('at', g.at, 'uid', g.uid, 'pkg', substr(g.reason, 7), 'gem', g.delta, 'name', d.data->>'n', 'acct', moe_acct(u.email)) order by g.id desc), '[]'::jsonb)
   from gem_log g left join docs d on d.path = 'arena/' || g.uid::text left join auth.users u on u.id = g.uid
   where g.reason like 'topup:%' and (g.at at time zone 'Asia/Taipei')::date between coalesce(p_from, moe_today() - 30) and coalesce(p_to, moe_today())); end $$;
@@ -780,7 +819,7 @@ drop policy if exists bots_read on public.bots; create policy bots_read on publi
 grant select on public.bots to anon, authenticated;
 insert into public.bots(name, role, sort) select * from (values ('長安小霸王','lord',0),('草原狼王','lord',1),('洛陽老街','lord',2),('尼羅河午夜','lord',3),('不勝不歸','lord',4),('奶茶去冰','lord',5),('肝帝阿明','lord',6),('小熊軟糖','lord',7),('雷霆一擊','lord',8),('睡到自然醒','lord',9),('星空下的貓','lord',10),('佛系守護員','lord',11),('鍋貼大王','lord',12),('月光餅乾','lord',13),('鹹魚翻身','lord',14),('阿喵不睡覺','player',100),('布丁大隊長','player',101),('小熊愛吃蜜','player',102),('炸雞配可樂','player',103),('夜貓子阿哲','player',104),('珍奶少冰','player',105),('一隻小企鵝','player',106),('曬太陽的龍','player',107),('山頂洞人','player',108),('拿鐵不加糖','player',109),('肥宅快樂水','player',110),('今天也要加油','player',111),('跳跳虎','player',112),('火鍋第一名','player',113),('雨天的狐狸','player',114),('阿福的寵物店','player',115),('雲端漫步','player',116),('黑糖饅頭','player',117),('路過的勇者','player',118),('鳳梨酥','player',119),('綠茶凍','player',120),('小籠包','player',121),('午夜電台','player',122),('海邊的鯨魚','player',123),('滷肉飯大師','player',124)) v(name, role, sort) where not exists (select 1 from public.bots);
 create or replace function public.admin_bot_save(p_id bigint, p_name text, p_role text, p_mul real, p_active boolean) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); n text := left(trim(coalesce(p_name,'')), 12); i bigint;
+declare a uuid := moe_admin_need('ops'); n text := left(trim(coalesce(p_name,'')), 12); i bigint;
 begin
   if n = '' then raise exception '請填寫名字'; end if;
   p_role := coalesce(nullif(p_role,''),'lord'); if p_role not in ('lord','player') then p_role := 'lord'; end if;
@@ -791,11 +830,11 @@ begin
   return jsonb_build_object('id', i);
 end $$;
 create or replace function public.admin_bot_delete(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); n text;
+declare a uuid := moe_admin_need('ops'); n text;
 begin delete from bots where id = p_id returning name into n; perform alog('bot_delete', null, jsonb_build_object('id', p_id, 'name', n)); return jsonb_build_object('ok', true); end $$;
 -- 重玩:p_id 留空 = 全部電腦玩家
 create or replace function public.admin_bot_reset(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); n int;
+declare a uuid := moe_admin_need('ops'); n int;
 begin
   update bots set reset_at = now() where p_id is null or id = p_id; get diagnostics n = row_count;
   perform alog('bot_reset', null, jsonb_build_object('id', p_id, 'n', n));
@@ -1119,7 +1158,7 @@ create or replace function public.admin_save_hist(p_uid uuid) returns jsonb lang
 declare a uuid := moe_admin(); begin
   return coalesce((select jsonb_agg(jsonb_build_object('id', id, 'at', at, 's', moe_save_stats(data)) order by at desc) from save_hist where uid = p_uid), '[]'::jsonb); end $$;
 create or replace function public.admin_save_restore(p_uid uuid, p_hist bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); dd jsonb; begin
+declare a uuid := moe_admin_need('ops'); dd jsonb; begin
   select data into dd from save_hist where id = p_hist and uid = p_uid; if dd is null then raise exception '找不到這份存檔'; end if;
   perform set_config('moe.skip', '1', true);
   update docs set data = jsonb_set(dd, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint)), updated_at = now() where path = 'data/users/' || p_uid::text || '/save';
@@ -1127,14 +1166,14 @@ declare a uuid := moe_admin(); dd jsonb; begin
   if to_regprocedure('public.moe_res_from_save(uuid)') is not null then perform moe_res_from_save(p_uid); end if;
   perform alog('save_restore', p_uid, jsonb_build_object('hist', p_hist)); return jsonb_build_object('ok', true); end $$;
 create or replace function public.admin_save_accept(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); f save_flags; begin
+declare a uuid := moe_admin_need('ops'); f save_flags; begin
   select * into f from save_flags where id = p_id; if f.id is null then raise exception '找不到'; end if;
   if f.attempted is not null then perform set_config('moe.skip', '1', true);
     update docs set data = jsonb_set(f.attempted, '{t}', to_jsonb((extract(epoch from now()) * 1000)::bigint)), updated_at = now() where path = 'data/users/' || f.uid::text || '/save'; end if;
   if to_regprocedure('public.moe_res_from_save(uuid)') is not null then perform moe_res_from_save(f.uid); end if;
   update save_flags set status = 'ok' where id = p_id; perform alog('save_accept', f.uid, jsonb_build_object('flag', p_id)); return jsonb_build_object('ok', true); end $$;
 create or replace function public.admin_save_close(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); begin update save_flags set status = 'closed' where id = p_id; return jsonb_build_object('ok', true); end $$;
+declare a uuid := moe_admin_need('ops'); begin update save_flags set status = 'closed' where id = p_id; return jsonb_build_object('ok', true); end $$;
 revoke execute on function public.moe_save_stats(jsonb), public.moe_save_guard() from public, anon, authenticated;
 grant execute on function public.admin_save_flags(text), public.admin_save_hist(uuid), public.admin_save_restore(uuid,bigint), public.admin_save_accept(bigint), public.admin_save_close(bigint) to authenticated;
 
@@ -1154,7 +1193,7 @@ create or replace function public.moe_backup_list() returns text[] language sql 
   select coalesce(array_agg(t order by t), '{}') from unnest(array['docs','wallet','admins','notice','admin_log','bans','bots','chat_hide','code_use','codes','game_event','gem_log','inbox','ladder','ladder_def','market','mint_quota','mutes','pay_first','player_day','save_flags','settings','td_duo','td_week','tickets']) t
   where to_regclass('public.' || t) is not null $$;
 create or replace function public.admin_backup_tables() returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); r jsonb := '[]'::jsonb; t text; n bigint;
+declare a uuid := moe_admin_need('super'); r jsonb := '[]'::jsonb; t text; n bigint;
 begin
   foreach t in array moe_backup_list() loop execute format('select count(*) from public.%I', t) into n; r := r || jsonb_build_array(jsonb_build_object('t', t, 'n', n)); end loop;
   r := r || jsonb_build_array(jsonb_build_object('t', 'auth_users', 'n', (select count(*) from auth.users)));
@@ -1162,7 +1201,7 @@ begin
 end $$;
 -- 分頁讀取一個資料表:依主鍵排序,p_after 傳上一頁最後一筆的 key
 create or replace function public.admin_backup_page(p_table text, p_after text default '', p_limit int default 500) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); k text; nk int; ke text; rws jsonb; lst text; lim int := greatest(1, least(coalesce(p_limit, 500), 2000));
+declare a uuid := moe_admin_need('super'); k text; nk int; ke text; rws jsonb; lst text; lim int := greatest(1, least(coalesce(p_limit, 500), 2000));
 begin
   if p_table = 'auth_users' then
     select coalesce(jsonb_agg(j order by kk), '[]'::jsonb), max(kk) into rws, lst from (
@@ -1179,13 +1218,13 @@ begin
   return jsonb_build_object('rows', rws, 'last', lst, 'done', jsonb_array_length(rws) < lim);
 end $$;
 create or replace function public.admin_backup_done(p_rows bigint, p_bytes bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); v jsonb; begin
+declare a uuid := moe_admin_need('super'); v jsonb; begin
   v := jsonb_build_object('at', now(), 'rows', p_rows, 'bytes', p_bytes, 'by', (select moe_acct(email) from auth.users where id = a));
   insert into settings(k, v) values ('backup', v) on conflict (k) do update set v = excluded.v;
   perform alog('backup', null, v); return v; end $$;
 -- 從備份還原單一玩家:存檔 + 鑽石錢包(不動儲值累計)。還原前先把目前存檔放進存檔歷史,並讓玩家在線的裝置登出,避免舊進度又被存回來
 create or replace function public.admin_backup_restore(p_uid uuid, p_save jsonb, p_wallet jsonb default null, p_from text default '') returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); pth text := 'data/users/' || p_uid::text || '/save'; cur jsonb; begin
+declare a uuid := moe_admin_need('super'); pth text := 'data/users/' || p_uid::text || '/save'; cur jsonb; begin
   if p_save is null or p_save->>'json' is null then raise exception '備份裡沒有這位玩家的存檔'; end if;
   if not exists (select 1 from auth.users where id = p_uid) then raise exception '這個帳號已經不存在,無法還原'; end if;
   select data into cur from docs where path = pth;
@@ -1203,7 +1242,7 @@ declare a uuid := moe_admin(); pth text := 'data/users/' || p_uid::text || '/sav
 revoke execute on function public.moe_backup_list() from public, anon, authenticated;
 grant execute on function public.admin_backup_tables(), public.admin_backup_page(text,text,int), public.admin_backup_done(bigint,bigint), public.admin_backup_restore(uuid,jsonb,jsonb,text) to authenticated;
 create or replace function public.admin_backup_last() returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); begin return (select v from settings where k = 'backup'); end $$;
+declare a uuid := moe_admin_need('super'); begin return (select v from settings where k = 'backup'); end $$;
 grant execute on function public.admin_backup_last() to authenticated;
 
 -- ============ 防作弊第二階段 A:主要資源改由伺服器記帳(星星幣、進化石、糖果;碎片只監控) ============
@@ -1311,7 +1350,7 @@ revoke execute on function public.moe_save_ledger() from public, anon, authentic
 create or replace function public.moe_save_issues(s jsonb) returns text[] language plpgsql immutable as $$
 declare r text[] := '{}'; k text; v jsonb; t text; x jsonb; st int; lv int; bt int; cap int; e jsonb; sb jsonb; mx numeric; i int := 0;
   pk text[] := array['fox','otter','penguin','pango','ferret','whale','bear','dragon','bunny','mouse','mole','puffer','owl','lizard','deer','moth','armad','seal','marten','phoenix'];
-  sm jsonb := '{"atk":4,"hp":4,"def":4,"crit":4,"critd":12,"cdr":3,"boss":8,"siege":10,"heal":10}'::jsonb;
+  sm jsonb := '{"atk":4,"hp":4,"def":4,"crit":4,"critd":12,"cdr":3,"boss":8,"siege":10,"spd":6,"heal":10}'::jsonb;
 begin
   if s is null then return r; end if;
   begin
@@ -1845,7 +1884,7 @@ begin
     'chat', (select coalesce(jsonb_agg(jsonb_build_object('uid', c.uid, 'x', c.x, 't', c.t, 'n', moe_pname(c.uid)) order by c.id desc), '[]'::jsonb) from (select * from guild_chat where gid = p_gid order by id desc limit 50) c));
 end $$;
 create or replace function public.admin_guild_set(p_gid bigint, p_name text, p_intro text, p_notice text) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); n text := moe_gname_ok(p_name);
+declare a uuid := moe_admin_need('ops'); n text := moe_gname_ok(p_name);
 begin
   if exists (select 1 from guilds where lower(name) = lower(n) and id <> p_gid) then raise exception '這個公會名稱已經有人用了'; end if;
   update guilds set name = n, intro = left(coalesce(p_intro,''), 80), notice = left(coalesce(p_notice,''), 120) where id = p_gid;
@@ -1853,7 +1892,7 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 create or replace function public.admin_guild_disband(p_gid bigint, p_reason text) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); gn text;
+declare a uuid := moe_admin_need('ops'); gn text;
 begin
   select name into gn from guilds where id = p_gid; if gn is null then raise exception '找不到公會'; end if;
   insert into inbox(uid, gem, note, credit, kind, title) select uid, 0, '你所在的公會「' || gn || '」已被營運團隊解散。原因:' || coalesce(nullif(trim(p_reason),''), '違反遊戲規範'), false, 'ops', '公會解散通知' from guild_mem where gid = p_gid;
@@ -1862,7 +1901,7 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 create or replace function public.admin_guild_kick(p_uid uuid) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); g bigint;
+declare a uuid := moe_admin_need('ops'); g bigint;
 begin
   select gid into g from guild_mem where uid = p_uid; if g is null then raise exception '對方不在公會裡'; end if;
   delete from guild_mem where uid = p_uid; perform moe_glog(g, moe_pname(p_uid) || ' 被營運團隊移出公會'); perform moe_gfix(g);
@@ -2146,14 +2185,14 @@ begin
       from raffle_win w) x), '[]'::jsonb));
 end $$;
 create or replace function public.admin_raffle_set(p_id bigint, p_status text, p_note text default null, p_invited boolean default null) returns void language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin
   if p_status is not null and p_status not in ('checkin','form','review','approved','paid','void','expired') then raise exception 'bad status'; end if;
   update raffle_win set status = coalesce(p_status, status), note = coalesce(p_note, note), invited = coalesce(p_invited, invited) where id = p_id;
   perform alog('raffle_set', (select uid from raffle_win where id = p_id), jsonb_build_object('id', p_id, 'status', p_status, 'note', p_note));
 end $$;
 create or replace function public.admin_raffle_cfg(p jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin
   update settings set v = v || (p - array(select k from jsonb_object_keys(p) k where k not in ('on','start','end','spin_end','p','cap','lv'))) where k = 'raffle';
   perform alog('raffle_cfg', null, p);
@@ -2164,7 +2203,7 @@ create or replace function public.raffle_feed() returns jsonb language sql stabl
 revoke execute on function public.moe_rf_expire() from public, anon, authenticated;
 -- 管理員測試用:給自己一張現金券(簽到第 1、2 天,或已簽滿 3 天可填資料);不算入份數與跑馬燈
 create or replace function public.admin_raffle_test(p_ck int) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); d date := moe_today(); k int := greatest(0, least(3, coalesce(p_ck,0)));
+declare a uuid := moe_admin_need('ops'); d date := moe_today(); k int := greatest(0, least(3, coalesce(p_ck,0)));
 begin
   delete from raffle_win where uid = a;
   if k = 0 then return jsonb_build_object('ok', true, 'deleted', true); end if;
@@ -2203,7 +2242,7 @@ create or replace function public.admin_queue() returns jsonb language plpgsql s
 declare a uuid := moe_admin();
 begin return jsonb_build_object('online', moe_online(), 'queue', (select count(*) from login_queue where seen > now() - interval '60 seconds'), 'max', coalesce((select (v->>'max')::int from settings where k = 'queue'), 0)); end $$;
 create or replace function public.admin_queue_set(p_max int) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('super');
 begin insert into settings(k, v) values ('queue', jsonb_build_object('max', greatest(0, coalesce(p_max,0)))) on conflict (k) do update set v = excluded.v;
   perform alog('queue_set', null, jsonb_build_object('max', p_max)); return admin_queue(); end $$;
 
@@ -2407,7 +2446,7 @@ create or replace function public.server_now() returns bigint language sql stabl
 grant execute on function public.server_now() to anon, authenticated;
 -- 全勤只接受本月;補簽只接受本月、今天以前的日期,而且每個日期一輩子只能領一次
 create or replace function public.moe_gem_src(u uuid, src jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
-declare x jsonb; k text; n int; pp text; suf text; r gem_rule; ok int := 0; rej jsonb := '[]'::jsonb; v_pid text; c gem_cnt; tp int; why text; i int := 0;
+declare mul numeric; x jsonb; k text; n int; pp text; suf text; r gem_rule; ok int := 0; rej jsonb := '[]'::jsonb; v_pid text; c gem_cnt; tp int; why text; i int := 0;
 begin
   if src is null or jsonb_typeof(src) <> 'array' then return jsonb_build_object('ok', 0, 'rej', rej); end if;
   select topup into tp from wallet where uid = u; tp := coalesce(tp, 0);
@@ -2416,6 +2455,7 @@ begin
     k := left(coalesce(x->>0, ''), 80); n := coalesce((x->>1)::numeric, 0)::int;
     pp := split_part(k, ':', 1); suf := substr(k, length(pp) + 2);
     select * into r from gem_rule where p = pp and p <> 'misc';
+    if found then mul := coalesce((moe_cfg()->'rw'->>(case when pp in ('sign','signb','signf') then 'sign' else pp end))::numeric, 1); if mul <> 1 then r.maxn := ceil(r.maxn * mul); r.cap := ceil(r.cap * mul); end if; end if;
     if not found then why := 'unknown';
     elsif n <= 0 then why := 'amount';
     elsif r.re is not null and suf !~ r.re then why := 'id';
@@ -2558,7 +2598,7 @@ declare a uuid := moe_admin(); begin
     from (select * from invites order by at desc limit 300) i left join docs d1 on d1.path = 'arena/' || i.inviter::text left join docs d2 on d2.path = 'arena/' || i.invitee::text), '[]'::jsonb);
 end $$;
 create or replace function public.admin_invite_ok(p_invitee uuid) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); begin
+declare a uuid := moe_admin_need('ops'); begin
   update invites set flag = null where invitee = p_invitee and not paid; perform alog('invite_ok', p_invitee, '{}'::jsonb);
   return jsonb_build_object('ok', true);
 end $$;
@@ -2698,7 +2738,7 @@ create or replace function public.ladder_report(p_win boolean, p_opp_pts int, p_
 declare u uuid := moe_uid(); L ladder := ladder_row(); v int; extra int; g int; ok boolean := true; rv boolean := false;
 begin
   select moe_vip(topup) into v from wallet where uid = u; v := coalesce(v,0); extra := (v>=1)::int + (v>=7)::int;
-  if L.used >= 5 + extra + L.bought then raise exception 'no tickets'; end if;
+  if L.used >= coalesce((moe_cfg()->'daily'->>'ladder')::int, 5) + extra + L.bought then raise exception 'no tickets'; end if;
   if L.last_at is not null and now() - L.last_at < interval '8 seconds' then raise exception 'too fast'; end if;
   p_opp_pts := least(greatest(coalesce(p_opp_pts, L.pts), 0), L.pts + 400);
   if p_win and (coalesce(p_secs,0) < 4 or coalesce(p_my_pw,0) * 2.5 < coalesce(p_opp_pw,0)) then ok := false; L.flags := L.flags + 1; end if;
@@ -2750,7 +2790,7 @@ drop policy if exists settings_read on public.settings;
 create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint','wipe','raffle','home_notice'));
 
 create or replace function public.admin_home_notice_set(p jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); ls jsonb := '[]'::jsonb; x text; col text; at text; av text; v jsonb;
+declare a uuid := moe_admin_need('ops'); ls jsonb := '[]'::jsonb; x text; col text; at text; av text; v jsonb;
 begin
   for x in select left(btrim(regexp_replace(e, '[[:cntrl:]<>]', '', 'g')), 20) from jsonb_array_elements_text(coalesce(p->'lines','[]'::jsonb)) e limit 3 loop
     if x <> '' then ls := ls || to_jsonb(x); end if;
@@ -2792,7 +2832,7 @@ create or replace function public.moe_raid_hpw(p_wid int) returns bigint languag
 
 -- 伺服器產生一件裝備(格式和遊戲相同)
 create or replace function public.moe_raid_eq(p_set text, p_rar int) returns jsonb language plpgsql volatile as $$
-declare ks text[] := array['atk','hp','def','crit','critd','cdr','boss','siege','heal']; lo numeric[] := array[2,2,2,2,6,1.5,4,5,5]; hi numeric[] := array[4,4,4,4,12,3,8,10,10];
+declare ks text[] := array['atk','hp','def','crit','critd','cdr','boss','spd','heal']; lo numeric[] := array[2,2,2,2,6,1.5,4,3,5]; hi numeric[] := array[4,4,4,4,12,3,8,6,10];
   subs jsonb := '[]'::jsonb; used int[] := '{}'; i int;
 begin
   while jsonb_array_length(subs) < p_rar loop
@@ -2959,7 +2999,7 @@ insert into settings(k, v) values ('auto_bc', '[]'::jsonb) on conflict (k) do no
 drop policy if exists settings_read on public.settings;
 create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint','wipe','raffle','home_notice','auto_bc'));
 create or replace function public.admin_auto_bc_set(p jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); it jsonb; out jsonb := '[]'::jsonb; x text; ev int; n int := 0;
+declare a uuid := moe_admin_need('ops'); it jsonb; out jsonb := '[]'::jsonb; x text; ev int; n int := 0;
 begin
   if jsonb_typeof(p) <> 'array' then raise exception '格式錯誤'; end if;
   for it in select * from jsonb_array_elements(p) loop
@@ -2978,7 +3018,7 @@ grant execute on function public.admin_auto_bc_set(jsonb) to authenticated;
 
 -- 管理員測試場:隨時開一場(不影響正式排行,結算只寄通知不發獎)
 create or replace function public.admin_raid_test(p_slot int, p_hp bigint, p_delay int) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); n int; w int;
+declare a uuid := moe_admin_need('ops'); n int; w int;
 begin
   select coalesce(max((wid - 900000000) / 3), -1) + 1 into n from raid_test;
   w := 900000000 + n * 3 + least(2, greatest(0, coalesce(p_slot, 0)));
@@ -3000,7 +3040,7 @@ grant execute on function public.admin_raid_test(int,bigint,int), public.raid_te
 create table if not exists public.off_chat(id bigserial primary key, x text not null, t bigint not null, by uuid, at timestamptz not null default now());
 alter table public.off_chat enable row level security;
 create or replace function public.admin_off_chat(p_x text) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin(); x text := left(trim(regexp_replace(coalesce(p_x,''), '[<>]', '', 'g')), 200); tt bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint; i bigint;
+declare a uuid := moe_admin_need('ops'); x text := left(trim(regexp_replace(coalesce(p_x,''), '[<>]', '', 'g')), 200); tt bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint; i bigint;
 begin
   if x = '' then raise exception '請輸入內容'; end if;
   insert into off_chat(x, t, by) values (x, tt, a) returning id into i;
@@ -3009,7 +3049,7 @@ begin
   return jsonb_build_object('id', i, 't', tt);
 end $$;
 create or replace function public.admin_off_chat_del(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
-declare a uuid := moe_admin();
+declare a uuid := moe_admin_need('ops');
 begin delete from off_chat where id = p_id; return jsonb_build_object('ok', true); end $$;
 create or replace function public.off_chat_list() returns jsonb language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', id, 'x', x, 't', t) order by t), '[]'::jsonb) from (
@@ -3017,3 +3057,62 @@ create or replace function public.off_chat_list() returns jsonb language sql sta
 $$;
 revoke execute on function public.admin_off_chat(text), public.admin_off_chat_del(bigint) from public, anon;
 grant execute on function public.admin_off_chat(text), public.admin_off_chat_del(bigint), public.off_chat_list() to authenticated;
+
+-- ================= 管理員權限分級(設定權限、補償上限) =================
+create or replace function public.admin_admin_role(p_uid uuid, p_role text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin_need('super');
+begin
+  if p_role not in ('super','ops','cs') then raise exception '權限格式錯誤'; end if;
+  if p_uid = a and p_role <> 'super' then raise exception '不能降低自己的權限'; end if;
+  update admins set role = p_role where uid = p_uid;
+  if not found then raise exception '找不到這位管理員'; end if;
+  perform alog('admin_role', p_uid, jsonb_build_object('role', p_role));
+  return jsonb_build_object('ok', true);
+end $$;
+create or replace function public.admin_caps_get() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin return coalesce((select v from settings where k = 'adm_caps'), jsonb_build_object(
+  'ops', '{"gem":500,"coin":10000000,"candy":5000,"stones":500,"ore":1000,"enh":500,"reroll":100,"rtix":10}'::jsonb,
+  'cs', '{"gem":0,"coin":100000,"candy":500,"stones":50,"ore":100,"enh":50,"reroll":10,"rtix":0}'::jsonb)); end $$;
+create or replace function public.admin_caps_set(p jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin_need('super'); o jsonb := '{}'::jsonb; r text; kk text;
+begin
+  foreach r in array array['ops','cs'] loop
+    o := o || jsonb_build_object(r, (select coalesce(jsonb_object_agg(kk2, least(greatest(coalesce((p->r->>kk2)::bigint,0),0),100000000)), '{}'::jsonb)
+      from unnest(array['gem','coin','candy','stones','ore','enh','reroll','rtix']) kk2));
+  end loop;
+  insert into settings(k, v) values ('adm_caps', o) on conflict (k) do update set v = excluded.v;
+  perform alog('caps', null, o);
+  return o;
+end $$;
+grant execute on function public.admin_admin_role(uuid,text), public.admin_caps_get(), public.admin_caps_set(jsonb) to authenticated;
+
+-- ================= 遊戲數值設定(後台遠端設定 game_cfg,版本紀錄、還原) =================
+create table if not exists public.game_cfg_hist(id bigserial primary key, d jsonb not null, note text, by uuid, at timestamptz not null default now());
+alter table public.game_cfg_hist enable row level security;
+-- 目前生效的設定(伺服器函式用)
+create or replace function public.admin_cfg_get() returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare a uuid := moe_admin_need('super');
+begin
+  return jsonb_build_object('cur', coalesce((select v from settings where k = 'game_cfg'), '{"d":{}}'::jsonb),
+    'hist', (select coalesce(jsonb_agg(jsonb_build_object('id', h.id, 'note', h.note, 'at', h.at, 'by', moe_acct(u.email), 'n', (select count(*) from jsonb_object_keys(h.d))) order by h.id desc), '[]'::jsonb)
+      from (select * from game_cfg_hist order by id desc limit 50) h left join auth.users u on u.id = h.by));
+end $$;
+create or replace function public.admin_cfg_set(p jsonb, p_note text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin_need('super'); ver int; i bigint;
+begin
+  if jsonb_typeof(p) <> 'object' then raise exception '設定格式錯誤'; end if;
+  if length(p::text) > 200000 then raise exception '設定內容太大'; end if;
+  ver := coalesce((select (v->>'ver')::int from settings where k = 'game_cfg'), 0) + 1;
+  insert into settings(k, v) values ('game_cfg', jsonb_build_object('ver', ver, 'at', now(), 'd', p)) on conflict (k) do update set v = excluded.v;
+  insert into game_cfg_hist(d, note, by) values (p, left(coalesce(p_note,''), 200), a) returning id into i;
+  perform alog('game_cfg', null, jsonb_build_object('ver', ver, 'note', p_note, 'hist', i));
+  return jsonb_build_object('ok', true, 'ver', ver);
+end $$;
+create or replace function public.admin_cfg_hist_get(p_id bigint) returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin_need('super');
+begin return (select d from game_cfg_hist where id = p_id); end $$;
+revoke execute on function public.moe_cfg() from public, anon, authenticated;
+grant execute on function public.admin_cfg_get(), public.admin_cfg_set(jsonb,text), public.admin_cfg_hist_get(bigint) to authenticated;
+drop policy if exists settings_read on public.settings;
+create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint','wipe','raffle','home_notice','auto_bc','game_cfg'));
