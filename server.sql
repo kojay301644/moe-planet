@@ -977,7 +977,7 @@ create or replace function public.report_error(p_msg text, p_stack text, p_ctx t
 declare u uuid := auth.uid(); b text := left(coalesce(p_msg,''),300) || chr(10) || left(coalesce(p_ctx,''),300) || chr(10) || left(coalesce(p_stack,''),900);
 begin
   if u is null then return jsonb_build_object('ok', false); end if;
-  if b ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中)' then return jsonb_build_object('ok', false, 'skip', true); end if;
+  if b ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中|Failed to start the audio device|^Script error\.)' then return jsonb_build_object('ok', false, 'skip', true); end if;
   if (select count(*) from tickets where uid = u and cat = '系統錯誤' and at > now() - interval '1 hour') >= 10 then return jsonb_build_object('ok', false); end if;
   if exists (select 1 from tickets where uid = u and cat = '系統錯誤' and left(body, 300) = left(b, 300) and at > now() - interval '1 day') then return jsonb_build_object('ok', false); end if;
   insert into tickets(uid, cat, body) values (u, '系統錯誤', b);
@@ -3204,7 +3204,7 @@ grant execute on function public.admin_todo(), public.admin_player2(uuid), publi
 
 -- ================= 一鍵刪檔(只有超級管理員)+ 重複登入不算系統錯誤 =================
 -- 把舊的「重複登入 / 維護中」錯誤回報標成已處理(不刪除)
-update tickets set status = 'closed' where cat = '系統錯誤' and status = 'open' and body ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中)';
+update tickets set status = 'closed' where cat = '系統錯誤' and status = 'open' and body ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中|Failed to start the audio device|^Script error\.)';
 create or replace function public.admin_wipe_preview() returns jsonb language plpgsql security definer set search_path = public as $$
 declare a uuid := moe_admin_need('super'); begin
   return jsonb_build_object(
