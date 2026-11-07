@@ -2641,3 +2641,105 @@ begin
 end $$;
 
 grant execute on function public.dm_list(boolean), public.dm_send(text), public.admin_dm_threads(), public.admin_dm_get(uuid), public.admin_dm_send(uuid,text), public.admin_dm_find(text) to authenticated;
+
+-- ================= 稽核修正 =================
+-- (1) 碎片改為和星星幣/進化石/糖果一樣套用每日上限(超過的部分存進 r_bank,之後每天陸續入帳)
+--     碎片預設上限 = 700 + 30 × 主城等級(主城 1 級 730、10 級 1000);已經在 settings.res_caps 設過 shards 的話不覆蓋
+insert into settings(k, v) values ('res_caps', '{"shards":[700,30]}'::jsonb)
+on conflict (k) do update set v = case when settings.v ? 'shards' then settings.v else settings.v || '{"shards":[700,30]}'::jsonb end;
+create or replace function public.wallet_sync(p_earn int, p_spend int, p_re jsonb default '{}'::jsonb, p_rs jsonb default '{}'::jsonb, p_src jsonb default '[]'::jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); v jsonb; g jsonb; w wallet; cs int; k text; e bigint; s bigint; cap bigint; today bigint; ok bigint; bal bigint; bad jsonb := '{}'::jsonb;
+begin
+  v := moe_gem_src(u, p_src);
+  g := moe_gem_apply(u, (v->>'ok')::int, p_earn, p_spend, v->'rej');
+  select * into w from wallet where uid = u for update;
+  if not w.r_on then perform moe_res_from_save(u); select * into w from wallet where uid = u for update; end if;
+  if w.r_day is distinct from moe_today() then w.r_day := moe_today(); w.r_today := '{}'::jsonb; end if;
+  cs := moe_castle(u);
+  foreach k in array array['coin','stones','candy','shards'] loop
+    e := greatest(0, least(coalesce((p_re->>k)::bigint, 0), 1000000000)); s := greatest(0, least(coalesce((p_rs->>k)::bigint, 0), 1000000000));
+    e := e + coalesce((w.r_bank->>k)::bigint, 0);
+    cap := moe_res_cap(k, cs); today := coalesce((w.r_today->>k)::bigint, 0);
+    ok := least(e, greatest(0, cap - today));
+    w.r_bank := case when e - ok > 0 then w.r_bank || jsonb_build_object(k, e - ok) else w.r_bank - k end;
+    w.r_today := w.r_today || jsonb_build_object(k, today + ok);
+    bal := case k when 'coin' then w.r_coin when 'stones' then w.r_stones when 'candy' then w.r_candy else w.r_shards end + ok;
+    if s > bal then if k <> 'shards' then w.flags := w.flags + 1; bad := bad || jsonb_build_object(k || '_spend', jsonb_build_object('spend', s, 'have', bal)); end if; s := bal; end if;
+    bal := bal - s;
+    if k = 'coin' then w.r_coin := bal; elsif k = 'stones' then w.r_stones := bal; elsif k = 'candy' then w.r_candy := bal; else w.r_shards := bal; end if;
+    if e - ok > cap and w.r_flag is distinct from moe_today() then bad := bad || jsonb_build_object(k, jsonb_build_object('bank', e - ok, 'cap', cap)); end if;
+  end loop;
+  if bad <> '{}'::jsonb then w.r_flag := moe_today(); insert into save_flags(uid, lvl, detail) values (u, 'warn', jsonb_build_object('res', bad, 'castle', cs)); end if;
+  update wallet set r_coin = w.r_coin, r_stones = w.r_stones, r_candy = w.r_candy, r_shards = w.r_shards, r_day = w.r_day, r_today = w.r_today, r_bank = w.r_bank, r_flag = w.r_flag, flags = w.flags, updated_at = now() where uid = u;
+  return g || jsonb_build_object('res', moe_res_json(w));
+end $$;
+grant execute on function public.wallet_sync(int,int,jsonb,jsonb,jsonb) to authenticated;
+
+-- (2a) 雙人守塔排行:兩邊名字一律由伺服器查,不用客戶端傳的;隊友必須是存在的帳號、不能是自己、且最近 10 分鐘內在線
+create or replace function public.td_report2(p_mate uuid, p_mate_n text, p_my_n text, p_wave int, p_secs int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); w int := moe_week(); xa uuid; xb uuid; xan text; xbn text; mn text; on2 text; r int;
+begin
+  if p_mate is null or p_mate = u or p_wave is null or p_wave < 1 or p_wave > 500 or coalesce(p_secs,0) < p_wave * 6 then return jsonb_build_object('ok',false); end if;
+  if not exists (select 1 from auth.users where id = p_mate)
+     or not exists (select 1 from sessions where uid = p_mate and seen > now() - interval '10 minutes') then return jsonb_build_object('ok',false,'err','mate'); end if;
+  if not moe_td_ok(u, p_wave) then return jsonb_build_object('ok',false,'err','review'); end if;
+  mn := left(moe_pname(u), 20); on2 := left(moe_pname(p_mate), 20);
+  if u < p_mate then xa := u; xb := p_mate; xan := mn; xbn := on2; else xa := p_mate; xb := u; xan := on2; xbn := mn; end if;
+  insert into td_duo(wk, a, b, an, bn, best, secs) values (w, xa, xb, xan, xbn, p_wave, p_secs)
+  on conflict (wk, a, b) do update set best = greatest(td_duo.best, excluded.best), an = excluded.an, bn = excluded.bn,
+    secs = case when excluded.best > td_duo.best then excluded.secs else td_duo.secs end, at = case when excluded.best > td_duo.best then now() else td_duo.at end
+  returning td_duo.best into r;
+  return jsonb_build_object('ok',true,'best',r);
+end $$;
+grant execute on function public.td_report2(uuid,text,text,int,int) to authenticated;
+
+-- (2b) 天梯:只有對手帳號真的存在(且不是自己)才寫入防守紀錄;名字由 ladder_defs 從伺服器查
+create or replace function public.ladder_report(p_win boolean, p_opp_pts int, p_opp_pw int, p_my_pw int, p_secs real, p_opp_uid uuid default null, p_rev bigint default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); L ladder := ladder_row(); v int; extra int; g int; ok boolean := true; rv boolean := false;
+begin
+  select moe_vip(topup) into v from wallet where uid = u; v := coalesce(v,0); extra := (v>=1)::int + (v>=7)::int;
+  if L.used >= 5 + extra + L.bought then raise exception 'no tickets'; end if;
+  if L.last_at is not null and now() - L.last_at < interval '8 seconds' then raise exception 'too fast'; end if;
+  p_opp_pts := least(greatest(coalesce(p_opp_pts, L.pts), 0), L.pts + 400);
+  if p_win and (coalesce(p_secs,0) < 4 or coalesce(p_my_pw,0) * 2.5 < coalesce(p_opp_pw,0)) then ok := false; L.flags := L.flags + 1; end if;
+  if p_win and ok then
+    g := round(least(greatest(25 + (p_opp_pts - L.pts) / 10.0, 12), 40));
+    if L.ls >= 3 then g := round(g * 1.5); end if;
+    if p_rev is not null then update ladder_def set revenged = true where id = p_rev and defender = u and attacker = p_opp_uid and att_win and not revenged and at > now() - interval '1 day'; rv := found; if rv then g := g + 5; end if; end if;
+    L.pts := L.pts + g; L.w := L.w + 1; L.ls := 0;
+  else
+    g := round(least(greatest(15 + (L.pts - p_opp_pts) / 12.0, 6), 25));
+    L.pts := greatest(0, L.pts - g); L.l := L.l + 1; L.ls := L.ls + 1; g := -g;
+  end if;
+  L.best := greatest(L.best, L.pts); L.used := L.used + 1;
+  update ladder set pts=L.pts, best=L.best, w=L.w, l=L.l, ls=L.ls, used=L.used, flags=L.flags, last_at=now(), updated_at=now() where uid = u;
+  if p_opp_uid is not null and p_opp_uid <> u and p_rev is null and exists (select 1 from auth.users where id = p_opp_uid) then
+    insert into ladder_def(attacker, defender, att_win) values (u, p_opp_uid, p_win and ok); delete from ladder_def where at < now() - interval '7 days'; end if;
+  return ladder_json(L, extra) || jsonb_build_object('delta', g, 'ok', ok, 'rev', rv);
+end $$;
+grant execute on function public.ladder_report(boolean,int,int,int,real,uuid,bigint) to authenticated;
+
+-- (2c) 攻城跑馬燈:對手名字沒有 uid 可查,改為清掉控制字元/零寬字元/方向字元/<>、合併空白、最多 16 字;種類只接受 win / breach
+create or replace function public.event_siege(p_kind text, p_target text, p_loot int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); me text; kd text := case when p_kind = 'breach' then 'breach' else 'win' end; l int := least(greatest(coalesce(p_loot,0),0), 5000000);
+  t text := btrim(left(regexp_replace(regexp_replace(coalesce(p_target,''), '[[:cntrl:]<>­͏؜ᅟᅠ᠎​-‏ -‮⁠-⁯ㅤ︀-️﻿ﾠ]', '', 'g'), '\s+', ' ', 'g'), 16));
+begin
+  if exists (select 1 from events where uid = u and at > now() - interval '20 seconds') then return jsonb_build_object('ok', false); end if;
+  select left(coalesce(data->>'n','守護員'),16) into me from docs where path = 'arena/' || u::text; me := coalesce(me,'守護員');
+  if t = '' then return jsonb_build_object('ok', false); end if;
+  insert into events(uid, kind, txt) values (u, kd, case when kd = 'breach' then '🔥 ' || t || ' 攻破了 ' || me || ' 的城門' || case when l > 0 then ',搶走 ⭐' || to_char(l,'FM999,999,999') else '' end
+    else '⚔️ ' || me || ' 攻破了 ' || t || ' 的城門' || case when l > 0 then ',搶走 ⭐' || to_char(l,'FM999,999,999') else '' end end);
+  delete from events where at < now() - interval '1 day';
+  return jsonb_build_object('ok', true);
+end $$;
+grant execute on function public.event_siege(text,text,int) to authenticated;
+
+-- (3) 內部輔助函式不給客戶端直接呼叫(只在 security definer 函式裡用)
+revoke execute on function public.moe_rf(), public.moe_rf_left(uuid), public.moe_online(), public.moe_ip(), public.moe_fc(uuid), public.moe_pname(uuid) from public, anon, authenticated;
+
+-- (4) 備份清單補上抽獎、私訊、邀請、好友碼、鑽石規則計數、改名紀錄
+create or replace function public.moe_backup_list() returns text[] language sql stable set search_path = public as $$
+  select coalesce(array_agg(t order by t), '{}') from unnest(array['docs','wallet','admins','notice','admin_log','bans','bots','chat_hide','code_use','codes','game_event','gem_log','inbox','ladder','ladder_def','market','mint_quota','mutes','pay_first','player_day','save_flags','settings','td_duo','td_week','tickets','guilds','guild_mem','guild_req','guild_quit','guild_log','guild_chat',
+    'raffle_win','raffle_spin','raffle_tix','dm','invites','fcodes','gem_once','gem_cnt','name_log']) t
+  where to_regclass('public.' || t) is not null $$;
+revoke execute on function public.moe_backup_list() from public, anon, authenticated;
