@@ -2812,7 +2812,9 @@ begin
   fin := coalesce(W.killed_at, moe_raid_st(p_wid) + interval '10 minutes');
   if now() < fin + interval '30 seconds' then return; end if;
   killed := W.killed_at is not null;
-  for r in select * from raid_run where wid = p_wid and dmg > 0 order by dmg desc, joined loop
+  for r in select * from raid_run where wid = p_wid and dmg > 0
+    and (coalesce(last, joined) - joined >= interval '60 seconds' or (W.killed_at is not null and coalesce(last, joined) >= W.killed_at - interval '20 seconds'))
+    order by dmg desc, joined loop
     rk := rk + 1;
     if p_wid >= 900000000 then
       insert into inbox(uid, gem, credit, kind, title, note) values (r.uid, 0, false, 'system', '【測試】團隊 Boss 結算:第 ' || rk || ' 名',
