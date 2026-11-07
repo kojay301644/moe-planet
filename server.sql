@@ -3146,3 +3146,57 @@ revoke execute on function public.moe_cfg() from public, anon, authenticated;
 grant execute on function public.admin_cfg_get(), public.admin_cfg_set(jsonb,text), public.admin_cfg_hist_get(bigint) to authenticated;
 drop policy if exists settings_read on public.settings;
 create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint','wipe','raffle','home_notice','auto_bc','game_cfg'));
+
+-- ================= 後台第三階段:待處理事項、玩家詳情加強、資源調整 =================
+create or replace function public.admin_todo() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin(); r text := moe_role();
+begin
+  return jsonb_build_object(
+    'role', r,
+    'tickets', (select count(*) from tickets where status = 'open' and cat is distinct from '系統錯誤'),
+    'errors', (select count(*) from tickets where cat = '系統錯誤' and at > now() - interval '24 hours'),
+    'dm', (select count(*) from dm where not adm and not rd),
+    'flags', (select count(*) from save_flags where status = 'open'),
+    'raffle', (select count(*) from raffle_win where status = 'review'),
+    'online', (select count(*) from sessions where seen > now() - interval '2 minutes'),
+    'maint', coalesce((select (v->>'on')::boolean from settings where k = 'maint'), false),
+    'cfg', (select jsonb_build_object('ver', v->>'ver', 'at', v->>'at') from settings where k = 'game_cfg'),
+    'banned_today', (select count(*) from bans where at > now() - interval '24 hours'),
+    'gem_big', (select count(*) from gem_log where at > now() - interval '24 hours' and delta >= 3000 and reason not like 'topup:%'));
+end $$;
+
+create or replace function public.admin_player2(p_uid uuid) returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare a uuid := moe_admin(); sv jsonb;
+begin
+  select data into sv from docs where path = 'data/users/' || p_uid::text || '/save';
+  return jsonb_build_object(
+    'teq', (select data->'teq' from docs where path = 'arena/' || p_uid::text),
+    'save', case when sv is null then null else jsonb_build_object(
+      'coin', sv->'coin', 'candy', sv->'candy', 'stones', sv->'stones', 'mat', sv->'mat', 'rtix', sv->'rtix', 'skv', sv->'skv', 'gl', sv->'gl', 'castle', sv->'castle',
+      'pets', (select coalesce(jsonb_agg(jsonb_build_object('k', k, 'lv', v->'lv', 'st', v->'st', 'q', v->'q', 'stars', v->'stars') order by (v->>'lv')::int desc nulls last), '[]'::jsonb) from jsonb_each(coalesce(sv->'pets','{}'::jsonb)) x(k, v) where jsonb_typeof(v) = 'object'),
+      'eq', (select jsonb_build_object('n', count(*), 'r0', count(*) filter (where (e->>'rar')::int = 0), 'r1', count(*) filter (where (e->>'rar')::int = 1), 'r2', count(*) filter (where (e->>'rar')::int = 2), 'r3', count(*) filter (where (e->>'rar')::int = 3), 'r4', count(*) filter (where (e->>'rar')::int = 4))
+        from jsonb_array_elements(case when jsonb_typeof(sv->'equips') = 'array' then sv->'equips' else '[]'::jsonb end) e)) end,
+    'days', (select coalesce(jsonb_agg(d order by d desc), '[]'::jsonb) from (select d from player_day where uid = p_uid and d > moe_today() - 30) x),
+    'acts', (select coalesce(jsonb_agg(jsonb_build_object('at', l.at, 'action', l.action, 'detail', l.detail, 'admin', moe_acct(u.email)) order by l.id desc), '[]'::jsonb)
+      from (select * from admin_log where target = p_uid order by id desc limit 40) l left join auth.users u on u.id = l.admin),
+    'mute', (select to_jsonb(m) from mutes m where uid = p_uid and (until is null or until > now())));
+end $$;
+
+-- 直接調整伺服器資源帳本(星星幣、進化石、糖果),正數受補償上限限制
+create or replace function public.admin_res_adjust(p_uid uuid, p_key text, p_delta bigint, p_reason text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin_need('ops'); w wallet; nv bigint;
+begin
+  if p_key not in ('coin','stones','candy') then raise exception '只能調整星星幣、進化石、糖果'; end if;
+  if coalesce(p_delta, 0) = 0 or abs(p_delta) > 100000000 then raise exception '數量不合理'; end if;
+  if p_delta > 0 then perform moe_cap_check(0, jsonb_build_object(p_key, p_delta)); end if;
+  select * into w from wallet where uid = p_uid for update;
+  if w.uid is null or not coalesce(w.r_on, false) then raise exception '這位玩家還沒啟用伺服器帳本,請改用寄信補償'; end if;
+  if p_key = 'coin' then update wallet set r_coin = greatest(0, r_coin + p_delta) where uid = p_uid returning r_coin into nv;
+  elsif p_key = 'stones' then update wallet set r_stones = greatest(0, r_stones + p_delta) where uid = p_uid returning r_stones into nv;
+  else update wallet set r_candy = greatest(0, r_candy + p_delta) where uid = p_uid returning r_candy into nv; end if;
+  insert into inbox(uid, gem, credit, kind, title, note) values (p_uid, 0, true, 'ops', '營運通知:資源調整',
+    coalesce(nullif(trim(p_reason), ''), '資源調整') || '(' || case p_key when 'coin' then '星星幣' when 'stones' then '進化石' else '糖果' end || ' ' || case when p_delta > 0 then '+' else '' end || p_delta || ',已直接生效)');
+  perform alog('res_adjust', p_uid, jsonb_build_object('key', p_key, 'delta', p_delta, 'reason', p_reason, 'now', nv));
+  return jsonb_build_object('ok', true, 'value', nv);
+end $$;
+grant execute on function public.admin_todo(), public.admin_player2(uuid), public.admin_res_adjust(uuid,text,bigint,text) to authenticated;
