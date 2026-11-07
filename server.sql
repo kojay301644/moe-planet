@@ -1727,10 +1727,10 @@ end $$;
 -- 建立公會:花 50 萬星星幣(伺服器帳本扣款)
 drop function if exists public.guild_create(text,text,text,text,int);
 create or replace function public.guild_create(p_name text, p_emb text, p_intro text, p_mode text, p_lv int, p_pay text default 'coin') returns jsonb language plpgsql security definer set search_path = public as $$
-declare u uuid := moe_uid(); n text := moe_gname_ok(p_name); w wallet; gid bigint; cost int := 100000; gcost int := 100;
+declare u uuid := moe_uid(); n text := moe_gname_ok(p_name); w wallet; gid bigint; cost int := 100000; gcost int := 100; ul int := coalesce(nullif(moe_cfg()->'unlock'->>'guild','')::int, 7);
 begin
   perform moe_gcd(u);
-  if coalesce(p_lv, 0) < 15 then raise exception '守護員 Lv.15 才能建立公會'; end if;
+  if coalesce(p_lv, 0) < ul then raise exception '守護員 Lv.% 才能建立公會', ul; end if;
   if exists (select 1 from guilds where lower(name) = lower(n)) then raise exception '這個公會名稱已經有人用了'; end if;
   select * into w from wallet where uid = u for update;
   if w.uid is null then raise exception '還沒連上伺服器,請重新整理'; end if;
