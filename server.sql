@@ -2980,7 +2980,7 @@ declare a uuid := moe_admin(); n int; w int;
 begin
   select coalesce(max((wid - 900000000) / 3), -1) + 1 into n from raid_test;
   w := 900000000 + n * 3 + least(2, greatest(0, coalesce(p_slot, 0)));
-  insert into raid_test(wid, st, hp, by) values (w, now() + make_interval(secs => least(300, greatest(3, coalesce(p_delay, 60)))), case when p_hp = 200000 then 200000 else 4000000 end, a);
+  insert into raid_test(wid, st, hp, by) values (w, now() + make_interval(secs => least(300, greatest(3, coalesce(p_delay, 60)))), case when p_hp = 20000 then 20000 else 4000000 end, a);
   insert into raid_win(wid) values (w) on conflict do nothing;
   perform alog('raid_test', null, jsonb_build_object('wid', w, 'hp', p_hp));
   return raid_test_cur();
