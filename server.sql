@@ -2722,7 +2722,7 @@ grant execute on function public.ladder_report(boolean,int,int,int,real,uuid,big
 -- (2c) 攻城跑馬燈:對手名字沒有 uid 可查,改為清掉控制字元/零寬字元/方向字元/<>、合併空白、最多 16 字;種類只接受 win / breach
 create or replace function public.event_siege(p_kind text, p_target text, p_loot int) returns jsonb language plpgsql security definer set search_path = public as $$
 declare u uuid := moe_uid(); me text; kd text := case when p_kind = 'breach' then 'breach' else 'win' end; l int := least(greatest(coalesce(p_loot,0),0), 5000000);
-  t text := btrim(left(regexp_replace(regexp_replace(coalesce(p_target,''), '[[:cntrl:]<>­͏؜ᅟᅠ᠎​-‏ -‮⁠-⁯ㅤ︀-️﻿ﾠ]', '', 'g'), '\s+', ' ', 'g'), 16));
+  t text := btrim(left(regexp_replace(regexp_replace(coalesce(p_target,''), E'[[:cntrl:]<>\u00ad\u034f\u061c\u115f\u1160\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0]', '', 'g'), '\s+', ' ', 'g'), 16));
 begin
   if exists (select 1 from events where uid = u and at > now() - interval '20 seconds') then return jsonb_build_object('ok', false); end if;
   select left(coalesce(data->>'n','守護員'),16) into me from docs where path = 'arena/' || u::text; me := coalesce(me,'守護員');
