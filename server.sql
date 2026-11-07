@@ -2776,12 +2776,19 @@ alter table public.raid_win enable row level security;
 alter table public.raid_run enable row level security;
 
 -- 時段:台灣時間 13、19、22 點,每場 10 分鐘;wid = 台灣日序 × 3 + 時段
-create or replace function public.moe_raid_st(p_wid int) returns timestamptz language sql immutable as $$
-  select to_timestamp((p_wid / 3)::bigint * 86400 - 28800 + (array[13,19,22])[p_wid % 3 + 1] * 3600) $$;
+create table if not exists public.raid_test(wid int primary key, st timestamptz not null, hp bigint not null default 4000000, by uuid, created timestamptz not null default now());
+alter table public.raid_test enable row level security;
+create or replace function public.moe_raid_st(p_wid int) returns timestamptz language plpgsql stable security definer set search_path = public as $$
+begin
+  if p_wid >= 900000000 then return coalesce((select st from raid_test where wid = p_wid), 'infinity'::timestamptz); end if;
+  return to_timestamp((p_wid / 3)::bigint * 86400 - 28800 + (array[13,19,22])[p_wid % 3 + 1] * 3600);
+end $$;
 create or replace function public.moe_raid_last() returns int language plpgsql stable as $$
 declare w int := (floor((extract(epoch from now()) + 28800) / 86400)::int + 1) * 3 + 2;
 begin while moe_raid_st(w) > now() loop w := w - 1; end loop; return w; end $$;
 create or replace function public.moe_raid_hp() returns bigint language sql immutable as $$ select 4000000::bigint $$;
+create or replace function public.moe_raid_hpw(p_wid int) returns bigint language sql stable security definer set search_path = public as $$
+  select coalesce((select hp from raid_test where wid = p_wid), 4000000::bigint) $$;
 
 -- 伺服器產生一件裝備(格式和遊戲相同)
 create or replace function public.moe_raid_eq(p_set text, p_rar int) returns jsonb language plpgsql volatile as $$
@@ -2807,6 +2814,11 @@ begin
   killed := W.killed_at is not null;
   for r in select * from raid_run where wid = p_wid and dmg > 0 order by dmg desc, joined loop
     rk := rk + 1;
+    if p_wid >= 900000000 then
+      insert into inbox(uid, gem, credit, kind, title, note) values (r.uid, 0, false, 'system', '【測試】團隊 Boss 結算:第 ' || rk || ' 名',
+        bn || (case when killed then '(已打倒)' else '(時間到)' end) || ' · 你的傷害 ' || to_char(r.dmg, 'FM999,999,999') || ',排名第 ' || rk || ' 名。測試場不發放獎勵。');
+      continue;
+    end if;
     g := case when rk = 1 then 150 when rk <= 3 then 100 when rk <= 10 then 60 else 30 end;
     rr := case when rk = 1 then 3 when rk <= 3 then 2 when rk <= 10 then 1 else 0 end;
     eq := case when rk = 1 then moe_raid_eq(st, 3) when rk <= 3 then moe_raid_eq(st, 2) when rk <= 10 and random() < .5 then moe_raid_eq(st, 2) else null end;
@@ -2840,17 +2852,23 @@ begin
   select * into me from raid_run where wid = wd and uid = u;
   if me.uid is not null then select count(*) + 1 into myrk from raid_run where wid = wd and (dmg > me.dmg or (dmg = me.dmg and joined < me.joined)); end if;
   return jsonb_build_object('wid', wd, 'st', extract(epoch from moe_raid_st(wd)) * 1000, 'en', extract(epoch from moe_raid_st(wd) + interval '10 minutes') * 1000, 'now', extract(epoch from now()) * 1000,
-    'hp', moe_raid_hp(), 'total', tot, 'killed', WN.killed_at is not null, 'settled', coalesce(WN.settled, false), 'n', (select count(*) from raid_run where wid = wd),
+    'hp', moe_raid_hpw(wd), 'test', wd >= 900000000, 'total', tot, 'killed', WN.killed_at is not null, 'settled', coalesce(WN.settled, false), 'n', (select count(*) from raid_run where wid = wd),
     'me', case when me.uid is null then null else jsonb_build_object('d', me.dmg, 'quit', me.quit, 'rank', myrk) end,
     'list', (select coalesce(jsonb_agg(jsonb_build_object('n', coalesce(nullif(left(d.data->>'n', 16), ''), '守護員'), 'd', x.dmg, 'me', x.uid = u, 'av', d.data->>'av') order by x.dmg desc, x.joined), '[]'::jsonb)
       from (select * from raid_run where wid = wd and dmg > 0 order by dmg desc, joined limit 30) x left join docs d on d.path = 'arena/' || x.uid::text));
 end $$;
 
 -- 進場:每個時段只有一次機會(斷線沒按退出可以重新進場)
-create or replace function public.raid_join() returns jsonb language plpgsql security definer set search_path = public as $$
-declare u uuid := moe_uid(); w int := moe_raid_last(); R raid_run; pw numeric;
+drop function if exists public.raid_join();
+create or replace function public.raid_join(p_test int default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); w int := moe_raid_last(); R raid_run; pw numeric; a uuid;
 begin
-  if now() >= moe_raid_st(w) + interval '10 minutes' then
+  if p_test is not null then
+    a := moe_admin(); w := p_test;
+    if not exists (select 1 from raid_test where wid = w) then raise exception '找不到這個測試場'; end if;
+    if now() >= moe_raid_st(w) + interval '10 minutes' then raise exception '測試場已經結束'; end if;
+    if moe_raid_st(w) - now() > interval '5 minutes' then raise exception '測試場還沒開放'; end if;
+  elsif now() >= moe_raid_st(w) + interval '10 minutes' then
     if moe_raid_st(w + 1) - now() <= interval '5 minutes' then w := w + 1; else raise exception '團隊 Boss 還沒開打(開打前 5 分鐘開放等待房間)'; end if;
   end if;
   insert into raid_win(wid) values (w) on conflict do nothing;
@@ -2878,18 +2896,18 @@ begin
   update raid_run set dmg = greatest(dmg, d), last = now(), quit = quit or coalesce(p_quit, false) where wid = p_wid and uid = u;
   if W.killed_at is null then
     select coalesce(sum(dmg), 0) into tot from raid_run where wid = p_wid;
-    if tot >= moe_raid_hp() then update raid_win set killed_at = now() where wid = p_wid and killed_at is null; end if;
+    if tot >= moe_raid_hpw(p_wid) then update raid_win set killed_at = now() where wid = p_wid and killed_at is null; end if;
   end if;
   return raid_board(p_wid);
 end $$;
-grant execute on function public.raid_board(int), public.raid_join(), public.raid_report(int,bigint,boolean) to authenticated;
+grant execute on function public.raid_board(int), public.raid_join(int), public.raid_report(int,bigint,boolean) to authenticated;
 
 -- 後台:最近幾場的前 10 名(看傷害是否異常)
 create or replace function public.admin_raid() returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare a uuid := moe_admin();
 begin
   return (select coalesce(jsonb_agg(x order by (x->>'wid')::int desc), '[]'::jsonb) from (
-    select jsonb_build_object('wid', w.wid, 'st', moe_raid_st(w.wid), 'killed', w.killed_at, 'settled', w.settled, 'n', (select count(*) from raid_run r where r.wid = w.wid),
+    select jsonb_build_object('wid', w.wid, 'test', w.wid >= 900000000, 'hp', moe_raid_hpw(w.wid), 'st', moe_raid_st(w.wid), 'killed', w.killed_at, 'settled', w.settled, 'n', (select count(*) from raid_run r where r.wid = w.wid),
       'total', (select coalesce(sum(dmg),0) from raid_run r where r.wid = w.wid),
       'top', (select coalesce(jsonb_agg(jsonb_build_object('uid', r.uid, 'n', d.data->>'n', 'd', r.dmg, 'cap', r.cap, 'pw', (d.data->>'pw')::numeric, 'quit', r.quit,
           'dps', round(r.dmg / greatest(1, extract(epoch from (coalesce(r.last, r.joined) - r.joined))))) order by r.dmg desc), '[]'::jsonb)
@@ -2955,3 +2973,23 @@ begin
   return out;
 end $$;
 grant execute on function public.admin_auto_bc_set(jsonb) to authenticated;
+
+-- 管理員測試場:隨時開一場(不影響正式排行,結算只寄通知不發獎)
+create or replace function public.admin_raid_test(p_slot int, p_hp bigint, p_delay int) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); n int; w int;
+begin
+  select coalesce(max((wid - 900000000) / 3), -1) + 1 into n from raid_test;
+  w := 900000000 + n * 3 + least(2, greatest(0, coalesce(p_slot, 0)));
+  insert into raid_test(wid, st, hp, by) values (w, now() + make_interval(secs => least(300, greatest(3, coalesce(p_delay, 60)))), case when p_hp = 200000 then 200000 else 4000000 end, a);
+  insert into raid_win(wid) values (w) on conflict do nothing;
+  perform alog('raid_test', null, jsonb_build_object('wid', w, 'hp', p_hp));
+  return raid_test_cur();
+end $$;
+create or replace function public.raid_test_cur() returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); t raid_test;
+begin
+  select * into t from raid_test where st + interval '10 minutes' > now() order by wid desc limit 1;
+  if t.wid is null then return null; end if;
+  return jsonb_build_object('wid', t.wid, 'st', extract(epoch from t.st) * 1000, 'en', extract(epoch from t.st + interval '10 minutes') * 1000, 'now', extract(epoch from now()) * 1000, 'hp', t.hp, 'killed', (select killed_at is not null from raid_win where wid = t.wid));
+end $$;
+grant execute on function public.admin_raid_test(int,bigint,int), public.raid_test_cur() to authenticated;
