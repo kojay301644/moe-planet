@@ -2721,8 +2721,10 @@ grant execute on function public.dm_list(boolean), public.dm_send(text), public.
 --     碎片預設上限 = 700 + 30 × 主城等級(主城 1 級 730、10 級 1000);已經在 settings.res_caps 設過 shards 的話不覆蓋
 insert into settings(k, v) values ('res_caps', '{"shards":[700,30]}'::jsonb)
 on conflict (k) do update set v = case when settings.v ? 'shards' then settings.v else settings.v || '{"shards":[700,30]}'::jsonb end;
-create or replace function public.wallet_sync(p_earn int, p_spend int, p_re jsonb default '{}'::jsonb, p_rs jsonb default '{}'::jsonb, p_src jsonb default '[]'::jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
-declare u uuid := moe_uid(); v jsonb; g jsonb; w wallet; cs int; k text; e bigint; s bigint; cap bigint; today bigint; ok bigint; bal bigint; bad jsonb := '{}'::jsonb;
+-- 商店用鑽石買的星星幣/糖果/進化石不算每日收入上限(p_rb);伺服器核對這次確實有扣到足夠鑽石
+drop function if exists public.wallet_sync(int,int,jsonb,jsonb,jsonb);
+create or replace function public.wallet_sync(p_earn int, p_spend int, p_re jsonb default '{}'::jsonb, p_rs jsonb default '{}'::jsonb, p_src jsonb default '[]'::jsonb, p_rb jsonb default '{}'::jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); v jsonb; g jsonb; w wallet; cs int; k text; e bigint; s bigint; cap bigint; today bigint; ok bigint; bal bigint; bad jsonb := '{}'::jsonb; b bigint; bc bigint; bs bigint; bk bigint; need numeric;
 begin
   v := moe_gem_src(u, p_src);
   g := moe_gem_apply(u, (v->>'ok')::int, p_earn, p_spend, v->'rej');
@@ -2730,14 +2732,23 @@ begin
   if not w.r_on then perform moe_res_from_save(u); select * into w from wallet where uid = u for update; end if;
   if w.r_day is distinct from moe_today() then w.r_day := moe_today(); w.r_today := '{}'::jsonb; end if;
   cs := moe_castle(u);
+  bc := greatest(0, least(coalesce((p_rb->>'coin')::bigint, 0), coalesce((p_re->>'coin')::bigint, 0)));
+  bs := greatest(0, least(coalesce((p_rb->>'stones')::bigint, 0), coalesce((p_re->>'stones')::bigint, 0)));
+  bk := greatest(0, least(coalesce((p_rb->>'candy')::bigint, 0), coalesce((p_re->>'candy')::bigint, 0)));
+  need := bc / 3000.0 + bs * 10 + bk * 1;
+  if need > greatest(0, coalesce(p_spend, 0)) then
+    if need > 0 then insert into save_flags(uid, lvl, detail) values (u, 'warn', jsonb_build_object('rb', p_rb, 'spend', p_spend)); end if;
+    bc := 0; bs := 0; bk := 0;
+  end if;
   foreach k in array array['coin','stones','candy','shards'] loop
-    e := greatest(0, least(coalesce((p_re->>k)::bigint, 0), 1000000000)); s := greatest(0, least(coalesce((p_rs->>k)::bigint, 0), 1000000000));
+    b := case k when 'coin' then bc when 'stones' then bs when 'candy' then bk else 0 end;
+    e := greatest(0, least(coalesce((p_re->>k)::bigint, 0), 1000000000) - b); s := greatest(0, least(coalesce((p_rs->>k)::bigint, 0), 1000000000));
     e := e + coalesce((w.r_bank->>k)::bigint, 0);
     cap := moe_res_cap(k, cs); today := coalesce((w.r_today->>k)::bigint, 0);
     ok := least(e, greatest(0, cap - today));
     w.r_bank := case when e - ok > 0 then w.r_bank || jsonb_build_object(k, e - ok) else w.r_bank - k end;
     w.r_today := w.r_today || jsonb_build_object(k, today + ok);
-    bal := case k when 'coin' then w.r_coin when 'stones' then w.r_stones when 'candy' then w.r_candy else w.r_shards end + ok;
+    bal := case k when 'coin' then w.r_coin when 'stones' then w.r_stones when 'candy' then w.r_candy else w.r_shards end + ok + b;
     if s > bal then if k <> 'shards' then w.flags := w.flags + 1; bad := bad || jsonb_build_object(k || '_spend', jsonb_build_object('spend', s, 'have', bal)); end if; s := bal; end if;
     bal := bal - s;
     if k = 'coin' then w.r_coin := bal; elsif k = 'stones' then w.r_stones := bal; elsif k = 'candy' then w.r_candy := bal; else w.r_shards := bal; end if;
@@ -2747,7 +2758,7 @@ begin
   update wallet set r_coin = w.r_coin, r_stones = w.r_stones, r_candy = w.r_candy, r_shards = w.r_shards, r_day = w.r_day, r_today = w.r_today, r_bank = w.r_bank, r_flag = w.r_flag, flags = w.flags, updated_at = now() where uid = u;
   return g || jsonb_build_object('res', moe_res_json(w));
 end $$;
-grant execute on function public.wallet_sync(int,int,jsonb,jsonb,jsonb) to authenticated;
+grant execute on function public.wallet_sync(int,int,jsonb,jsonb,jsonb,jsonb) to authenticated;
 
 -- (2a) 雙人守塔排行:兩邊名字一律由伺服器查,不用客戶端傳的;隊友必須是存在的帳號、不能是自己、且最近 10 分鐘內在線
 create or replace function public.td_report2(p_mate uuid, p_mate_n text, p_my_n text, p_wave int, p_secs int) returns jsonb language plpgsql security definer set search_path = public as $$
