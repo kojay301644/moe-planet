@@ -1725,8 +1725,9 @@ begin
   if exists (select 1 from guild_quit where uid = u and at > now() - interval '24 hours') then raise exception '退出公會後 24 小時內不能加入新公會'; end if;
 end $$;
 -- 建立公會:花 50 萬星星幣(伺服器帳本扣款)
-create or replace function public.guild_create(p_name text, p_emb text, p_intro text, p_mode text, p_lv int) returns jsonb language plpgsql security definer set search_path = public as $$
-declare u uuid := moe_uid(); n text := moe_gname_ok(p_name); w wallet; gid bigint; cost int := 500000;
+drop function if exists public.guild_create(text,text,text,text,int);
+create or replace function public.guild_create(p_name text, p_emb text, p_intro text, p_mode text, p_lv int, p_pay text default 'coin') returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); n text := moe_gname_ok(p_name); w wallet; gid bigint; cost int := 100000; gcost int := 100;
 begin
   perform moe_gcd(u);
   if coalesce(p_lv, 0) < 15 then raise exception '守護員 Lv.15 才能建立公會'; end if;
@@ -1734,13 +1735,19 @@ begin
   select * into w from wallet where uid = u for update;
   if w.uid is null then raise exception '還沒連上伺服器,請重新整理'; end if;
   if not w.r_on then perform moe_res_from_save(u); select * into w from wallet where uid = u for update; end if;
-  if w.r_coin < cost then raise exception '星星幣不足(需要 500,000)'; end if;
-  update wallet set r_coin = r_coin - cost, updated_at = now() where uid = u;
+  if p_pay = 'gem' then
+    if w.gem < gcost then raise exception '鑽石不足(需要 100)'; end if;
+    update wallet set gem = gem - gcost, updated_at = now() where uid = u;
+    insert into gem_log(uid, delta, reason) values (u, -gcost, 'guild_create');
+  else
+    if w.r_coin < cost then raise exception '星星幣不足(需要 100,000)'; end if;
+    update wallet set r_coin = r_coin - cost, updated_at = now() where uid = u;
+  end if;
   insert into guilds(name, emb, intro, mode, owner) values (n, coalesce(nullif(left(p_emb,20),''),'fox'), moe_gtext_ok(p_intro, 80), case when p_mode = 'apply' then 'apply' else 'open' end, u) returning id into gid;
   insert into guild_mem(uid, gid, role, wk) values (u, gid, 'leader', moe_week());
   delete from guild_req where uid = u;
   perform moe_glog(gid, moe_pname(u) || ' 建立了公會');
-  return guild_me() || jsonb_build_object('res', (select moe_res_json(x) from wallet x where uid = u));
+  return guild_me() || jsonb_build_object('res', (select moe_res_json(x) from wallet x where uid = u), 'gem', (select gem from wallet where uid = u));
 end $$;
 -- 加入(自由加入)或送出申請(需要審核)
 create or replace function public.guild_join(p_gid bigint, p_lv int) returns jsonb language plpgsql security definer set search_path = public as $$
@@ -1930,7 +1937,7 @@ begin
   perform alog('guild_kick', p_uid, jsonb_build_object('gid', g)); return jsonb_build_object('ok', true);
 end $$;
 revoke execute on function public.moe_gfix(bigint), public.moe_glog(bigint,text), public.moe_gcd(uuid), public.moe_grole(uuid), public.moe_pname(uuid) from public, anon, authenticated;
-grant execute on function public.guild_me(), public.guild_list(text), public.guild_create(text,text,text,text,int), public.guild_join(bigint,int), public.guild_unapply(bigint), public.guild_review(uuid,boolean),
+grant execute on function public.guild_me(), public.guild_list(text), public.guild_create(text,text,text,text,int,text), public.guild_join(bigint,int), public.guild_unapply(bigint), public.guild_review(uuid,boolean),
   public.guild_leave(), public.guild_kick(uuid), public.guild_role(uuid,text), public.guild_edit(text,text,text,text,int), public.guild_donate(int), public.guild_buy(text),
   public.guild_chat_send(text), public.guild_chat_list(bigint), public.admin_guilds(text), public.admin_guild(bigint), public.admin_guild_set(bigint,text,text,text), public.admin_guild_disband(bigint,text), public.admin_guild_kick(uuid) to authenticated;
 -- 清理:公會聊天 7 天、公會紀錄 60 天、退會冷卻 2 天
