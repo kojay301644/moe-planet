@@ -2967,7 +2967,7 @@ begin
     x := left(trim(regexp_replace(coalesce(it->>'x',''), '[<>]', '', 'g')), 120);
     if x = '' then continue; end if;
     ev := least(1440, greatest(5, coalesce((it->>'every')::int, 30)));
-    out := out || jsonb_build_array(jsonb_build_object('id', left(coalesce(nullif(it->>'id',''), md5(random()::text)), 16), 'on', coalesce((it->>'on')::boolean, false), 'x', x, 'every', ev,
+    out := out || jsonb_build_array(jsonb_build_object('id', left(coalesce(nullif(it->>'id',''), md5(random()::text)), 16), 'on', coalesce((it->>'on')::boolean, false), 'x', x, 'every', ev, 'chat', coalesce((it->>'chat')::boolean, true),
       'start', case when coalesce(it->>'start','') <> '' then (it->>'start')::timestamptz end, 'end', case when coalesce(it->>'end','') <> '' then (it->>'end')::timestamptz end));
   end loop;
   insert into settings(k, v) values ('auto_bc', out) on conflict (k) do update set v = excluded.v;
@@ -2995,3 +2995,25 @@ begin
   return jsonb_build_object('wid', t.wid, 'st', extract(epoch from t.st) * 1000, 'en', extract(epoch from t.st + interval '10 minutes') * 1000, 'now', extract(epoch from now()) * 1000, 'hp', t.hp, 'killed', (select killed_at is not null from raid_win where wid = t.wid));
 end $$;
 grant execute on function public.admin_raid_test(int,bigint,int), public.raid_test_cur() to authenticated;
+
+-- ================= 官方聊天(後台發言、公告同步到世界頻道) =================
+create table if not exists public.off_chat(id bigserial primary key, x text not null, t bigint not null, by uuid, at timestamptz not null default now());
+alter table public.off_chat enable row level security;
+create or replace function public.admin_off_chat(p_x text) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); x text := left(trim(regexp_replace(coalesce(p_x,''), '[<>]', '', 'g')), 200); tt bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint; i bigint;
+begin
+  if x = '' then raise exception '請輸入內容'; end if;
+  insert into off_chat(x, t, by) values (x, tt, a) returning id into i;
+  delete from off_chat where at < now() - interval '3 days';
+  perform alog('off_chat', null, jsonb_build_object('x', x));
+  return jsonb_build_object('id', i, 't', tt);
+end $$;
+create or replace function public.admin_off_chat_del(p_id bigint) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin delete from off_chat where id = p_id; return jsonb_build_object('ok', true); end $$;
+create or replace function public.off_chat_list() returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'x', x, 't', t) order by t), '[]'::jsonb) from (
+    select id, x, t from off_chat where at > now() - interval '24 hours' order by t desc limit 20) s;
+$$;
+revoke execute on function public.admin_off_chat(text), public.admin_off_chat_del(bigint) from public, anon;
+grant execute on function public.admin_off_chat(text), public.admin_off_chat_del(bigint), public.off_chat_list() to authenticated;
