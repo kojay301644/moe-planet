@@ -977,6 +977,7 @@ create or replace function public.report_error(p_msg text, p_stack text, p_ctx t
 declare u uuid := auth.uid(); b text := left(coalesce(p_msg,''),300) || chr(10) || left(coalesce(p_ctx,''),300) || chr(10) || left(coalesce(p_stack,''),900);
 begin
   if u is null then return jsonb_build_object('ok', false); end if;
+  if b ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中)' then return jsonb_build_object('ok', false, 'skip', true); end if;
   if (select count(*) from tickets where uid = u and cat = '系統錯誤' and at > now() - interval '1 hour') >= 10 then return jsonb_build_object('ok', false); end if;
   if exists (select 1 from tickets where uid = u and cat = '系統錯誤' and left(body, 300) = left(b, 300) and at > now() - interval '1 day') then return jsonb_build_object('ok', false); end if;
   insert into tickets(uid, cat, body) values (u, '系統錯誤', b);
@@ -3200,3 +3201,65 @@ begin
   return jsonb_build_object('ok', true, 'value', nv);
 end $$;
 grant execute on function public.admin_todo(), public.admin_player2(uuid), public.admin_res_adjust(uuid,text,bigint,text) to authenticated;
+
+-- ================= 一鍵刪檔(只有超級管理員)+ 重複登入不算系統錯誤 =================
+-- 把舊的「重複登入 / 維護中」錯誤回報標成已處理(不刪除)
+update tickets set status = 'closed' where cat = '系統錯誤' and status = 'open' and body ~ '(kicked|帳號已在其他裝置登入|maintenance|遊戲維護中)';
+create or replace function public.admin_wipe_preview() returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin_need('super'); begin
+  return jsonb_build_object(
+    'players', (select count(*) from docs where path like 'data/users/%/save'),
+    'wallets', (select count(*) from wallet),
+    'payers', (select count(*) from wallet where topup > 0),
+    'topup', (select coalesce(sum(topup),0) from wallet),
+    'tickets', (select count(*) from tickets), 'dm', (select count(*) from dm),
+    'backup', (select v from settings where k = 'backup'),
+    'wipe', (select v from settings where k = 'wipe'));
+end $$;
+create or replace function public.admin_wipe(p_confirm text, p_refund boolean default false, p_clear_cs boolean default false) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin_need('super'); t text; n bigint; cnt jsonb := '{}'::jsonb; rf int := 0; rg bigint := 0; wid uuid := gen_random_uuid();
+  tl text[] := array['docs','gem_log','ladder','ladder_def','inbox','market','mint_quota','guild_chat','guild_req','guild_log','guild_quit','guild_mem','guilds',
+    'off_chat','chat_hide','raid_win','raid_run','raid_chat','raid_test','td_week','td_duo','gem_once','gem_cnt','save_flags','save_hist','sessions','login_queue',
+    'raffle_tix','raffle_spin','events','live_msg'];
+begin
+  if coalesce(p_confirm,'') <> '確認刪除所有玩家進度' then raise exception '確認文字不正確,沒有刪除任何資料'; end if;
+  -- 1) 先開維護模式,避免刪到一半有人寫入
+  insert into settings(k, v) values ('maint', jsonb_build_object('on', true, 'msg', '伺服器重置中,請稍後再回來')) on conflict (k) do update set v = excluded.v;
+  -- 2) 記下要返還的儲值(刪錢包前)
+  create temp table if not exists _wipe_top(uid uuid primary key, topup int) on commit drop;
+  delete from _wipe_top;
+  if p_refund then insert into _wipe_top select uid, topup from wallet where topup > 0; end if;
+  -- 3) 刪除玩家資料
+  perform set_config('moe.skip', '1', true);
+  foreach t in array tl loop
+    if to_regclass('public.' || t) is not null then execute format('delete from public.%I', t); get diagnostics n = row_count; cnt := cnt || jsonb_build_object(t, n); end if;
+  end loop;
+  delete from wallet; get diagnostics n = row_count; cnt := cnt || jsonb_build_object('wallet', n);
+  if p_clear_cs then
+    delete from tickets; get diagnostics n = row_count; cnt := cnt || jsonb_build_object('tickets', n);
+    delete from dm; get diagnostics n = row_count; cnt := cnt || jsonb_build_object('dm', n);
+  end if;
+  update bots set reset_at = now();
+  -- 4) 返還儲值:保留儲值累計(VIP 不掉),鑽石放進信箱
+  if p_refund then
+    insert into wallet(uid, topup) select uid, topup from _wipe_top on conflict (uid) do update set topup = excluded.topup;
+    insert into inbox(uid, gem, credit, title, note, kind) select uid, topup, true, '儲值鑽石返還', '伺服器已重置,這是你之前儲值的鑽石,請收下 💎', 'system' from _wipe_top;
+    select count(*), coalesce(sum(topup),0) into rf, rg from _wipe_top;
+  end if;
+  -- 5) 通知所有裝置清掉本機進度
+  insert into settings(k, v) values ('wipe', jsonb_build_object('id', wid, 'at', now())) on conflict (k) do update set v = excluded.v;
+  perform alog('wipe', null, jsonb_build_object('rows', cnt, 'refund', p_refund, 'refund_n', rf, 'refund_gem', rg, 'clear_cs', p_clear_cs, 'id', wid));
+  return jsonb_build_object('ok', true, 'rows', cnt, 'refund_n', rf, 'refund_gem', rg, 'id', wid);
+end $$;
+revoke execute on function public.admin_wipe(text,boolean,boolean) from public, anon;
+grant execute on function public.admin_wipe_preview(), public.admin_wipe(text,boolean,boolean) to authenticated;
+-- 大額鑽石明細(總覽「24 小時大額鑽石」點進去看)
+create or replace function public.admin_gem_big(p_hours int default 24, p_min int default 3000) returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin_need('cs'); begin
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', g.id, 'uid', g.uid, 'delta', g.delta, 'reason', g.reason, 'at', g.at,
+      'acct', (select moe_acct(email) from auth.users where id = g.uid), 'name', (select data->>'n' from docs where path = 'arena/' || g.uid::text),
+      'gem', (select gem from wallet where uid = g.uid)) order by g.at desc), '[]'::jsonb)
+    from (select * from gem_log where at > now() - make_interval(hours => greatest(1, least(coalesce(p_hours,24), 24*30)))
+      and delta >= greatest(1, coalesce(p_min,3000)) and reason not like 'topup:%' order by at desc limit 300) g);
+end $$;
+grant execute on function public.admin_gem_big(int,int) to authenticated;

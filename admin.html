@@ -132,12 +132,12 @@ const REASON=r=>{r=r||'';return r==='earn'?'遊戲獲得':r==='spend'?'遊戲花
 const ACTN={bot:'儲存電腦玩家',bot_delete:'刪除電腦玩家',bot_reset:'電腦玩家重玩',live:'即時廣播',event:'儲存活動',event_delete:'刪除活動',code:'兌換碼',maint:'維護模式',chat_hide:'隱藏聊天',chat_unhide:'恢復聊天',mute:'禁言',unmute:'解除禁言',ticket:'客服回覆',claim:'成為管理員',gem:'調整鑽石',mail:'寄信',ban:'停權',unban:'解除停權','set:flags':'清除可疑','set:pts':'設定天梯分','set:bank':'設定待入帳',market_remove:'下架裝備',notice:'儲存公告',notice_delete:'刪除公告',admin_add:'新增管理員',save_restore:'還原存檔',backup:'匯出備份',backup_restore:'從備份還原',save_accept:'接受存檔',admin_remove:'移除管理員'};
 let DMU=null,DMN=0,DMQ='',DMF=null;let ME=null,TAB='home',PQ={q:'',sort:'recent'},MKS='open';
 const GROUPS=[['data','📊 數據',[['home','總覽','cs'],['metrics','📈 玩家數據','cs'],['report','數據報表','cs']]],
- ['ply','👤 玩家',[['players','玩家查詢','cs'],['saves','存檔異常','cs'],['topups','儲值紀錄','super']]],
+ ['ply','👤 玩家',[['players','玩家查詢','cs'],['saves','存檔異常','cs'],['gembig','💎 大額鑽石','cs'],['topups','儲值紀錄','super']]],
  ['com','📢 營運溝通',[['notice','公告 / 廣播','ops'],['hnotice','主頁公告','ops'],['mail','寄信 / 補償','cs'],['tickets','客服回報','cs'],['dm','💬 私訊','cs'],['chat','聊天管理','cs']]],
  ['evt','🎉 活動',[['events','活動','ops'],['codes','兌換碼','ops'],['raffle','🎡 抽獎','ops'],['raid','🐙 團隊 Boss','ops']]],
  ['cfg','⚙️ 遊戲設定',[['cfg_sum','召喚','super'],['cfg_sta','體力與次數','super'],['cfg_mult','倍率與獎勵','super'],['cfg_shop','商店','super'],['cfg_pay','儲值方案','super'],['cfg_flag','功能開關 / 解鎖','super'],['cfg_rwt','獎勵內容','super'],['cfg_pet','萌獸數值','super'],['cfg_mon','怪物與 Boss','super'],['cfg_eq','裝備','super'],['cfg_raid','團隊 Boss','super'],['cfg_lad','天梯','super'],['cfg_td','守塔','super'],['cfg_hist','版本紀錄','super']]],
  ['soc','🏰 社群經濟',[['guilds','公會','cs'],['market','交易所','cs'],['bots','電腦玩家','ops']]],
- ['sys','🛠 系統',[['system','維護 / 排隊','super'],['admins','管理員 / 權限','super'],['backup','💾 備份','super'],['logs','操作紀錄','cs']]]];
+ ['sys','🛠 系統',[['system','維護 / 排隊','super'],['admins','管理員 / 權限','super'],['backup','💾 備份','super'],['wipe','🧨 一鍵刪檔','super'],['logs','操作紀錄','cs']]]];
 const RLV={super:3,ops:2,cs:1},RNM={super:'👑 超級管理員',ops:'🛠 營運',cs:'💬 客服'};let ROLE='cs';
 const canR=r=>(RLV[ROLE]||0)>=(RLV[r]||9);
 let TABS=[];function tabsBuild(){TABS=[];GROUPS.forEach(([g,gn,L])=>L.forEach(([k,n,r])=>{if(canR(r))TABS.push([k,n,g])}))}
@@ -153,7 +153,7 @@ async function boot(){const {data:{session}}=await sb.auth.getSession();if(!sess
   if(!w.admin){$('loginV').hidden=false;$('appV').hidden=true;
     $('lmsg').innerHTML=w.anyAdmin?'這個帳號沒有管理員權限。<br>請現有管理員到「管理員」頁新增你。<br><button class="s" id="lout">換帳號</button>':'目前還沒有任何管理員。<br><button class="p" id="lclaim">設定我為第一位管理員</button> <button class="s" id="lout">換帳號</button>';
     $('lout').onclick=async()=>{await sb.auth.signOut();location.reload()};if($('lclaim'))$('lclaim').onclick=async()=>{try{await rpc('admin_claim');toast('你已經是管理員了');boot()}catch(e){toast(e.message)}};return}
-  const {data:{user}}=await sb.auth.getUser();ME={uid:user.id,acct:(user.email||'').split('@')[0]};ROLE=w.role||'super';tabsBuild();$('who').textContent=ME.acct+' · '+(RNM[ROLE]||'');$('loginV').hidden=true;$('appV').hidden=false;
+  const {data:{user}}=await sb.auth.getUser();ME={uid:user.id,acct:(user.email||'').split('@')[0],email:user.email||''};ROLE=w.role||'super';tabsBuild();$('who').textContent=ME.acct+' · '+(RNM[ROLE]||'');$('loginV').hidden=true;$('appV').hidden=false;
   TAB=(location.hash||'#home').slice(1);if(!TABS.some(t=>t[0]===TAB))TAB='home';render()}
 addEventListener('hashchange',()=>{const t=location.hash.slice(1);if(TABS.some(x=>x[0]===t)&&t!==TAB){TAB=t;render()}});
 function navR(){const cur=(TABS.find(t=>t[0]===TAB)||[])[2];const G=GROUPS.filter(g=>TABS.some(t=>t[2]===g[0]));
@@ -422,6 +422,40 @@ A.svres=async(u,id)=>{if(!sure('svres'+id,'把玩家存檔還原到這份'))retu
 // ---------- 備份 ----------
 let BK=null,BKQ='',BKbusy=0;const kb=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
 const bkSave=d=>{try{const S=JSON.parse(d.json);return {castle:S.castle,pets:Object.keys(S.pets||{}).length,coin:S.coin,name:S.name}}catch(e){return null}};
+let GB={h:24,m:3000};
+V.gembig=async()=>{const L=await rpc('admin_gem_big',{p_hours:GB.h,p_min:GB.m});
+  return `<div class="card"><h2>💎 大額鑽石獲得 <small>一次拿到很多鑽石的紀錄(不含儲值),用來抓異常或作弊。點玩家可以看詳細資料</small></h2>
+    <div class="row">期間 <select id="gbH">${[[24,'24 小時'],[72,'3 天'],[168,'7 天'],[720,'30 天']].map(([v,t])=>`<option value="${v}"${GB.h==v?' selected':''}>${t}</option>`).join('')}</select>
+    單次 ≥ <input id="gbM" type="number" min="1" value="${GB.m}" style="width:110px"> 💎 <button class="s" data-a="gbq">查詢</button></div>
+    ${L.length?`<div class="tw"><table><thead><tr><th>時間</th><th>玩家</th><th class="n">數量</th><th>來源</th><th class="n">目前鑽石</th></tr></thead><tbody>${L.map(x=>`<tr class="click" data-a="pdet:${x.uid}"><td>${new Date(x.at).toLocaleString('zh-TW',{hour12:false})}</td><td><b>${esc(x.name||'—')}</b><br><small class="mut">${esc(x.acct||x.uid.slice(0,8))}</small></td><td class="n"><b>+${fmt(x.delta)}</b></td><td>${esc(REASON(x.reason))}<br><small class="mut">${esc(x.reason||'')}</small></td><td class="n">${x.gem==null?'—':fmt(x.gem)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">這段期間沒有符合條件的紀錄</div>'}</div>`};
+A.gbq=()=>{GB.h=+($('gbH')||{}).value||24;GB.m=Math.max(1,Math.round(+($('gbM')||{}).value||3000));render()};
+const WPCSS=(()=>{const st=document.createElement('style');st.textContent='.wpck{display:flex;gap:10px;align-items:flex-start;justify-content:flex-start;text-align:left;margin:6px 0;font-weight:600;cursor:pointer}.wpck input{width:18px;height:18px;flex:none;margin:2px 0 0}';document.head.appendChild(st)})();const WIPE_PH='確認刪除所有玩家進度';let WPT=null,WPC=0;
+V.wipe=async()=>{const R=await rpc('admin_wipe_preview'),b=R.backup,w=R.wipe,ago=b&&b.at?(Date.now()-new Date(b.at).getTime())/36e5:1e9;clearInterval(WPT);WPC=0;
+  const h=`<div class="card" style="border-color:var(--bad)"><h2>🧨 一鍵刪檔 <small>清空所有玩家的遊戲進度,讓全部人從頭開始。<b style="color:var(--bad)">刪除後無法復原</b></small></h2>
+    <p>會刪除:所有玩家存檔、鑽石錢包與保底、鑽石紀錄、天梯與防守紀錄、信箱、交易所、公會(含聊天與紀錄)、團隊 Boss 紀錄、守塔排行、抽獎券與抽獎紀錄、跑馬燈、存檔歷史、登入狀態;電腦玩家也會一起重置。</p>
+    <p>會保留:玩家帳號密碼、管理員、停權名單、操作紀錄、遊戲設定與獎勵設定、公告、兌換碼、活動排程、實體獎品得獎紀錄、首儲紀錄、邀請紀錄。</p>
+    <p class="mut">目前:${fmt(R.players)} 份玩家存檔 · ${fmt(R.wallets)} 個錢包 · ${fmt(R.payers)} 位儲值玩家(累計 💎${fmt(R.topup)})${w&&w.at?` · 上次刪檔:${new Date(w.at).toLocaleString('zh-TW',{hour12:false})}`:''}</p></div>
+  <div class="card act"><h2>選項</h2>
+    <label class="wpck"><input type="checkbox" id="wpRf" checked> 返還儲值鑽石:把每位玩家累計儲值的鑽石寄到信箱(${fmt(R.payers)} 人,共 💎${fmt(R.topup)}),儲值累計與 VIP 等級保留</label>
+    <label class="wpck"><input type="checkbox" id="wpCs"> 同時清除客服回報(${fmt(R.tickets)} 筆)與私訊(${fmt(R.dm)} 筆)</label></div>
+  <div class="card act"><h2>防誤按確認(5 道)</h2>
+    <p>① 上次備份:${b&&b.at?`<b style="color:${ago>24?'var(--bad)':'inherit'}">${new Date(b.at).toLocaleString('zh-TW',{hour12:false})}</b>${ago>24?'(超過 24 小時,建議先到「💾 備份」重新匯出)':''}`:'<b style="color:var(--bad)">從來沒有備份過,請先到「💾 備份」匯出</b>'}</p>
+    <label class="wpck"><input type="checkbox" id="wpBk"> ② 我已經下載最新的備份檔</label>
+    <div class="row">③ 再輸入一次你的管理員密碼:<input type="password" id="wpPw" autocomplete="current-password" placeholder="管理員密碼"></div>
+    <div class="row">④ 輸入「<b>${WIPE_PH}</b>」:<input id="wpPh" placeholder="${WIPE_PH}" autocomplete="off"></div>
+    <div class="row">⑤ <button class="s" id="wpArm" data-a="wparm">開始 10 秒倒數</button><button class="d" id="wpGo" data-a="wpgo" disabled>🧨 確定刪檔</button><span id="wpMsg" class="mut"></span></div>
+    <p class="mut">按下後會自動開啟維護模式(玩家暫時進不了遊戲),確認一切正常後,請到「維護 / 排隊」手動關閉維護模式。</p></div>`;
+  setTimeout(()=>{['wpBk','wpPw','wpPh'].forEach(i=>{const e=$(i);if(e)e.oninput=e.onchange=wpUpd});wpUpd()},0);return h};
+function wpOk(){return !!($('wpBk')&&$('wpBk').checked&&$('wpPw').value&&$('wpPh').value.trim()===WIPE_PH)}
+function wpUpd(){const a=$('wpArm'),g=$('wpGo');if(!a)return;a.disabled=!wpOk()||WPC>0;if(!wpOk()){clearInterval(WPT);WPC=0;g.disabled=true;g.textContent='🧨 確定刪檔';$('wpMsg').textContent=''}}
+A.wparm=()=>{if(!wpOk())return toast('請先完成上面的確認');clearInterval(WPT);WPC=10;const g=$('wpGo');g.disabled=true;$('wpArm').disabled=true;
+  const tick=()=>{if(!$('wpGo')){clearInterval(WPT);return}if(!wpOk())return wpUpd();if(WPC<=0){clearInterval(WPT);g.disabled=false;g.textContent='🧨 確定刪檔(現在可以按)';$('wpMsg').textContent='';return}g.textContent=`🧨 確定刪檔(${WPC} 秒)`;$('wpMsg').textContent='請再想一下…';WPC--};tick();WPT=setInterval(tick,1000)};
+A.wpgo=async()=>{if(!wpOk()||WPC>0)return toast('請先完成上面的確認');const g=$('wpGo');g.disabled=true;g.textContent='驗證密碼中…';
+  try{const {error}=await sb.auth.signInWithPassword({email:ME.email||em(ME.acct),password:$('wpPw').value});if(error)throw new Error(/Invalid/.test(error.message)?'密碼錯誤,沒有刪除任何資料':error.message);
+    g.textContent='刪檔中…請不要關閉頁面';const r=await rpc('admin_wipe',{p_confirm:$('wpPh').value.trim(),p_refund:$('wpRf').checked,p_clear_cs:$('wpCs').checked});
+    const n=Object.values(r.rows||{}).reduce((a,x)=>a+(+x||0),0);$('main').innerHTML=`<div class="card"><h2>✅ 刪檔完成</h2><p>共刪除 ${fmt(n)} 筆資料${r.refund_n?`,已寄出 ${fmt(r.refund_n)} 封儲值返還信(共 💎${fmt(r.refund_gem)})`:''}。</p><p>玩家下次開遊戲會看到「伺服器已重置,歡迎回來」,並從頭開始。</p><p><b>維護模式目前是開啟的</b>,確認沒問題後請到「🛠 系統 → 維護 / 排隊」關閉。</p><div class="row"><button class="p" data-a="wpdone">前往維護設定</button></div></div>`;bind($('main'))}
+  catch(e){toast(e.message);g.textContent='🧨 確定刪檔';wpUpd();g.disabled=!wpOk()}};
+A.wpdone=()=>A.go('system');
 V.backup=async()=>{const R=await rpc('admin_backup_tables'),b=R.last,tot=R.tables.reduce((a,x)=>a+x.n,0);
   let h=`<div class="card"><h2>💾 匯出全部資料 <small>Supabase 免費方案沒有自動備份,建議每週按一次,把檔案存在電腦或雲端硬碟</small></h2>
     <p>上次備份:${b&&b.at?`<b>${new Date(b.at).toLocaleString('zh-TW',{hour12:false})}</b> · ${fmt(b.rows)} 筆 · ${kb(b.bytes)} · ${esc(b.by||'')}`:'<b style="color:var(--bad)">從來沒有備份過</b>'}</p>
@@ -605,7 +639,7 @@ let GST=null;document.addEventListener('input',e=>{if(e.target.id!=='gsq')return
 document.addEventListener('click',e=>{if(!e.target.closest||!e.target.closest('.gs')){const b=$('gsr');if(b)b.hidden=true}});
 // ---------- 總覽:待處理事項 ----------
 async function todoCard(){let T;try{T=await rpc('admin_todo')}catch(e){return ''}const it=[];const add=(n,v,tab,hot,r)=>{if(r&&!canR(r))return;it.push(`<a href="#${tab}" class="${hot&&v?'hot':''}"><span>${n}</span><b>${fmt(v)}</b></a>`)};
-  add('📮 待回覆客服',T.tickets,'tickets',1,'cs');add('💬 未讀私訊',T.dm,'dm',1,'cs');add('🐞 24 小時系統錯誤',T.errors,'tickets',1,'cs');add('⚠ 存檔異常待處理',T.flags,'saves',1,'cs');add('🎡 抽獎待審核',T.raffle,'raffle',1,'ops');add('💎 24 小時大額鑽石(≥3000)',T.gem_big,'players',1,'cs');add('🟢 目前在線',T.online,'metrics',0,'cs');add('⛔ 24 小時新停權',T.banned_today,'players',0,'cs');
+  add('📮 待回覆客服',T.tickets,'tickets',1,'cs');add('💬 未讀私訊',T.dm,'dm',1,'cs');add('🐞 24 小時系統錯誤',T.errors,'tickets',1,'cs');add('⚠ 存檔異常待處理',T.flags,'saves',1,'cs');add('🎡 抽獎待審核',T.raffle,'raffle',1,'ops');add('💎 24 小時大額鑽石(≥3000)',T.gem_big,'gembig',1,'cs');add('🟢 目前在線',T.online,'metrics',0,'cs');add('⛔ 24 小時新停權',T.banned_today,'players',0,'cs');
   return `${T.maint?'<div class="card" style="border-color:var(--bad);background:var(--badbg)"><b style="color:var(--bad)">🛠 目前是維護模式,一般玩家無法進入遊戲</b> <a href="#system">前往關閉</a></div>':''}<div class="card"><h2>待處理事項 <small>紅框表示有需要處理的項目;點一下前往</small></h2><div class="todo">${it.join('')}</div>${T.cfg&&T.cfg.ver?`<p class="mut" style="margin:8px 0 0">遊戲數值設定:第 ${T.cfg.ver} 版(${tm(T.cfg.at)})${canR('super')?' · <a href="#cfg_hist">版本紀錄</a>':''}</p>`:''}</div>`}
 // ---------- 玩家詳情加強 ----------
 const EQN={collar:'項圈',hat:'帽子',charm:'護符',bell:'鈴鐺'},EQTK=['collar','hat','charm','bell'],RARC=['#8a9aa8','#3fa9ff','#b45cff','#ffb020','#ff3a6a'];
