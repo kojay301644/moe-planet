@@ -2767,3 +2767,131 @@ begin
   return v;
 end $$;
 grant execute on function public.admin_home_notice_set(jsonb) to authenticated;
+
+-- ================= 團隊 Boss 限時(每天 13:00、19:00、22:00 各 10 分鐘,伺服器排名發獎) =================
+create table if not exists public.raid_win(wid int primary key, killed_at timestamptz, settled boolean not null default false, settled_at timestamptz);
+create table if not exists public.raid_run(wid int not null, uid uuid not null, joined timestamptz not null default now(), dmg bigint not null default 0, last timestamptz, quit boolean not null default false, cap int not null default 0, primary key(wid, uid));
+create index if not exists raid_run_wid_idx on public.raid_run(wid, dmg desc);
+alter table public.raid_win enable row level security;
+alter table public.raid_run enable row level security;
+
+-- 時段:台灣時間 13、19、22 點,每場 10 分鐘;wid = 台灣日序 × 3 + 時段
+create or replace function public.moe_raid_st(p_wid int) returns timestamptz language sql immutable as $$
+  select to_timestamp((p_wid / 3)::bigint * 86400 - 28800 + (array[13,19,22])[p_wid % 3 + 1] * 3600) $$;
+create or replace function public.moe_raid_last() returns int language plpgsql stable as $$
+declare w int := (floor((extract(epoch from now()) + 28800) / 86400)::int + 1) * 3 + 2;
+begin while moe_raid_st(w) > now() loop w := w - 1; end loop; return w; end $$;
+create or replace function public.moe_raid_hp() returns bigint language sql immutable as $$ select 4000000::bigint $$;
+
+-- 伺服器產生一件裝備(格式和遊戲相同)
+create or replace function public.moe_raid_eq(p_set text, p_rar int) returns jsonb language plpgsql volatile as $$
+declare ks text[] := array['atk','hp','def','crit','critd','cdr','boss','siege','heal']; lo numeric[] := array[2,2,2,2,6,1.5,4,5,5]; hi numeric[] := array[4,4,4,4,12,3,8,10,10];
+  subs jsonb := '[]'::jsonb; used int[] := '{}'; i int;
+begin
+  while jsonb_array_length(subs) < p_rar loop
+    i := 1 + floor(random() * 9)::int; if i = any(used) then continue; end if; used := used || i;
+    subs := subs || jsonb_build_array(jsonb_build_array(ks[i], round(lo[i] + random()::numeric * (hi[i] - lo[i]), 1)));
+  end loop;
+  return jsonb_build_object('type', (array['collar','hat','charm','bell'])[1 + floor(random() * 4)::int], 'rar', p_rar, 'lv', 0, 'set', p_set, 'subs', subs);
+end $$;
+
+-- 結算:依傷害排名寄出獎勵(只會結算一次)
+create or replace function public.moe_raid_settle(p_wid int) returns void language plpgsql security definer set search_path = public as $$
+declare W raid_win; r record; rk int := 0; st text := (array['guard','wind','hunt'])[p_wid % 3 + 1]; bn text := (array['深淵章魚王','遠古樹人','暗影星狼'])[p_wid % 3 + 1];
+  g int; rr int; eq jsonb; killed boolean; fin timestamptz;
+begin
+  select * into W from raid_win where wid = p_wid for update;
+  if W.wid is null or W.settled then return; end if;
+  fin := coalesce(W.killed_at, moe_raid_st(p_wid) + interval '10 minutes');
+  if now() < fin + interval '30 seconds' then return; end if;
+  killed := W.killed_at is not null;
+  for r in select * from raid_run where wid = p_wid and dmg > 0 order by dmg desc, joined loop
+    rk := rk + 1;
+    g := case when rk = 1 then 150 when rk <= 3 then 100 when rk <= 10 then 60 else 30 end;
+    rr := case when rk = 1 then 3 when rk <= 3 then 2 when rk <= 10 then 1 else 0 end;
+    eq := case when rk = 1 then moe_raid_eq(st, 3) when rk <= 3 then moe_raid_eq(st, 2) when rk <= 10 and random() < .5 then moe_raid_eq(st, 2) else null end;
+    insert into inbox(uid, gem, credit, item, kind, title, note, bonus) values (r.uid, g, true, eq, 'system', '團隊 Boss 結算:第 ' || rk || ' 名',
+      bn || (case when killed then '(已打倒)' else '(時間到)' end) || ' · 你的傷害 ' || to_char(r.dmg, 'FM999,999,999') || ',排名第 ' || rk || ' 名',
+      jsonb_strip_nulls(jsonb_build_object('ore', 15, 'enh', 5, 'reroll', nullif(rr, 0), 'ti', case when rk = 1 then 'sp_raid' end)));
+    if killed then
+      insert into inbox(uid, gem, credit, item, kind, title, note) values (r.uid, 50, true, moe_raid_eq(st, case when random() < .05 then 3 else 2 end), 'system', '團隊 Boss 打倒獎勵', bn || ' 被大家打倒了!有參戰的守護員都能領');
+    end if;
+  end loop;
+  update raid_win set settled = true, settled_at = now() where wid = p_wid;
+end $$;
+revoke execute on function public.moe_raid_settle(int) from public, anon, authenticated;
+
+create or replace function public.moe_raid_settle_due() returns void language plpgsql security definer set search_path = public as $$
+declare w int;
+begin
+  for w in select wid from raid_win where not settled and coalesce(killed_at, moe_raid_st(wid) + interval '10 minutes') + interval '30 seconds' < now() order by wid limit 5 loop
+    begin perform moe_raid_settle(w); exception when others then null; end;
+  end loop;
+end $$;
+revoke execute on function public.moe_raid_settle_due() from public, anon, authenticated;
+
+-- 排行(戰鬥中每 15 秒讀一次)
+create or replace function public.raid_board(p_wid int default null) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := auth.uid(); wd int := coalesce(p_wid, moe_raid_last()); WN raid_win; tot bigint; me raid_run; myrk int;
+begin
+  perform moe_raid_settle_due();
+  select * into WN from raid_win where wid = wd;
+  select coalesce(sum(dmg), 0) into tot from raid_run where wid = wd;
+  select * into me from raid_run where wid = wd and uid = u;
+  if me.uid is not null then select count(*) + 1 into myrk from raid_run where wid = wd and (dmg > me.dmg or (dmg = me.dmg and joined < me.joined)); end if;
+  return jsonb_build_object('wid', wd, 'st', extract(epoch from moe_raid_st(wd)) * 1000, 'en', extract(epoch from moe_raid_st(wd) + interval '10 minutes') * 1000, 'now', extract(epoch from now()) * 1000,
+    'hp', moe_raid_hp(), 'total', tot, 'killed', WN.killed_at is not null, 'settled', coalesce(WN.settled, false), 'n', (select count(*) from raid_run where wid = wd),
+    'me', case when me.uid is null then null else jsonb_build_object('d', me.dmg, 'quit', me.quit, 'rank', myrk) end,
+    'list', (select coalesce(jsonb_agg(jsonb_build_object('n', coalesce(nullif(left(d.data->>'n', 16), ''), '守護員'), 'd', x.dmg, 'me', x.uid = u, 'av', d.data->>'av') order by x.dmg desc, x.joined), '[]'::jsonb)
+      from (select * from raid_run where wid = wd and dmg > 0 order by dmg desc, joined limit 30) x left join docs d on d.path = 'arena/' || x.uid::text));
+end $$;
+
+-- 進場:每個時段只有一次機會(斷線沒按退出可以重新進場)
+create or replace function public.raid_join() returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); w int := moe_raid_last(); R raid_run; pw numeric;
+begin
+  if now() >= moe_raid_st(w) + interval '10 minutes' then raise exception '團隊 Boss 還沒開打'; end if;
+  insert into raid_win(wid) values (w) on conflict do nothing;
+  if (select killed_at from raid_win where wid = w) is not null then raise exception 'Boss 已經被打倒了'; end if;
+  select * into R from raid_run where wid = w and uid = u;
+  if R.uid is not null and R.quit then raise exception '你已經退出這一場,下一個時段再來'; end if;
+  if R.uid is null then
+    begin select coalesce((data->>'pw')::numeric, 0) into pw from docs where path = 'arena/' || u::text; exception when others then pw := 0; end;
+    insert into raid_run(wid, uid, cap) values (w, u, least(15000, greatest(800, round(coalesce(pw, 0) * .15 + 500)))::int);
+  end if;
+  return raid_board(w);
+end $$;
+
+-- 回報累計傷害:依進場後經過的秒數限制上限
+create or replace function public.raid_report(p_wid int, p_dmg bigint, p_quit boolean default false) returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := moe_uid(); R raid_run; W raid_win; lim timestamptz; sec numeric; d bigint; tot bigint;
+begin
+  select * into R from raid_run where wid = p_wid and uid = u for update;
+  if R.uid is null then raise exception '沒有進場紀錄'; end if;
+  select * into W from raid_win where wid = p_wid;
+  lim := coalesce(W.killed_at, moe_raid_st(p_wid) + interval '10 minutes');
+  if R.quit or now() > lim + interval '20 seconds' then return raid_board(p_wid); end if;
+  sec := greatest(0, extract(epoch from (least(now(), lim) - R.joined)));
+  d := least(greatest(coalesce(p_dmg, 0), 0), floor(sec * R.cap)::bigint);
+  update raid_run set dmg = greatest(dmg, d), last = now(), quit = quit or coalesce(p_quit, false) where wid = p_wid and uid = u;
+  if W.killed_at is null then
+    select coalesce(sum(dmg), 0) into tot from raid_run where wid = p_wid;
+    if tot >= moe_raid_hp() then update raid_win set killed_at = now() where wid = p_wid and killed_at is null; end if;
+  end if;
+  return raid_board(p_wid);
+end $$;
+grant execute on function public.raid_board(int), public.raid_join(), public.raid_report(int,bigint,boolean) to authenticated;
+
+-- 後台:最近幾場的前 10 名(看傷害是否異常)
+create or replace function public.admin_raid() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare a uuid := moe_admin();
+begin
+  return (select coalesce(jsonb_agg(x order by (x->>'wid')::int desc), '[]'::jsonb) from (
+    select jsonb_build_object('wid', w.wid, 'st', moe_raid_st(w.wid), 'killed', w.killed_at, 'settled', w.settled, 'n', (select count(*) from raid_run r where r.wid = w.wid),
+      'total', (select coalesce(sum(dmg),0) from raid_run r where r.wid = w.wid),
+      'top', (select coalesce(jsonb_agg(jsonb_build_object('uid', r.uid, 'n', d.data->>'n', 'd', r.dmg, 'cap', r.cap, 'pw', (d.data->>'pw')::numeric, 'quit', r.quit,
+          'dps', round(r.dmg / greatest(1, extract(epoch from (coalesce(r.last, r.joined) - r.joined))))) order by r.dmg desc), '[]'::jsonb)
+        from (select * from raid_run r where r.wid = w.wid order by dmg desc limit 10) r left join docs d on d.path = 'arena/' || r.uid::text)) x
+    from (select * from raid_win order by wid desc limit 15) w) q);
+end $$;
+grant execute on function public.admin_raid() to authenticated;
