@@ -2892,7 +2892,7 @@ begin
   lim := coalesce(W.killed_at, moe_raid_st(p_wid) + interval '10 minutes');
   if R.quit or now() > lim + interval '20 seconds' or now() < moe_raid_st(p_wid) then return raid_board(p_wid); end if;
   sec := greatest(0, extract(epoch from (least(now(), lim) - greatest(R.joined, moe_raid_st(p_wid)))));
-  d := least(greatest(coalesce(p_dmg, 0), 0), floor(sec * R.cap)::bigint);
+  d := least(greatest(coalesce(p_dmg, 0), 0), floor(sec * R.cap * (case when p_wid >= 900000000 then 5 else 1 end))::bigint);
   update raid_run set dmg = greatest(dmg, d), last = now(), quit = quit or coalesce(p_quit, false) where wid = p_wid and uid = u;
   if W.killed_at is null then
     select coalesce(sum(dmg), 0) into tot from raid_run where wid = p_wid;
