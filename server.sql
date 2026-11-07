@@ -2743,3 +2743,27 @@ create or replace function public.moe_backup_list() returns text[] language sql 
     'raffle_win','raffle_spin','raffle_tix','dm','invites','fcodes','gem_once','gem_cnt','name_log']) t
   where to_regclass('public.' || t) is not null $$;
 revoke execute on function public.moe_backup_list() from public, anon, authenticated;
+
+-- ================= 主頁公告 =================
+insert into settings(k, v) values ('home_notice', '{"on":false}'::jsonb) on conflict (k) do nothing;
+drop policy if exists settings_read on public.settings;
+create policy settings_read on public.settings for select to anon, authenticated using (k in ('maint','wipe','raffle','home_notice'));
+
+create or replace function public.admin_home_notice_set(p jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare a uuid := moe_admin(); ls jsonb := '[]'::jsonb; x text; col text; at text; av text; v jsonb;
+begin
+  for x in select left(btrim(regexp_replace(e, '[[:cntrl:]<>]', '', 'g')), 20) from jsonb_array_elements_text(coalesce(p->'lines','[]'::jsonb)) e limit 3 loop
+    if x <> '' then ls := ls || to_jsonb(x); end if;
+  end loop;
+  col := coalesce(p->>'color','orange'); if col not in ('orange','blue','green','purple','red') then col := 'orange'; end if;
+  at := coalesce(p->>'act','none'); av := left(coalesce(p->>'v',''), 200);
+  if at = 'sheet' and av !~ '^[a-z]{2,12}$' then at := 'none'; av := ''; end if;
+  if at = 'url' and av !~ '^https://[^\s<>"]+$' then at := 'none'; av := ''; end if;
+  if at not in ('none','sheet','url') then at := 'none'; av := ''; end if;
+  v := jsonb_build_object('on', coalesce((p->>'on')::boolean, false), 'lines', ls, 'color', col, 'act', at, 'v', av,
+    'start', nullif(left(coalesce(p->>'start',''),25),''), 'end', nullif(left(coalesce(p->>'end',''),25),''), 'at', now());
+  insert into settings(k, v) values ('home_notice', v) on conflict (k) do update set v = excluded.v;
+  perform alog('home_notice', null, v);
+  return v;
+end $$;
+grant execute on function public.admin_home_notice_set(jsonb) to authenticated;
