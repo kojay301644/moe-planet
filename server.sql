@@ -5,6 +5,25 @@
 create or replace function public.moe_cfg() returns jsonb language plpgsql stable security definer set search_path = public as $$
 begin return coalesce((select v->'d' from settings where k = 'game_cfg'), '{}'::jsonb); exception when undefined_table then return '{}'::jsonb; end $$;
 revoke execute on function public.moe_cfg() from public, anon, authenticated;
+-- 後台自訂獎勵:轉成信箱 bonus、裝備
+create or replace function public.moe_rw_bonus(R jsonb) returns jsonb language plpgsql immutable as $$
+declare o jsonb := '{}'::jsonb; kk text;
+begin
+  if R is null then return '{}'::jsonb; end if;
+  foreach kk in array array['coin','candy','stones','ore','enh','reroll','rtix','skv'] loop
+    if (R->>kk) ~ '^[0-9]+$' and (R->>kk)::bigint > 0 then o := o || jsonb_build_object(kk, least((R->>kk)::bigint, 100000000)); end if;
+  end loop;
+  if R->'sh' is not null and (R->'sh'->>'k') ~ '^[a-z]+$' then o := o || jsonb_build_object('sh', jsonb_build_object('k', R->'sh'->>'k', 'n', least(greatest(coalesce((R->'sh'->>'n')::int, 1), 1), 999))); end if;
+  if coalesce(R->>'ti', '') ~ '^[a-z0-9_]+$' then o := o || jsonb_build_object('ti', R->>'ti'); end if;
+  return o;
+end $$;
+create or replace function public.moe_rw_eq(R jsonb, p_set text) returns jsonb language plpgsql volatile as $$
+declare rr int := least(greatest(coalesce((R->'eq'->>'r')::int, 0), 0), 3); s text := coalesce(nullif(R->'eq'->>'s', ''), 'any');
+begin
+  if rr < 1 then return null; end if;
+  if s = 'any' or s not in ('fire','ice','elec','guard','wind','siege','hunt') then s := coalesce(p_set, (array['fire','ice','elec','guard','wind','siege','hunt'])[1 + floor(random() * 7)::int]); end if;
+  return moe_raid_eq(s, rr);
+end $$;
 create or replace function public.moe_rc(k text, d numeric) returns numeric language plpgsql stable security definer set search_path = public as $$
 begin return coalesce((moe_cfg()->'raid'->>k)::numeric, d); end $$;
 
@@ -2457,7 +2476,7 @@ begin
     k := left(coalesce(x->>0, ''), 80); n := coalesce((x->>1)::numeric, 0)::int;
     pp := split_part(k, ':', 1); suf := substr(k, length(pp) + 2);
     select * into r from gem_rule where p = pp and p <> 'misc';
-    if found then mul := coalesce((moe_cfg()->'rw'->>(case when pp in ('sign','signb','signf') then 'sign' else pp end))::numeric, 1); if mul <> 1 then r.maxn := ceil(r.maxn * mul); r.cap := ceil(r.cap * mul); end if; end if;
+    if found then mul := coalesce((moe_cfg()->'rw'->>(case when pp in ('sign','signb','signf') then 'sign' else pp end))::numeric, 1); if mul <> 1 then r.maxn := ceil(r.maxn * mul); r.cap := ceil(r.cap * mul); end if; r.maxn := greatest(r.maxn, ceil(coalesce((moe_cfg()->'gemmax'->>(case when pp in ('sign','signb') then 'sign' else pp end))::numeric, 0) * mul)); end if;
     if not found then why := 'unknown';
     elsif n <= 0 then why := 'amount';
     elsif r.re is not null and suf !~ r.re then why := 'id';
@@ -2488,15 +2507,18 @@ end $$;
 update gem_rule set per = 'once', lim = 1, cap = null where p = 'signb';
 -- 守塔每週排行:鑽石改成領信時入帳,並補發先前沒入帳的
 create or replace function public.td_claim() returns jsonb language plpgsql security definer set search_path = public as $$
-declare u uuid := moe_uid(); pw int := moe_week() - 1; r int; g int; T td_week;
+declare u uuid := moe_uid(); pw int := moe_week() - 1; r int; g int; T td_week; RR jsonb;
 begin
   select * into T from td_week where uid = u and wk = pw for update;
   if T.uid is null or T.claimed then return jsonb_build_object('gem',0); end if;
   select rn into r from (select uid, row_number() over () rn from td_board(pw)) q where q.uid = u;
   update td_week set claimed = true where uid = u and wk = pw;
   g := case when r is null then 0 when r = 1 then coalesce((moe_cfg()->'td'->>'w1')::int, 600) when r <= 3 then coalesce((moe_cfg()->'td'->>'w2')::int, 400) when r <= 10 then coalesce((moe_cfg()->'td'->>'w3')::int, 200) when r <= 50 then coalesce((moe_cfg()->'td'->>'w4')::int, 60) else 0 end;
-  if g > 0 then
-    insert into inbox(uid, gem, credit, note, title, kind) values (u, g, true, '上週守塔挑戰無盡模式第 ' || r || ' 名(' || T.best || ' 波),獎勵請收下!', '🛡️ 守塔排行獎勵', 'system');
+  RR := moe_cfg()->'td'->'R'->(case when r = 1 then '1' when r <= 3 then '2' when r <= 10 then '3' when r <= 50 then '4' end);
+  if r is not null and RR is not null then g := coalesce((RR->>'gem')::int, 0); end if;
+  if g > 0 or RR is not null then
+    insert into inbox(uid, gem, credit, note, title, kind, item, bonus) values (u, g, true, '上週守塔挑戰無盡模式第 ' || r || ' 名(' || T.best || ' 波),獎勵請收下!', '🛡️ 守塔排行獎勵', 'system',
+      case when RR is not null then moe_rw_eq(RR, null) end, case when RR is not null then nullif(moe_rw_bonus(RR), '{}'::jsonb) end);
   end if;
   return jsonb_build_object('gem',g,'rank',r);
 end $$;
@@ -2847,7 +2869,7 @@ end $$;
 -- 結算:依傷害排名寄出獎勵(只會結算一次)
 create or replace function public.moe_raid_settle(p_wid int) returns void language plpgsql security definer set search_path = public as $$
 declare W raid_win; r record; rk int := 0; st text := (array['guard','wind','hunt'])[p_wid % 3 + 1]; bn text := (array['深淵章魚王','遠古樹人','暗影星狼'])[p_wid % 3 + 1];
-  g int; rr int; eq jsonb; killed boolean; fin timestamptz;
+  g int; rr int; eq jsonb; killed boolean; fin timestamptz; RWR jsonb; RWA jsonb := moe_cfg()->'raid'->'R'->'all'; RWK jsonb := moe_cfg()->'raid'->'R'->'kill'; bo jsonb;
 begin
   select * into W from raid_win where wid = p_wid for update;
   if W.wid is null or W.settled then return; end if;
@@ -2866,11 +2888,17 @@ begin
     g := case when rk = 1 then moe_rc('g1',150) when rk <= 3 then moe_rc('g2',100) when rk <= 10 then moe_rc('g3',60) else moe_rc('g4',30) end;
     rr := case when rk = 1 then moe_rc('r1',3) when rk <= 3 then moe_rc('r2',2) when rk <= 10 then moe_rc('r3',1) else 0 end;
     eq := case when rk = 1 then moe_raid_eq(st, 3) when rk <= 3 then moe_raid_eq(st, 2) when rk <= 10 and random() < .5 then moe_raid_eq(st, 2) else null end;
-    insert into inbox(uid, gem, credit, item, kind, title, note, bonus) values (r.uid, g, true, eq, 'system', '團隊 Boss 結算:第 ' || rk || ' 名',
+    bo := jsonb_strip_nulls(jsonb_build_object('reroll', nullif(rr, 0), 'ti', case when rk = 1 then 'sp_raid' end));
+    RWR := moe_cfg()->'raid'->'R'->(case when rk = 1 then '1' when rk <= 3 then '2' when rk <= 10 then '3' else '4' end);
+    if RWR is not null then g := coalesce((RWR->>'gem')::int, 0); eq := moe_rw_eq(RWR, st); bo := moe_rw_bonus(RWR); end if;
+    bo := coalesce(case when RWA is not null then moe_rw_bonus(RWA) else jsonb_build_object('ore', moe_rc('ore',15)::int, 'enh', moe_rc('enh',5)::int) end, '{}'::jsonb) || bo;
+    insert into inbox(uid, gem, credit, item, kind, title, note, bonus) values (r.uid, g + coalesce((RWA->>'gem')::int, 0), true, eq, 'system', '團隊 Boss 結算:第 ' || rk || ' 名',
       bn || (case when killed then '(已打倒)' else '(時間到)' end) || ' · 你的傷害 ' || to_char(r.dmg, 'FM999,999,999') || ',排名第 ' || rk || ' 名',
-      jsonb_strip_nulls(jsonb_build_object('ore', moe_rc('ore',15)::int, 'enh', moe_rc('enh',5)::int, 'reroll', nullif(rr, 0), 'ti', case when rk = 1 then 'sp_raid' end)));
+      nullif(bo, '{}'::jsonb));
     if killed then
-      insert into inbox(uid, gem, credit, item, kind, title, note) values (r.uid, moe_rc('kg',50)::int, true, moe_raid_eq(st, case when random() < .05 then 3 else 2 end), 'system', '團隊 Boss 打倒獎勵', bn || ' 被大家打倒了!有參戰的守護員都能領');
+      insert into inbox(uid, gem, credit, item, kind, title, note, bonus) values (r.uid, case when RWK is not null then coalesce((RWK->>'gem')::int, 0) else moe_rc('kg',50)::int end, true,
+        case when RWK is not null then moe_rw_eq(RWK, st) else moe_raid_eq(st, case when random() < .05 then 3 else 2 end) end, 'system', '團隊 Boss 打倒獎勵', bn || ' 被大家打倒了!有參戰的守護員都能領',
+        case when RWK is not null then nullif(moe_rw_bonus(RWK), '{}'::jsonb) end);
     end if;
   end loop;
   update raid_win set settled = true, settled_at = now() where wid = p_wid;
